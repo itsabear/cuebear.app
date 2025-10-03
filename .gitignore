@@ -1,0 +1,35 @@
+# Xcode
+*.xcuserstate
+*.xcuserdatad
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+xcuserdata/
+
+# Build products
+build/
+DerivedData/
+*.app
+*.dSYM.zip
+*.dSYM
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Temporary files
+*.tmp
+*.temp
+
+# Archives
+*.zip
+*.tar.gz
+
+# Debug/test files (keep in local only)
+DEBUG_REPORT.md
+PERFORMANCE_TEST_PLAN.md
+QUICK_TEST_SCRIPT.md
+
+# App Store metadata (optional - uncomment if you want to keep private)
+# APP_STORE_METADATA.md

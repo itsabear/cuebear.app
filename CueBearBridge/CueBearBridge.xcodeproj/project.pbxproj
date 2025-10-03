@@ -1,0 +1,259 @@
+// !$*UTF8*$!
+{
+  archiveVersion = 1;
+  classes = {};
+  objectVersion = 56;
+  objects = {
+
+/* Begin PBXBuildFile section */
+    AA1111000000000000000001 /* CueBearBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000001 /* CueBearBridgeApp.swift */; };
+    AA1111000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000002 /* ContentView.swift */; };
+    AA1111000000000000000003 /* IProxyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000003 /* IProxyManager.swift */; };
+    AA1111000000000000000004 /* MacConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000004 /* MacConnectionManager.swift */; };
+    AA1111000000000000000005 /* MIDIManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000005 /* MIDIManager.swift */; };
+    AA1111000000000000000008 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000008 /* Logger.swift */; };
+    AA1111000000000000000009 /* ConnectionSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000009 /* ConnectionSecurity.swift */; };
+    AA111100000000000000000A /* LoginItemManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA111200000000000000000A /* LoginItemManager.swift */; };
+    AA1111000000000000000006 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000006 /* Assets.xcassets */; };
+    AA1111000000000000000007 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000007 /* Info.plist */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+    AA1112000000000000000000 /* CueBearBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CueBearBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+    AA1112000000000000000001 /* CueBearBridgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueBearBridgeApp.swift; sourceTree = "<group>"; };
+    AA1112000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+    AA1112000000000000000003 /* IProxyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IProxyManager.swift; sourceTree = "<group>"; };
+    AA1112000000000000000004 /* MacConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacConnectionManager.swift; sourceTree = "<group>"; };
+    AA1112000000000000000005 /* MIDIManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIManager.swift; sourceTree = "<group>"; };
+    AA1112000000000000000008 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
+    AA1112000000000000000009 /* ConnectionSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionSecurity.swift; sourceTree = "<group>"; };
+    AA111200000000000000000A /* LoginItemManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginItemManager.swift; sourceTree = "<group>"; };
+    AA1112000000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+    AA1112000000000000000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+    AA1100000000000000000000 = {
+      isa = PBXGroup;
+      children = (
+        AA1110000000000000000000 /* CueBearBridge */,
+        AA1199000000000000000000 /* Products */,
+      );
+      sourceTree = "<group>";
+    };
+    AA1110000000000000000000 /* CueBearBridge */ = {
+      isa = PBXGroup;
+      children = (
+        AA1112000000000000000001 /* CueBearBridgeApp.swift */,
+        AA1112000000000000000002 /* ContentView.swift */,
+        AA1112000000000000000003 /* IProxyManager.swift */,
+        AA1112000000000000000004 /* MacConnectionManager.swift */,
+        AA1112000000000000000005 /* MIDIManager.swift */,
+        AA1112000000000000000008 /* Logger.swift */,
+        AA1112000000000000000009 /* ConnectionSecurity.swift */,
+        AA111200000000000000000A /* LoginItemManager.swift */,
+        AA1112000000000000000006 /* Assets.xcassets */,
+        AA1112000000000000000007 /* Info.plist */,
+      );
+      sourceTree = "<group>";
+    };
+    AA1199000000000000000000 /* Products */ = {
+      isa = PBXGroup;
+      children = (
+        AA1112000000000000000000 /* CueBearBridge.app */,
+      );
+      name = Products;
+      sourceTree = "<group>";
+    };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+    AA1120000000000000000000 /* CueBearBridge */ = {
+      isa = PBXNativeTarget;
+      buildConfigurationList = AA1150000000000000000000 /* Build configuration list for PBXNativeTarget "CueBearBridge" */;
+      buildPhases = (
+        AA1130000000000000000000 /* Sources */,
+        AA1131000000000000000000 /* Resources */,
+        AA1132000000000000000000 /* Run Script - Embed iproxy (optional) */,
+      );
+      buildRules = (
+      );
+      dependencies = (
+      );
+      name = CueBearBridge;
+      productName = CueBearBridge;
+      productReference = AA1112000000000000000000 /* CueBearBridge.app */;
+      productType = "com.apple.product-type.application";
+    };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+    AA11A0000000000000000000 /* Project object */ = {
+      isa = PBXProject;
+      attributes = {
+        LastSwiftUpdateCheck = 1500;
+        LastUpgradeCheck = 1500;
+        ORGANIZATIONNAME = "CueBear";
+        TargetAttributes = {
+          AA1120000000000000000000 = {
+            CreatedOnToolsVersion = 15.0;
+          };
+        };
+      };
+      buildConfigurationList = AA1151000000000000000000 /* Build configuration list for PBXProject "CueBearBridge" */;
+      compatibilityVersion = "Xcode 15.0";
+      developmentRegion = en;
+      hasScannedForEncodings = 0;
+      knownRegions = (
+        en,
+      );
+      mainGroup = AA1100000000000000000000;
+      productRefGroup = AA1199000000000000000000 /* Products */;
+      projectDirPath = "";
+      projectRoot = "";
+      targets = (
+        AA1120000000000000000000 /* CueBearBridge */,
+      );
+    };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+    AA1131000000000000000000 /* Resources */ = {
+      isa = PBXResourcesBuildPhase;
+      buildActionMask = 2147483647;
+      files = (
+        AA1111000000000000000006 /* Assets.xcassets in Resources */,
+      );
+      runOnlyForDeploymentPostprocessing = 0;
+    };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+    AA1132000000000000000000 /* Run Script - Embed iproxy (optional) */ = {
+      isa = PBXShellScriptBuildPhase;
+      buildActionMask = 2147483647;
+      files = (
+      );
+      inputPaths = (
+      );
+      name = "Run Script - Embed iproxy (optional)";
+      outputPaths = (
+      "$(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)/Contents/MacOS/iproxy",
+);
+      runOnlyForDeploymentPostprocessing = 0;
+      shellPath = /bin/sh;
+      shellPath = /bin/sh;
+      shellScript = "set -e
+APP=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"
+HELPER_SRC=\"${SRCROOT}/Resources/Helpers/iproxy\"
+HELPER_DST=\"${APP}/Contents/MacOS/iproxy\"
+if [ -f \"$HELPER_SRC\" ]; then
+  echo \"Embedding iproxy…\"
+  cp -f \"$HELPER_SRC\" \"$HELPER_DST\"
+  chmod 755 \"$HELPER_DST\"
+fi
+# Embed any helper dylibs (optional)
+FRAMEWORKS_SRC=\"${SRCROOT}/Resources/Frameworks\"
+FRAMEWORKS_DST=\"${APP}/Contents/Frameworks\"
+mkdir -p \"$FRAMEWORKS_DST\"
+if [ -d \"$FRAMEWORKS_SRC\" ]; then
+  find \"$FRAMEWORKS_SRC\" -type f -name \"*.dylib\" -print0 | while IFS= read -r -d '' f; do
+    echo \"Embedding $(basename \"$f\")…\"
+    cp -f \"$f\" \"$FRAMEWORKS_DST/\"
+    chmod 755 \"$FRAMEWORKS_DST/$(basename \"$f\")\"
+  done
+fi
+# Ensure rpath points to embedded frameworks
+install_name_tool -add_rpath \"@executable_path/../Frameworks\" \"$APP/Contents/MacOS/iproxy\" 2>/dev/null || true
+";
+    };
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+    AA1130000000000000000000 /* Sources */ = {
+      isa = PBXSourcesBuildPhase;
+      buildActionMask = 2147483647;
+      files = (
+        AA1111000000000000000001 /* CueBearBridgeApp.swift in Sources */,
+        AA1111000000000000000002 /* ContentView.swift in Sources */,
+        AA1111000000000000000003 /* IProxyManager.swift in Sources */,
+        AA1111000000000000000004 /* MacConnectionManager.swift in Sources */,
+        AA1111000000000000000005 /* MIDIManager.swift in Sources */,
+        AA1111000000000000000008 /* Logger.swift in Sources */,
+        AA1111000000000000000009 /* ConnectionSecurity.swift in Sources */,
+        AA111100000000000000000A /* LoginItemManager.swift in Sources */,
+      );
+      runOnlyForDeploymentPostprocessing = 0;
+    };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+    AA1152000000000000000000 /* Debug */ = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+        CODE_SIGN_STYLE = Automatic;
+        CURRENT_PROJECT_VERSION = 1;
+        GENERATE_INFOPLIST_FILE = NO;
+        INFOPLIST_FILE = Info.plist;
+        IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+        MACOSX_DEPLOYMENT_TARGET = 13.0;
+        PRODUCT_BUNDLE_IDENTIFIER = com.cuebear.bridge.clean;
+        PRODUCT_NAME = "$(TARGET_NAME)";
+        SDKROOT = macosx;
+        SWIFT_EMIT_LOC_STRINGS = YES;
+        SWIFT_VERSION = 5.0;
+        USE_HEADERMAP = YES;
+        ALWAYS_SEARCH_USER_PATHS = NO;
+        SUPPORTS_MACCATALYST = NO;
+        TARGETED_DEVICE_FAMILY = "1,2";
+      };
+      name = Debug;
+    };
+    AA1153000000000000000000 /* Release */ = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+        CODE_SIGN_STYLE = Automatic;
+        CURRENT_PROJECT_VERSION = 1;
+        GENERATE_INFOPLIST_FILE = NO;
+        INFOPLIST_FILE = Info.plist;
+        IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+        MACOSX_DEPLOYMENT_TARGET = 13.0;
+        PRODUCT_BUNDLE_IDENTIFIER = com.cuebear.bridge.clean;
+        PRODUCT_NAME = "$(TARGET_NAME)";
+        SDKROOT = macosx;
+        SWIFT_EMIT_LOC_STRINGS = YES;
+        SWIFT_VERSION = 5.0;
+        USE_HEADERMAP = YES;
+        ALWAYS_SEARCH_USER_PATHS = NO;
+        SUPPORTS_MACCATALYST = NO;
+        TARGETED_DEVICE_FAMILY = "1,2";
+      };
+      name = Release;
+    };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+    AA1150000000000000000000 /* Build configuration list for PBXNativeTarget "CueBearBridge" */ = {
+      isa = XCConfigurationList;
+      buildConfigurations = (
+        AA1152000000000000000000 /* Debug */,
+        AA1153000000000000000000 /* Release */,
+      );
+      defaultConfigurationIsVisible = 0;
+      defaultConfigurationName = Debug;
+    };
+    AA1151000000000000000000 /* Build configuration list for PBXProject "CueBearBridge" */ = {
+      isa = XCConfigurationList;
+      buildConfigurations = (
+        AA1152000000000000000000 /* Debug */,
+        AA1153000000000000000000 /* Release */,
+      );
+      defaultConfigurationIsVisible = 0;
+      defaultConfigurationName = Debug;
+    };
+/* End XCConfigurationList section */
+  };
+  rootObject = AA11A0000000000000000000 /* Project object */;
+}

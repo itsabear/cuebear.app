@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Privacy Tracking -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+
+	<!-- Privacy Tracking Domains (none - we don't track users) -->
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<!-- Collected Data Types (none - we don't collect user data) -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+
+	<!-- Accessed API Types -->
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<!-- Network API Usage -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryNetwork</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<!-- C617.1: Local network connectivity to user-configured devices -->
+				<string>C617.1</string>
+			</array>
+		</dict>
+
+		<!-- UserDefaults Usage -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<!-- CA92.1: App preferences and settings -->
+				<string>CA92.1</string>
+			</array>
+		</dict>
+
+		<!-- File Timestamp Usage -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<!-- C617.1: Access times for user-created documents -->
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

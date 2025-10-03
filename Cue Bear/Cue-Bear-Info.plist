@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_cuebear._tcp</string>
+	</array>
+
+	<!-- Local Network Usage Description - Required for Bonjour Discovery -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Cue Bear needs to find your Mac computer on the local network to send MIDI commands during your performance. This connection stays completely private between your iPad and Mac.</string>
+
+	<!-- Document Types for iCloud Drive -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Cue Bear Project</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.studiobear.cuebear.project</string>
+			</array>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>cuebearproj</string>
+			</array>
+		</dict>
+	</array>
+	
+	<!-- UTI Definitions -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.studiobear.cuebear.project</string>
+			<key>UTTypeDescription</key>
+			<string>Cue Bear Project</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>cuebearproj</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+	
+	<!-- Document Browser Support -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
+
+	<!-- Note: No background modes needed. App uses beginBackgroundTask() for graceful
+	     disconnection and reconnects automatically when returning to foreground (1-3 seconds).
+	     This provides optimal live performance UX without risk of App Store rejection. -->
+
+	<!-- Prevent app from being terminated during background -->
+	<key>UIApplicationExitsOnSuspend</key>
+	<false/>
+
+	<!-- Require full screen (disable resize on iPadOS 18+) -->
+	<key>UIRequiresFullScreen</key>
+	<true/>
+
+	<!-- Disable multiple windows to ensure single fixed-size window -->
+	<key>UISupportsMultipleScenes</key>
+	<false/>
+
+	<!-- Scene Configuration for proper window management on iPadOS 18+ -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+</dict>
+</plist>
