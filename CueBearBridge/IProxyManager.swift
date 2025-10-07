@@ -17,13 +17,17 @@ final class IProxyManager: ObservableObject {
     private let devicePort: UInt16 = 9360
     private var usbDeviceObserver: NSObjectProtocol?
     private var isMonitoringUSB = false
+    private var sleepObserver: NSObjectProtocol?
+    private var wakeObserver: NSObjectProtocol?
 
     init() {
         setupUSBDeviceMonitoring()
+        setupSleepWakeMonitoring()
     }
-    
+
     deinit {
         stopUSBDeviceMonitoring()
+        stopSleepWakeMonitoring()
     }
 
     func start() throws {
@@ -144,10 +148,9 @@ final class IProxyManager: ObservableObject {
     }
 
     private func findBundledIproxy() -> String? {
-        // Use system iproxy from libimobiledevice
         let systemIproxy = "/usr/local/bin/iproxy"
         let homebrewIproxy = "/opt/homebrew/bin/iproxy"
-        
+
         if FileManager.default.fileExists(atPath: systemIproxy) {
             Logger.shared.log("🔧 IProxyManager: Using system iproxy at: \(systemIproxy)")
             return systemIproxy
@@ -155,7 +158,7 @@ final class IProxyManager: ObservableObject {
             Logger.shared.log("🔧 IProxyManager: Using Homebrew iproxy at: \(homebrewIproxy)")
             return homebrewIproxy
         } else {
-            Logger.shared.log("🔧 IProxyManager: ❌ No system iproxy found")
+            Logger.shared.log("🔧 IProxyManager: ❌ No iproxy found")
             return nil
         }
     }
@@ -214,14 +217,80 @@ final class IProxyManager: ObservableObject {
         // Check for common iOS device mount points
         let iosDevicePatterns = [
             "/Volumes/iPhone",
-            "/Volumes/iPad", 
+            "/Volumes/iPad",
             "/Volumes/iPod",
             "/Volumes/Apple iPhone",
             "/Volumes/Apple iPad"
         ]
-        
+
         return iosDevicePatterns.contains { pattern in
             path.hasPrefix(pattern)
+        }
+    }
+
+    // MARK: - Sleep/Wake Monitoring for Auto-Restart
+
+    private func setupSleepWakeMonitoring() {
+        Logger.shared.log("🔧 IProxyManager: Setting up sleep/wake monitoring for auto-restart")
+
+        // Listen for system sleep notification
+        sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleSystemSleep()
+        }
+
+        // Listen for system wake notification
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleSystemWake()
+        }
+
+        Logger.shared.log("🔧 IProxyManager: ✅ Sleep/wake monitoring active")
+    }
+
+    private func stopSleepWakeMonitoring() {
+        if let observer = sleepObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            sleepObserver = nil
+        }
+        if let observer = wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            wakeObserver = nil
+        }
+        Logger.shared.log("🔧 IProxyManager: Sleep/wake monitoring stopped")
+    }
+
+    private func handleSystemSleep() {
+        Logger.shared.log("🔧 IProxyManager: 💤 System going to sleep - stopping iproxy")
+        stop(manual: false)
+    }
+
+    private func handleSystemWake() {
+        Logger.shared.log("🔧 IProxyManager: ⏰ System woke up - restarting iproxy after 2s delay")
+
+        // Wait a moment for USB subsystem to be ready after wake
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            do {
+                try self?.start()
+                Logger.shared.log("🔧 IProxyManager: ✅ iproxy restarted successfully after wake")
+            } catch {
+                Logger.shared.log("🔧 IProxyManager: ❌ Failed to restart iproxy after wake: \(error)")
+                // Retry after a longer delay if first attempt fails
+                DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                    do {
+                        try self?.start()
+                        Logger.shared.log("🔧 IProxyManager: ✅ iproxy restarted on retry after wake")
+                    } catch {
+                        Logger.shared.log("🔧 IProxyManager: ❌ Failed to restart iproxy on retry: \(error)")
+                    }
+                }
+            }
         }
     }
 }

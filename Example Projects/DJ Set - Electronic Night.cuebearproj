@@ -1,0 +1,290 @@
+{
+  "name": "DJ Set - Electronic Night",
+  "setlist": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Warm Up",
+      "subtitle": "120 BPM • Am",
+      "cc": 1,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111112",
+      "name": "Building Energy",
+      "subtitle": "124 BPM • Em",
+      "cc": 2,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111113",
+      "name": "Peak Hour Banger",
+      "subtitle": "128 BPM • Cm",
+      "cc": 3,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111114",
+      "name": "Deep Tech Groove",
+      "subtitle": "126 BPM • Gm",
+      "cc": 4,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111115",
+      "name": "Melodic Break",
+      "subtitle": "122 BPM • Dm",
+      "cc": 5,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111116",
+      "name": "Second Drop",
+      "subtitle": "128 BPM • F#m",
+      "cc": 6,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111117",
+      "name": "Vocal Anthem",
+      "subtitle": "126 BPM • Bm",
+      "cc": 7,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111118",
+      "name": "Festival Vibes",
+      "subtitle": "130 BPM • Em",
+      "cc": 8,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111119",
+      "name": "Cool Down",
+      "subtitle": "120 BPM • Am",
+      "cc": 9,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111120",
+      "name": "Closing Track",
+      "subtitle": "118 BPM • Cm",
+      "cc": 10,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    }
+  ],
+  "library": [
+    {
+      "id": "11111111-1111-1111-1111-111111111101",
+      "name": "Midnight Drive",
+      "subtitle": "Deep House • 120 BPM • Am",
+      "kind": "note",
+      "note": 36,
+      "cc": 0,
+      "channel": 1,
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111102",
+      "name": "Solar Flare",
+      "subtitle": "Progressive House • 128 BPM • Em",
+      "kind": "note",
+      "note": 37,
+      "cc": 0,
+      "channel": 1,
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111103",
+      "name": "Neon Lights",
+      "subtitle": "Tech House • 126 BPM • Dm",
+      "kind": "note",
+      "note": 38,
+      "cc": 0,
+      "channel": 1,
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111104",
+      "name": "Cosmic Journey",
+      "subtitle": "Trance • 138 BPM • Gm",
+      "kind": "note",
+      "note": 39,
+      "cc": 0,
+      "channel": 1,
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111105",
+      "name": "Underground",
+      "subtitle": "Techno • 132 BPM • Cm",
+      "kind": "note",
+      "note": 40,
+      "cc": 0,
+      "channel": 1,
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111106",
+      "name": "Electric Dreams",
+      "subtitle": "Electro House • 128 BPM • F#m",
+      "kind": "note",
+      "note": 41,
+      "cc": 0,
+      "channel": 1,
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111107",
+      "name": "Skyline",
+      "subtitle": "Future House • 124 BPM • Bm",
+      "kind": "note",
+      "note": 42,
+      "cc": 0,
+      "channel": 1,
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111108",
+      "name": "Pulse",
+      "subtitle": "Bass House • 126 BPM • Am",
+      "kind": "note",
+      "note": 43,
+      "cc": 0,
+      "channel": 1,
+      "velocity": 127
+    }
+  ],
+  "controls": [
+    {
+      "id": "01111111-1111-1111-1111-111111111111",
+      "title": "Master Vol",
+      "symbol": "speaker.wave.3.fill",
+      "kind": "cc",
+      "number": 20,
+      "channel": 1,
+      "velocity": 127,
+      "isFader": true,
+      "faderValue": 0.75,
+      "faderOrientation": "horizontal",
+      "faderDirection": "right",
+      "gridCol": 4,
+      "gridRow": 0
+    },
+    {
+      "id": "01111111-1111-1111-1111-111111111112",
+      "title": "HP Filter",
+      "symbol": "waveform.path",
+      "kind": "cc",
+      "number": 21,
+      "channel": 1,
+      "velocity": 127,
+      "isFader": true,
+      "faderValue": 0.0,
+      "faderOrientation": "horizontal",
+      "faderDirection": "right",
+      "gridCol": 4,
+      "gridRow": 1
+    },
+    {
+      "id": "01111111-1111-1111-1111-111111111113",
+      "title": "FX Send",
+      "symbol": "sparkles",
+      "kind": "cc",
+      "number": 22,
+      "channel": 1,
+      "velocity": 127,
+      "isFader": true,
+      "faderValue": 0.3,
+      "faderOrientation": "horizontal",
+      "faderDirection": "right",
+      "gridCol": 4,
+      "gridRow": 2
+    },
+    {
+      "id": "01111111-1111-1111-1111-111111111114",
+      "title": "Crossfade",
+      "symbol": "slider.horizontal.3",
+      "kind": "cc",
+      "number": 23,
+      "channel": 1,
+      "velocity": 127,
+      "isFader": true,
+      "faderValue": 0.5,
+      "faderOrientation": "horizontal",
+      "faderDirection": "right",
+      "gridCol": 4,
+      "gridRow": 3
+    },
+    {
+      "id": "01111111-1111-1111-1111-111111111115",
+      "title": "Beat Sync",
+      "symbol": "metronome.fill",
+      "kind": "note",
+      "number": 60,
+      "channel": 1,
+      "velocity": 127,
+      "isToggle": true,
+      "toggleState": false,
+      "gridCol": 0,
+      "gridRow": 0
+    },
+    {
+      "id": "01111111-1111-1111-1111-111111111116",
+      "title": "Loop 4",
+      "symbol": "4.circle.fill",
+      "kind": "note",
+      "number": 61,
+      "channel": 1,
+      "velocity": 127,
+      "gridCol": 2,
+      "gridRow": 0
+    },
+    {
+      "id": "01111111-1111-1111-1111-111111111118",
+      "title": "Reverb",
+      "symbol": "waveform.circle.fill",
+      "kind": "note",
+      "number": 63,
+      "channel": 1,
+      "velocity": 127,
+      "isToggle": true,
+      "toggleState": false,
+      "gridCol": 0,
+      "gridRow": 2
+    },
+    {
+      "id": "01111111-1111-1111-1111-111111111119",
+      "title": "Delay",
+      "symbol": "repeat.circle.fill",
+      "kind": "note",
+      "number": 64,
+      "channel": 1,
+      "velocity": 127,
+      "isToggle": true,
+      "toggleState": false,
+      "gridCol": 2,
+      "gridRow": 2
+    }
+  ],
+  "isGlobalChannel": false
+}

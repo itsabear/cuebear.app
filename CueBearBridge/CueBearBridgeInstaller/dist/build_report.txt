@@ -1,0 +1,65 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CueBear Bridge Installer Build Report
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build Date: Wed Oct  8 00:12:52 IDT 2025
+Builder: omribehr
+Machine: Omris-MacBook-Pro.local
+
+Project Information:
+  App Name: CueBearBridge
+  Bundle ID: com.cuebear.bridge.clean
+  Version: 1.0.0
+  Xcode Project: /Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridge.xcodeproj
+  Scheme: CueBearBridge
+
+Signing:
+  App Certificate: Developer ID Application: Omri Behr (2U78NYVLQN)
+  Installer Certificate: Developer ID Installer: Omri Behr (2U78NYVLQN)
+
+Output Files:
+  Package: /Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/dist/CueBearBridge-Installer.pkg
+  App Bundle: /Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/build/CueBearBridge.app
+  Build Directory: /Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/build
+
+Bundled Components:
+  ✅ App binary
+  ✅ Dylibs (6 files):
+      - libxml2.2.dylib
+      - libusbmuxd.4.dylib
+      - libicudata.77.dylib
+      - libicuuc.77.dylib
+      - libimobiledevice-glue.1.dylib
+      - libplist.3.dylib
+  ✅ Helper binaries:
+      - iproxy
+
+Package Signature:
+Package "CueBearBridge-Installer.pkg":
+   Status: signed by a developer certificate issued by Apple for distribution
+   Signed with a trusted timestamp on: 2025-10-07 21:12:51 +0000
+   Certificate Chain:
+    1. Developer ID Installer: Omri Behr (2U78NYVLQN)
+       Expires: 2030-10-05 17:25:43 +0000
+       SHA256 Fingerprint:
+           5A 17 15 9E AB 6D 9A C8 BE 5C B2 13 77 89 9E 4B C5 08 39 F2 33 C1 
+           4C 1B 3F 6C A6 4A FA 9D 80 29
+       ------------------------------------------------------------------------
+    2. Developer ID Certification Authority
+       Expires: 2031-09-17 00:00:00 +0000
+       SHA256 Fingerprint:
+           F1 6C D3 C5 4C 7F 83 CE A4 BF 1A 3E 6A 08 19 C8 AA A8 E4 A1 52 8F 
+           D1 44 71 5F 35 06 43 D2 DF 3A
+       ------------------------------------------------------------------------
+    3. Apple Root CA
+       Expires: 2035-02-09 21:40:36 +0000
+       SHA256 Fingerprint:
+           B0 B1 73 0E CB C7 FF 45 05 14 2C 49 F1 29 5E 6E DA 6B CA ED 7E 2C 
+           68 C5 BE 91 B5 A1 10 01 F0 24
+
+Next Steps:
+  1. Test installation: sudo installer -pkg "/Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/dist/CueBearBridge-Installer.pkg" -target /
+  2. Notarize package: ./scripts/notarize_pkg.sh "/Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/dist/CueBearBridge-Installer.pkg"
+  3. Distribute notarized package
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

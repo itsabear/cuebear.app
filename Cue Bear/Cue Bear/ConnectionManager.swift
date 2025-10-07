@@ -74,6 +74,8 @@ class ConnectionManager: ObservableObject {
     private var batchTimer: Timer?
     private let batchSize = 5 // Reduced for lower latency
     private let batchTimeout: TimeInterval = 0.01 // 10ms for lower latency
+    private let maxBatchSize = 100 // CRITICAL: Prevent unbounded growth during stress testing
+    private var isSendingBatch = false // Prevent concurrent batch sends
     
     // Handshake timeout timers per connection
     private var handshakeTimers: [ObjectIdentifier: DispatchSourceTimer] = [:]
@@ -184,8 +186,14 @@ class ConnectionManager: ObservableObject {
     }
     
     private func addToBatch(_ message: String) {
+        // CRITICAL: Enforce maximum batch size to prevent unbounded growth during stress testing
+        if messageBatch.count >= maxBatchSize {
+            debugPrint("🔗 ConnectionManager: ⚠️ Batch at maximum size (\(maxBatchSize)) - forcing immediate send")
+            sendBatch()
+        }
+
         messageBatch.append(message)
-        
+
         // Send immediately if batch is full
         if messageBatch.count >= batchSize {
             sendBatch()
@@ -203,45 +211,78 @@ class ConnectionManager: ObservableObject {
     }
     
     private func sendBatch() {
+        // CRITICAL: Prevent concurrent batch sends which could cause race conditions
+        guard !isSendingBatch else {
+            debugPrint("🔗 ConnectionManager: Already sending batch - skipping concurrent send")
+            return
+        }
+
         guard !messageBatch.isEmpty else { return }
-        
+
         batchTimer?.invalidate()
         batchTimer = nil
-        
-        // Create batched message
-        let batchedMessage = [
-            "type": "batch",
-            "messages": messageBatch,
-            "count": messageBatch.count,
-            "timestamp": Date().timeIntervalSince1970
-        ] as [String: Any]
-        
+
         guard isConnected, let connection = activeUSB else {
             debugPrint("🔗 ConnectionManager: No connection - cannot send batch")
             messageBatch.removeAll()
             return
         }
-        
-        guard let data = try? JSONSerialization.data(withJSONObject: batchedMessage),
-              let message = String(data: data, encoding: .utf8) else {
-            debugPrint("🔗 ConnectionManager: Failed to create batch JSON")
-            messageBatch.removeAll()
-            return
-        }
-        
-        guard let messageData = (message + "\n").data(using: .utf8) else {
-            debugPrint("🔗 ConnectionManager: Failed to encode batch message as UTF-8")
-            messageBatch.removeAll()
-            return
-        }
-        connection.send(content: messageData, completion: .contentProcessed { [weak self] error in
-            if let error = error {
-                debugPrint("🔗 ConnectionManager: Failed to send batch: \(error)")
-            } else {
-                debugPrint("🔗 ConnectionManager: Batch sent successfully (\(self?.messageBatch.count ?? 0) messages)")
+
+        // CRITICAL FIX: Copy batch and clear IMMEDIATELY before serialization
+        // This prevents unbounded growth during stress testing
+        let messagesToSend = messageBatch
+        let messageCount = messagesToSend.count
+        messageBatch.removeAll() // Clear NOW, not in completion handler
+        isSendingBatch = true
+
+        // CRITICAL FIX: Move JSON serialization to background thread
+        // This prevents main thread freeze during stress testing
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak connection] in
+            guard let self = self, let connection = connection else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.isSendingBatch = false
+                }
+                return
             }
-            self?.messageBatch.removeAll()
-        })
+
+            // Create batched message (now on background thread)
+            let batchedMessage = [
+                "type": "batch",
+                "messages": messagesToSend,
+                "count": messageCount,
+                "timestamp": Date().timeIntervalSince1970
+            ] as [String: Any]
+
+            // Serialize JSON on background thread
+            guard let data = try? JSONSerialization.data(withJSONObject: batchedMessage),
+                  let message = String(data: data, encoding: .utf8) else {
+                debugPrint("🔗 ConnectionManager: ❌ Failed to create batch JSON")
+                DispatchQueue.main.async { [weak self] in
+                    self?.isSendingBatch = false
+                }
+                return
+            }
+
+            guard let messageData = (message + "\n").data(using: .utf8) else {
+                debugPrint("🔗 ConnectionManager: ❌ Failed to encode batch message as UTF-8")
+                DispatchQueue.main.async { [weak self] in
+                    self?.isSendingBatch = false
+                }
+                return
+            }
+
+            // Send data (network I/O happens on connection's queue)
+            connection.send(content: messageData, completion: .contentProcessed { [weak self] error in
+                DispatchQueue.main.async { [weak self] in
+                    self?.isSendingBatch = false
+                    if let error = error {
+                        debugPrint("🔗 ConnectionManager: ❌ Failed to send batch: \(error)")
+                    } else {
+                        debugPrint("🔗 ConnectionManager: ✅ Batch sent successfully (\(messageCount) messages)")
+                    }
+                }
+            })
+        }
     }
     
     func stop() {
@@ -258,6 +299,7 @@ class ConnectionManager: ObservableObject {
         batchTimer?.invalidate()
         batchTimer = nil
         messageBatch.removeAll()
+        isSendingBatch = false
         
         stopListening()
         stopHealthMonitoring()

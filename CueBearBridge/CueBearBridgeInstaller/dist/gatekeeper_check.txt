@@ -1,0 +1,3 @@
+dist/CueBearBridge-Installer.pkg: accepted
+source=Notarized Developer ID
+origin=Developer ID Installer: Omri Behr (2U78NYVLQN)

@@ -21,11 +21,48 @@ enum DocumentProjectIO {
     
     /// Open existing project from document picker
     static func openProject(from url: URL, completion: @escaping (ProjectPayload?) -> Void) {
+        debugPrint("📂 DocumentProjectIO: Attempting to open project from URL: \(url)")
+        debugPrint("📂 DocumentProjectIO: URL path: \(url.path)")
+        debugPrint("📂 DocumentProjectIO: URL is file URL: \(url.isFileURL)")
+
+        // Start accessing security-scoped resource
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        debugPrint("📂 DocumentProjectIO: Started accessing security-scoped resource: \(didStartAccessing)")
+
         let document = CueBearProjectDocument(fileURL: url)
-        
+
         document.open { success in
-            DispatchQueue.main.async {
-                completion(success ? document.projectData : nil)
+            debugPrint("📂 DocumentProjectIO: Document open result: \(success)")
+            if success {
+                debugPrint("📂 DocumentProjectIO: Project data loaded successfully")
+                debugPrint("📂 DocumentProjectIO: Project name: \(document.projectData?.name ?? "nil")")
+
+                // Copy the data before closing the document
+                let projectData = document.projectData
+
+                // Close the document to release resources
+                document.close { closeSuccess in
+                    debugPrint("📂 DocumentProjectIO: Document close result: \(closeSuccess)")
+
+                    DispatchQueue.main.async {
+                        if didStartAccessing {
+                            url.stopAccessingSecurityScopedResource()
+                            debugPrint("📂 DocumentProjectIO: Stopped accessing security-scoped resource")
+                        }
+                        completion(projectData)
+                    }
+                }
+            } else {
+                debugPrint("❌ DocumentProjectIO: Failed to open document")
+                debugPrint("❌ DocumentProjectIO: Document state: \(document.documentState)")
+
+                DispatchQueue.main.async {
+                    if didStartAccessing {
+                        url.stopAccessingSecurityScopedResource()
+                        debugPrint("📂 DocumentProjectIO: Stopped accessing security-scoped resource")
+                    }
+                    completion(nil)
+                }
             }
         }
     }
@@ -74,14 +111,20 @@ enum DocumentProjectIO {
     
     /// Present document picker for opening projects
     static func presentDocumentPicker(from viewController: UIViewController, completion: @escaping (URL?) -> Void) {
+        debugPrint("📁 DocumentProjectIO: Presenting document picker")
+        debugPrint("📁 DocumentProjectIO: Content type: com.studiobear.cuebear.project")
+
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.cueBearProject])
         picker.allowsMultipleSelection = false
-        
+
         // Store completion handler
         DocumentPickerDelegate.shared.completion = completion
         picker.delegate = DocumentPickerDelegate.shared
-        
-        viewController.present(picker, animated: true)
+
+        debugPrint("📁 DocumentProjectIO: About to present picker from view controller: \(viewController)")
+        viewController.present(picker, animated: true) {
+            debugPrint("📁 DocumentProjectIO: Document picker presented successfully")
+        }
     }
 }
 
@@ -90,12 +133,19 @@ enum DocumentProjectIO {
 private class DocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
     static let shared = DocumentPickerDelegate()
     var completion: ((URL?) -> Void)?
-    
+
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        debugPrint("📁 DocumentPickerDelegate: User picked documents")
+        debugPrint("📁 DocumentPickerDelegate: Number of URLs: \(urls.count)")
+        if let firstURL = urls.first {
+            debugPrint("📁 DocumentPickerDelegate: First URL: \(firstURL)")
+            debugPrint("📁 DocumentPickerDelegate: URL path: \(firstURL.path)")
+        }
         completion?(urls.first)
     }
-    
+
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        debugPrint("📁 DocumentPickerDelegate: User cancelled document picker")
         completion?(nil)
     }
 }

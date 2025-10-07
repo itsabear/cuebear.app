@@ -1,0 +1,6 @@
+Conducting pre-submission checks for CueBearBridge-Installer.pkg and initiating connection to the Apple notary service...
+Submission ID received
+  id: 30dea56b-0ffe-43d9-86db-178a429bb6d9
+Successfully uploaded file
+  id: 30dea56b-0ffe-43d9-86db-178a429bb6d9
+  path: /Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/dist/CueBearBridge-Installer.pkg

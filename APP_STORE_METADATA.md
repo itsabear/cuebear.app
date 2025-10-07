@@ -3,23 +3,22 @@
 ## App Information
 
 **App Name:** Cue Bear
-**Subtitle:** MIDI Controller for Live Performance
+**Subtitle:** If a MIDI controller and a setlist had a baby
 **Bundle ID:** Omri-Behr.Cue-Bear
 **Category:** Music
-**Price:** $[YOUR_PRICE] (or Free)
+**Price:** $[19] (or Free)
 
 ---
 
 ## App Description (4000 character limit)
 
 ### Short Version (170 characters for search results):
-Transform your iPad into a powerful MIDI controller for live performances, theater, worship, DJing, and studio sessions. Create custom layouts, control your show wirelessly.
+Meet Cue Bear Bridge — a new kind of MIDI controller built around your setlist. Skip old faders; control every cue, scene, and transition in real time.
 
 ### Full Description:
 
-**Cue Bear turns your iPad into a professional MIDI controller designed for live performance.**
-
-Whether you're running a theater production, leading worship, DJing a club night, or mixing a live band, Cue Bear gives you intuitive wireless control over your entire show.
+**Cue Bear turns your iPad into a professional MIDI controller designed for live performance, and based on your show's setlist.**
+Whether you're running a theater production, leading worship, DJing a club night, or mixing a live band, Cue Bear gives you intuitive control over your DAW, via USB or WIFI.
 
 **KEY FEATURES:**
 

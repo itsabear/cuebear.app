@@ -149,12 +149,6 @@ struct CBTransportDock: View {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .highPriorityGesture(TapGesture().onEnded { onClear() })
-                    // Block drag gestures on Clear button to prevent capsule movement
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { _ in }  // Consume drag without propagating
-                    )
                     .padding(6)
                     .contentShape(Rectangle())
                     .accessibilityLabel("Clear cued item")
@@ -175,12 +169,6 @@ struct CBTransportDock: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .highPriorityGesture(TapGesture().onEnded { onPrev() })
-                // Block drag gestures on Back button to prevent capsule movement
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in }  // Consume drag without propagating
-                )
                 .disabled(!canPrev)
                 .opacity(canPrev ? 1.0 : 0.5)
 
@@ -196,15 +184,6 @@ struct CBTransportDock: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .highPriorityGesture(TapGesture().onEnded {
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                    onGo()
-                })
-                // Block drag gestures on GO button to prevent capsule movement
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in }  // Consume drag without propagating
-                )
                 .disabled(!isGoEnabled)
 
                 Button(action: onNext) {
@@ -215,12 +194,6 @@ struct CBTransportDock: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .highPriorityGesture(TapGesture().onEnded { onNext() })
-                // Block drag gestures on Forward button to prevent capsule movement
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in }  // Consume drag without propagating
-                )
                 .disabled(!canNext)
                 .opacity(canNext ? 1.0 : 0.5)
             }
@@ -295,7 +268,7 @@ struct DraggableTransportDock: View {
         }
         .frame(width: dockSize.width, height: dockSize.height)
         .contentShape(RoundedRectangle(cornerRadius: 32))
-        .gesture(
+        .highPriorityGesture(
             DragGesture(minimumDistance: 3, coordinateSpace: .local)
                 .onChanged { value in
                     if !isTrackingDrag {
