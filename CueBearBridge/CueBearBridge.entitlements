@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Hardened Runtime - Required for Notarization -->
+
+    <!-- Allow loading of bundled dylibs using @rpath -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+
+    <!-- Allow loading unsigned or differently-signed dylibs (for bundled libraries) -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!-- Allow JIT compilation (if needed by any dependency) -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <false/>
+
+    <!-- Allow unsigned executable memory (if needed) -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <false/>
+
+    <!-- Network Access - Required for USB proxy and WiFi connections -->
+
+    <!-- Outgoing network connections -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- Incoming network connections (for proxy server) -->
+    <key>com.apple.security.network.server</key>
+    <true/>
+
+    <!-- Device Access - Required for iOS device communication -->
+
+    <!-- USB device access (for iOS devices via libimobiledevice) -->
+    <key>com.apple.security.device.usb</key>
+    <true/>
+
+    <!-- Audio/MIDI - Required for MIDI output -->
+
+    <!-- Audio input (MIDI) -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+
+    <!-- App Sandbox - NOT enabled (would prevent USB access) -->
+    <!-- <key>com.apple.security.app-sandbox</key> -->
+    <!-- <false/> -->
+
+    <!-- Additional entitlements for helper processes -->
+
+    <!-- Allow spawning helper processes (iproxy) -->
+    <key>com.apple.security.cs.disable-executable-page-protection</key>
+    <false/>
+</dict>
+</plist>

@@ -234,6 +234,11 @@ log_info "Copying helpers from: $SOURCE_HELPERS"
 for helper in "$SOURCE_HELPERS"/*; do
     if [ -f "$helper" ]; then
         HELPER_NAME=$(basename "$helper")
+        # Skip iproxy - it will be bundled with fixed paths in Step 5
+        if [ "$HELPER_NAME" = "iproxy" ]; then
+            log_info "  Skipping $HELPER_NAME (will be bundled in Step 5 with fixed library paths)"
+            continue
+        fi
         log_info "  Copying $HELPER_NAME..."
         cp "$helper" "$HELPERS_DIR/"
         chmod +x "$HELPERS_DIR/$HELPER_NAME"
@@ -244,10 +249,22 @@ done
 log_success "Helper binaries bundled"
 
 # ============================================================================
-# Step 5: Sign App Bundle
+# Step 5: Bundle iproxy and Dependencies
 # ============================================================================
 
-log_step "Step 5: Signing app bundle"
+log_step "Step 5: Bundling iproxy and dependencies"
+
+log_info "Running iproxy bundling script..."
+
+"$SCRIPT_DIR/bundle_iproxy.sh" "$APP_BUNDLE"
+
+log_success "iproxy and dependencies bundled"
+
+# ============================================================================
+# Step 6: Sign App Bundle
+# ============================================================================
+
+log_step "Step 6: Signing app bundle"
 
 log_info "Running codesign script..."
 
@@ -256,10 +273,10 @@ log_info "Running codesign script..."
 log_success "App bundle signed"
 
 # ============================================================================
-# Step 6: Create Package Root
+# Step 7: Create Package Root
 # ============================================================================
 
-log_step "Step 6: Creating package root"
+log_step "Step 7: Creating package root"
 
 # Create package root in /tmp to avoid Dropbox issues
 TEMP_PACKAGE_ROOT="/tmp/cuebear_pkg_root_$$"
@@ -275,7 +292,8 @@ cp -R "$APP_BUNDLE" "$TEMP_APP"
 
 log_info "Stripping ALL extended attributes from temp copy..."
 # Now strip from the /tmp copy (outside Dropbox)
-xattr -cr "$TEMP_APP"
+# Use || true to ignore errors from signed files
+xattr -cr "$TEMP_APP" 2>/dev/null || true
 
 log_info "Copying clean app bundle to package root..."
 # Copy the cleaned app to package root
@@ -285,7 +303,8 @@ log_info "Cleaning up intermediate copy..."
 rm -rf "$TEMP_APP"
 
 # Double-check: Remove any remaining extended attributes
-xattr -cr "$TEMP_PACKAGE_ROOT"
+# Use || true to ignore errors from signed files
+xattr -cr "$TEMP_PACKAGE_ROOT" 2>/dev/null || true
 
 # Remove any AppleDouble files (should be none at this point)
 find "$TEMP_PACKAGE_ROOT" -name '._*' -type f -delete 2>/dev/null || true
@@ -305,10 +324,10 @@ log_success "Package root created"
 PACKAGE_ROOT="$TEMP_PACKAGE_ROOT"
 
 # ============================================================================
-# Step 7: Build Package
+# Step 8: Build Package
 # ============================================================================
 
-log_step "Step 7: Building installer package"
+log_step "Step 8: Building installer package"
 
 # Build in /tmp to avoid Dropbox AppleDouble file issues
 TEMP_BUILD_DIR="/tmp/cuebear_pkg_build_$$"
@@ -366,7 +385,7 @@ log_success "Distribution package created in temp directory"
 
 # Copy final package to dist directory and remove Dropbox attributes
 cp "$TEMP_DIST_PKG" "$PKG_PATH"
-xattr -cr "$PKG_PATH"
+xattr -cr "$PKG_PATH" 2>/dev/null || true
 
 # Clean up temp directories
 rm -rf "$TEMP_BUILD_DIR"
@@ -377,10 +396,10 @@ log_success "Dropbox attributes removed from package"
 log_success "Temporary build directories cleaned up"
 
 # ============================================================================
-# Step 8: Verify Package
+# Step 9: Verify Package
 # ============================================================================
 
-log_step "Step 8: Verifying package"
+log_step "Step 9: Verifying package"
 
 log_info "Checking package signature..."
 pkgutil --check-signature "$PKG_PATH"
@@ -391,10 +410,10 @@ pkgutil --payload-files "$PKG_PATH" | head -20
 log_success "Package verified"
 
 # ============================================================================
-# Step 9: Generate Build Report
+# Step 10: Generate Build Report
 # ============================================================================
 
-log_step "Step 9: Generating build report"
+log_step "Step 10: Generating build report"
 
 REPORT_FILE="$DIST_DIR/build_report.txt"
 

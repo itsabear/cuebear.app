@@ -95,7 +95,7 @@ FRAMEWORKS_DIR="$APP_BUNDLE/Contents/Frameworks"
 if [ -d "$FRAMEWORKS_DIR" ]; then
     cd "$FRAMEWORKS_DIR"
 
-    # List of dylibs
+    # List of dylibs (old system + new iproxy dependencies)
     DYLIBS=(
         "libxml2.2.dylib"
         "libusbmuxd.4.dylib"
@@ -103,6 +103,9 @@ if [ -d "$FRAMEWORKS_DIR" ]; then
         "libicuuc.77.dylib"
         "libimobiledevice-glue.1.dylib"
         "libplist.3.dylib"
+        "libusbmuxd-2.0.7.dylib"
+        "libimobiledevice-glue-1.0.0.dylib"
+        "libplist-2.0.4.dylib"
     )
 
     for dylib in "${DYLIBS[@]}"; do
@@ -193,6 +196,34 @@ fi
 log_success "Step 3 complete: Helper binaries signed"
 
 # ============================================================================
+# Step 3.5: Sign iproxy Binary in MacOS
+# ============================================================================
+
+log_info "Step 3.5: Signing iproxy binary..."
+
+MACOS_DIR="$APP_BUNDLE/Contents/MacOS"
+IPROXY_BINARY="$MACOS_DIR/iproxy"
+
+if [ -f "$IPROXY_BINARY" ]; then
+    log_info "  Signing iproxy..."
+
+    # Ensure executable
+    chmod +x "$IPROXY_BINARY"
+
+    # Sign with hardened runtime
+    codesign --force --sign "$SIGNING_IDENTITY" \
+        --timestamp \
+        --options runtime \
+        "$IPROXY_BINARY"
+
+    log_success "  ✓ iproxy signed"
+else
+    log_warning "iproxy binary not found: $IPROXY_BINARY"
+fi
+
+log_success "Step 3.5 complete: iproxy binary signed"
+
+# ============================================================================
 # Step 4: Sign Frameworks (if any)
 # ============================================================================
 
@@ -274,6 +305,16 @@ if [ -d "$HELPERS_DIR" ]; then
             fi
         fi
     done
+fi
+
+# Verify iproxy
+if [ -f "$IPROXY_BINARY" ]; then
+    log_info "  Verifying iproxy..."
+    if codesign --verify --verbose=2 "$IPROXY_BINARY" 2>&1 | grep -q "valid"; then
+        log_success "    ✓ iproxy signature valid"
+    else
+        log_warning "    ? iproxy signature status unclear"
+    fi
 fi
 
 log_success "Step 6 complete: All signatures verified"
