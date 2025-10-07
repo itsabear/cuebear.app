@@ -148,6 +148,18 @@ final class IProxyManager: ObservableObject {
     }
 
     private func findBundledIproxy() -> String? {
+        // Priority 1: Check for bundled iproxy in app bundle (self-contained distribution)
+        if let bundlePath = Bundle.main.executablePath {
+            let appBundlePath = (bundlePath as NSString).deletingLastPathComponent
+            let bundledIproxy = (appBundlePath as NSString).appendingPathComponent("iproxy")
+
+            if FileManager.default.fileExists(atPath: bundledIproxy) {
+                Logger.shared.log("🔧 IProxyManager: Using bundled iproxy at: \(bundledIproxy)")
+                return bundledIproxy
+            }
+        }
+
+        // Priority 2: Check system paths (fallback for development)
         let systemIproxy = "/usr/local/bin/iproxy"
         let homebrewIproxy = "/opt/homebrew/bin/iproxy"
 
@@ -158,7 +170,7 @@ final class IProxyManager: ObservableObject {
             Logger.shared.log("🔧 IProxyManager: Using Homebrew iproxy at: \(homebrewIproxy)")
             return homebrewIproxy
         } else {
-            Logger.shared.log("🔧 IProxyManager: ❌ No iproxy found")
+            Logger.shared.log("🔧 IProxyManager: ❌ No iproxy found (checked bundled, system, and Homebrew paths)")
             return nil
         }
     }

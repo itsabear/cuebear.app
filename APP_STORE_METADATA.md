@@ -18,9 +18,17 @@ Meet Cue Bear Bridge — a new kind of MIDI controller built around your setlist
 ### Full Description:
 
 **Cue Bear turns your iPad into a professional MIDI controller designed for live performance, and based on your show's setlist.**
-Whether you're running a theater production, leading worship, DJing a club night, or mixing a live band, Cue Bear gives you intuitive control over your DAW, via USB or WIFI.
+Instead of trying to remember what button triggers which cue, Cue Bear combnines the setlist and the midi controller to create a seemless, stress-free performance oriented controller. Connect via USB or WIFI and start performing.
 
 **KEY FEATURES:**
+
+
+**🎵 Smart Setlist Management**
+• Create cues for each song or scene in your show
+• Add metadata: tempo, key, notes, scene numbers
+• Reorder with drag-and-drop
+• Search and filter your library
+• Save & Add Another for quick setup
 
 **🎛️ Customizable Control Surface**
 • Faders - Vertical or horizontal sliders for smooth parameter control
@@ -29,12 +37,6 @@ Whether you're running a theater production, leading worship, DJing a club night
 • Toggles - Latching buttons for effects and scene states
 • Grid layout - Organize controls exactly how you want them
 
-**🎵 Smart Setlist Management**
-• Create cues for each song or scene in your show
-• Add metadata: tempo, key, notes, scene numbers
-• Reorder with drag-and-drop
-• Search and filter your library
-• Save & Add Another for quick setup
 
 **📡 Wireless & USB Connectivity**
 • WiFi MIDI - Control your Mac wirelessly over the network
@@ -59,11 +61,11 @@ Whether you're running a theater production, leading worship, DJing a club night
 • Autosave keeps your work safe
 
 **🎭 Perfect For:**
+• Live bands - Monitor mixes and effect switching
 • Theater productions - Control lighting, sound effects, and scene changes
 • Worship services - Mix vocals, band, and click tracks
 • DJ performances - Trigger loops, effects, and hot cues
 • Studio sessions - Record, transport controls, and track mixing
-• Live bands - Monitor mixes and effect switching
 • Orchestras - Conduct tempo and dynamic changes
 • Educators - Teach music production and MIDI concepts
 
@@ -92,14 +94,14 @@ Whether you're running a theater production, leading worship, DJing a club night
 **📱 Setup Requirements**
 • iPad (any model with iOS 18.2+)
 • Mac computer with CueBearBridge installed (free from cuebear.app)
-• For USB: Lightning to USB cable
+• For USB: USB cable
 • For WiFi: Both devices on same network
 
 **🐻 Why Cue Bear?**
 
 Built by performers for performers, Cue Bear is designed for reliability during live shows. No complex menus, no confusing settings - just the controls you need, when you need them.
 
-Whether you're running a Broadway-style musical, leading a worship team, or mixing monitors for a rock band, Cue Bear adapts to your workflow.
+Whether you're playing backing tracks from a DAW for an arena show, running a Broadway-style musical, leading a worship team, or mixing monitors for a rock band, Cue Bear adapts to your workflow.
 
 **Download CueBearBridge (Mac companion app) free at: cuebear.app**
 

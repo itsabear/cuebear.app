@@ -2,7 +2,7 @@
 CueBear Bridge Installer Build Report
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Build Date: Wed Oct  8 00:12:52 IDT 2025
+Build Date: Wed Oct  8 01:24:11 IDT 2025
 Builder: omribehr
 Machine: Omris-MacBook-Pro.local
 
@@ -32,12 +32,12 @@ Bundled Components:
       - libimobiledevice-glue.1.dylib
       - libplist.3.dylib
   ✅ Helper binaries:
-      - iproxy
+
 
 Package Signature:
 Package "CueBearBridge-Installer.pkg":
    Status: signed by a developer certificate issued by Apple for distribution
-   Signed with a trusted timestamp on: 2025-10-07 21:12:51 +0000
+   Signed with a trusted timestamp on: 2025-10-07 22:24:10 +0000
    Certificate Chain:
     1. Developer ID Installer: Omri Behr (2U78NYVLQN)
        Expires: 2030-10-05 17:25:43 +0000
