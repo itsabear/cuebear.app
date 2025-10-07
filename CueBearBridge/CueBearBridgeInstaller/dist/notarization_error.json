@@ -1,0 +1,165 @@
+{
+  "logFormatVersion": 1,
+  "jobId": "e2e510cb-d09c-44df-8571-cee6eae98567",
+  "status": "Invalid",
+  "statusSummary": "Archive contains critical validation errors",
+  "statusCode": 4000,
+  "archiveFilename": "CueBearBridge-Installer.pkg",
+  "uploadDate": "2025-10-07T16:26:02.884Z",
+  "sha256": "5187c09d0440ddc7e07210a2ffff2092d3cbce51b576a844f72df61c8ca4d89f",
+  "ticketContents": null,
+  "issues": [
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/MacOS/CueBearBridge",
+      "message": "The signature of the binary is invalid.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087735",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/MacOS/CueBearBridge",
+      "message": "The signature does not include a secure timestamp.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087733",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/MacOS/CueBearBridge",
+      "message": "The executable does not have the hardened runtime enabled.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087724",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/MacOS/CueBearBridge",
+      "message": "The executable requests the com.apple.security.get-task-allow entitlement.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087731",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/MacOS/iproxy",
+      "message": "The signature of the binary is invalid.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087735",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/MacOS/iproxy",
+      "message": "The signature does not include a secure timestamp.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087733",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/MacOS/iproxy",
+      "message": "The executable does not have the hardened runtime enabled.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087724",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libxml2.2.dylib",
+      "message": "The signature of the binary is invalid.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087735",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libxml2.2.dylib",
+      "message": "The signature does not include a secure timestamp.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087733",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libusbmuxd.4.dylib",
+      "message": "The signature of the binary is invalid.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087735",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libusbmuxd.4.dylib",
+      "message": "The signature does not include a secure timestamp.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087733",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libicudata.77.dylib",
+      "message": "The signature of the binary is invalid.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087735",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libicudata.77.dylib",
+      "message": "The signature does not include a secure timestamp.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087733",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libicuuc.77.dylib",
+      "message": "The signature of the binary is invalid.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087735",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libicuuc.77.dylib",
+      "message": "The signature does not include a secure timestamp.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087733",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libimobiledevice-glue.1.dylib",
+      "message": "The signature of the binary is invalid.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087735",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libimobiledevice-glue.1.dylib",
+      "message": "The signature does not include a secure timestamp.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087733",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libplist.3.dylib",
+      "message": "The signature of the binary is invalid.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087735",
+      "architecture": "arm64"
+    },
+    {
+      "severity": "error",
+      "code": null,
+      "path": "CueBearBridge-Installer.pkg/CueBearBridge-Installer.pkg Contents/Payload/Applications/Contents/Frameworks/libplist.3.dylib",
+      "message": "The signature does not include a secure timestamp.",
+      "docUrl": "https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087733",
+      "architecture": "arm64"
+    }
+  ]
+}

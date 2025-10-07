@@ -23,12 +23,24 @@ final class CueBearProjectDocument: UIDocument {
     }
     
     override func load(fromContents contents: Any, ofType typeName: String?) throws {
+        debugPrint("📄 CueBearProjectDocument: load(fromContents:ofType:) called")
+        debugPrint("📄 CueBearProjectDocument: Type name: \(typeName ?? "nil")")
+
         guard let data = contents as? Data else {
+            debugPrint("❌ CueBearProjectDocument: Contents is not Data type")
             throw NSError(domain: "CueBear", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid project data"])
         }
-        
+
+        debugPrint("📄 CueBearProjectDocument: Data size: \(data.count) bytes")
+
         // Use existing JSON decoding - no changes to data format
-        projectData = try JSONDecoder().decode(ProjectPayload.self, from: data)
+        do {
+            projectData = try JSONDecoder().decode(ProjectPayload.self, from: data)
+            debugPrint("✅ CueBearProjectDocument: Successfully decoded project: \(projectData?.name ?? "unknown")")
+        } catch {
+            debugPrint("❌ CueBearProjectDocument: Decoding error: \(error)")
+            throw error
+        }
     }
     
     // MARK: - Document Behavior

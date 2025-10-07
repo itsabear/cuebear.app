@@ -89,10 +89,10 @@ final class MacConnectionManager: ObservableObject {
             return
         }
         
-        Logger.shared.log("🔗 MacConnectionManager: iproxy ready on port \(port), waiting 2s for iPad to be ready")
-        
-        // Wait a moment for the iPad's USB server to be ready
-        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) { [weak self] in
+        Logger.shared.log("🔗 MacConnectionManager: iproxy ready on port \(port), waiting 0.5s for iPad to be ready")
+
+        // Wait a brief moment for the iPad's USB server to be ready (retry logic handles longer waits)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
             Logger.shared.log("🔗 MacConnectionManager: Attempting connection after delay")
             self?.connect(to: port)
         }

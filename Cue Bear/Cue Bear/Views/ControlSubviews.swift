@@ -166,6 +166,71 @@ struct CBPerformanceRow: View {
     }
 }
 
+// MARK: - Setlist Row (custom row for handling drag appearance)
+struct CBSetlistRow: View {
+    let song: Song
+    var onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                onRemove()
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundColor(.red)
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(song.name).font(.body.bold()).foregroundColor(.primary)
+                if let sub = song.subtitle, !sub.isEmpty {
+                    Text(sub).font(.caption).foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(.systemBackground))
+        )
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Custom Drag Preview (no white border)
+struct CBSetlistDragPreview: View {
+    let song: Song
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Show hamburger menu icon during drag
+            Image(systemName: "line.3.horizontal")
+                .foregroundColor(.secondary)
+                .font(.title3)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(song.name).font(.body.bold()).foregroundColor(.primary)
+                if let sub = song.subtitle, !sub.isEmpty {
+                    Text(sub).font(.caption).foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .frame(width: 300, alignment: .leading) // Fixed width for preview
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.accentColor.opacity(0.15))
+                .shadow(color: Color.accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
+        )
+    }
+}
+
 // MARK: - Editor: Setlist column
 struct CBSetlistColumn: View {
     let songs: [Song]
@@ -212,26 +277,23 @@ struct CBSetlistColumn: View {
 
             List {
                 ForEach(songs) { s in
-                    CBRowLikeLibrary(
-                        title: s.name,
-                        subtitle: s.subtitle,
-                        leading: {
-                            Button {
-                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                onRemove(s)
-                            } label: {
-                                Image(systemName: "minus.circle.fill")
-                                    .foregroundColor(.red)
-                                    .font(.title3)
-                            }
-                            .buttonStyle(.plain)
-                        },
-                        trailing: { EmptyView() }
+                    CBSetlistRow(
+                        song: s,
+                        onRemove: {
+                            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                            onRemove(s)
+                        }
                     )
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowSeparator(.hidden)
-                    .contentShape(Rectangle())
+                    .onDrag {
+                        // Provide item for drag
+                        NSItemProvider(object: s.id.uuidString as NSString)
+                    } preview: {
+                        // Custom preview without white border
+                        CBSetlistDragPreview(song: s)
+                    }
                     .contextMenu {
                         Button("Edit Cue") { onRename(s) }
                         Button("Remove from Cue List") { onRemove(s) }
@@ -256,6 +318,7 @@ struct CBSetlistColumn: View {
             .environment(\.editMode, .constant(searchText.isEmpty ? .active : .inactive))
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .background(Color(.systemBackground))
         }
         .frame(maxWidth: .infinity)
     }
@@ -772,6 +835,10 @@ struct CBAddEditCueSheet: View {
     var onCancel: () -> Void
     var onDelete: ((Song) -> Void)? = nil
 
+    // Global channel support
+    let isGlobalChannel: Bool
+    let globalChannel: Int
+
     @State private var name: String = ""
     @State private var subtitle: String = ""
     @State private var kind: MIDIKind = .cc
@@ -864,6 +931,13 @@ struct CBAddEditCueSheet: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save(andAddAnother: false) } }
             }
             .onAppear { preset() }
+            .onChange(of: editingSong) { oldValue, newValue in
+                // When editingSong changes (especially when set to nil for "Add Another"),
+                // re-run preset to ensure form is properly initialized
+                if oldValue != nil && newValue == nil {
+                    preset()
+                }
+            }
             .onChange(of: autoAssign) { _, newValue in
                 if newValue {
                     number = firstFreeNumber(for: kind, channel: channel)
@@ -883,6 +957,7 @@ struct CBAddEditCueSheet: View {
     }
 
     private func preset() {
+        debugPrint("📋 [CUE] preset() called, editingSong: \(editingSong != nil ? "exists" : "nil")")
         if let s = editingSong {
             name = s.name
             subtitle = s.subtitle ?? ""
@@ -896,22 +971,32 @@ struct CBAddEditCueSheet: View {
             name = ""
             subtitle = ""
             kind = .cc
-            channel = 1
+            // FIX: Use global channel if enabled, otherwise default to 1
+            channel = isGlobalChannel ? globalChannel : 1
             velocity = 127
             // For new songs, enable auto-assign and find free MIDI
             autoAssign = true
+            debugPrint("  🆕 [CUE] No editing state, finding free number for \(kind) ch\(channel)")
             number = firstFreeNumber(for: kind, channel: channel)
+            debugPrint("  ✅ [CUE] preset() set number to \(number)")
         }
     }
 
     private func firstFreeNumber(for kind: MIDIKind, channel: Int) -> Int {
+        debugPrint("🔍 [CUE] Finding first free \(kind) number on channel \(channel), editingSong: \(editingSong?.name ?? "nil")")
         for n in 0...127 {
             let key = MIDIKey(kind: kind, channel: channel, number: n)
             if let owner = currentOwnerName(key) {
-                if owner != editingSong?.name { continue }
+                if owner != editingSong?.name {
+                    debugPrint("  ✗ [CUE] \(n) is taken by '\(owner)', skipping")
+                    continue
+                }
+                debugPrint("  ✓ [CUE] \(n) is taken by editing song, available")
             }
+            debugPrint("  ✅ [CUE] First free number: \(n)")
             return n
         }
+        debugPrint("  ⚠️ [CUE] No free numbers found, returning 0")
         return 0
     }
 
@@ -963,15 +1048,30 @@ struct CBAddEditCueSheet: View {
         onSave(song, andAddAnother)
 
         if andAddAnother {
-            // Reset form for next cue
+            debugPrint("➕ [CUE] Save & Add Another clicked")
+            // CRITICAL FIX: Reset state variables BEFORE setting editingSong = nil
+            // This prevents race condition where preset() uses old values when .onChange fires
+
+            // Reset all form fields to defaults FIRST
             name = ""
             subtitle = ""
             kind = .cc
-            channel = 1
             velocity = 127
             autoAssign = true
-            number = firstFreeNumber(for: kind, channel: channel)
             error = nil
+
+            // Calculate next channel and number with the reset values
+            debugPrint("  🔢 [CUE] Calculating next free number BEFORE setting editingSong=nil")
+            let nextChannel = isGlobalChannel ? globalChannel : 1
+            channel = nextChannel
+            let nextNumber = firstFreeNumber(for: .cc, channel: nextChannel)
+            number = nextNumber
+            debugPrint("  ✅ [CUE] Set number to \(nextNumber)")
+
+            // NOW set editingSong to nil (triggers .onChange which calls preset())
+            // preset() will now see the correct reset values above
+            debugPrint("  🔄 [CUE] Setting editingSong=nil (will trigger .onChange)")
+            editingSong = nil
         }
     }
 }

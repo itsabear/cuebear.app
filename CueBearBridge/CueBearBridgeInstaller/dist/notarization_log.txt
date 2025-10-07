@@ -1,0 +1,11 @@
+Conducting pre-submission checks for CueBearBridge-Installer.pkg and initiating connection to the Apple notary service...
+Submission ID received
+  id: 1182415f-84b3-4782-ad34-6d6dc614c036
+Successfully uploaded file
+  id: 1182415f-84b3-4782-ad34-6d6dc614c036
+  path: /Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/dist/CueBearBridge-Installer.pkg
+Waiting for processing to complete.
+Current status: In Progress...Current status: In Progress....Current status: In Progress.....Current status: Accepted......Processing complete
+  id: 1182415f-84b3-4782-ad34-6d6dc614c036
+  status: Accepted
+

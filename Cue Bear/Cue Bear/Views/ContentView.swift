@@ -65,7 +65,7 @@ struct TimeBasedWobbleModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         if let config = wobbleAnimator.wobbles[wobbleID] {
-            debugPrint("🎬 TimeBasedWobbleModifier: Rendering wobble for ID \(wobbleID.uuidString.prefix(8))...")
+            // Debug print removed - was causing 60fps console spam during wobble animation
             return AnyView(
                 TimelineView(.animation) { timeline in
                     let time = timeline.date.timeIntervalSinceReferenceDate
@@ -213,18 +213,48 @@ struct MIDINumberPicker: View {
     let kind: MIDIKind
     @Binding var number: Int
     let disabled: Bool
+    let channel: Int
+    var currentOwnerName: ((MIDIKey) -> String?)?
+    var editingControl: ControlButton?  // Full control being edited (to exclude from ownership check)
 
     var body: some View {
         Picker(kind == .cc ? "CC Number" : "Note Number", selection: $number) {
             ForEach(0...127, id: \.self) { n in
-                if kind == .note {
-                    Text("\(n) - \(n.midiNoteName)").tag(n)
-                } else {
-                    Text("\(n)").tag(n)
-                }
+                let owner = ownerFor(kind: kind, number: n, channel: channel)
+                let displayText = displayTextFor(kind: kind, number: n, owner: owner)
+
+                Text(displayText)
+                    .foregroundColor(owner == nil ? .primary : .secondary)
+                    .tag(n)
             }
         }
         .disabled(disabled)
+    }
+
+    private func displayTextFor(kind: MIDIKind, number: Int, owner: String?) -> String {
+        if kind == .note {
+            return owner == nil
+                ? "\(number) - \(number.midiNoteName)"
+                : "\(number) - \(number.midiNoteName) (Used by: \(owner!))"
+        } else {
+            return owner == nil
+                ? "\(number)"
+                : "\(number) (Used by: \(owner!))"
+        }
+    }
+
+    private func ownerFor(kind: MIDIKind, number: Int, channel: Int) -> String? {
+        guard let currentOwnerName = currentOwnerName else { return nil }
+
+        // If we're editing a control and checking its current MIDI assignment, don't show as taken
+        if let edit = editingControl {
+            if edit.kind == kind && edit.channel == channel && edit.number == number {
+                return nil
+            }
+        }
+
+        let key = MIDIKey(kind: kind, channel: channel, number: number)
+        return currentOwnerName(key)
     }
 }
 
@@ -272,6 +302,7 @@ struct CBControlEditorSheet: View {
     var allButtons: [ControlButton] = []  // All control buttons for space validation
     var columns: Int = 8  // Grid column count
     let icons: [String]
+    var isEditMode: Bool = false  // Explicit flag: true for editing existing control, false for adding new
 
     @State private var title: String = ""
     @State private var symbol: String = "square.grid.2x2.fill"
@@ -550,8 +581,15 @@ struct CBControlEditorSheet: View {
                             }
                         }
                     }
-                    MIDINumberPicker(kind: kind, number: $number, disabled: autoAssign)
-                        .id(kind == .note ? "note-picker" : "cc-picker")
+                    MIDINumberPicker(
+                        kind: kind,
+                        number: $number,
+                        disabled: autoAssign,
+                        channel: isGlobalChannel ? globalChannel : channel,
+                        currentOwnerName: currentOwnerName,
+                        editingControl: editing
+                    )
+                    .id(kind == .note ? "note-picker" : "cc-picker")
                     // Show conflict warning below picker (not inside picker items)
                     if let owner = conflictOwner() {
                         Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
@@ -561,8 +599,8 @@ struct CBControlEditorSheet: View {
                     }
                 }
 
-                // Delete section - only show when editing existing control (has title)
-                if !(editing?.title.isEmpty ?? true), onDelete != nil {
+                // Delete section - only show when editing existing control
+                if isEditMode, onDelete != nil {
                     Section {
                         Button(role: .destructive) {
                             showDeleteAlert = true
@@ -593,8 +631,8 @@ struct CBControlEditorSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
                 }
-                // Show "Save & Add Another" when adding new controls (empty title)
-                if editing?.title.isEmpty ?? true {
+                // Show "Save & Add Another" when adding new controls (not when editing existing)
+                if !isEditMode {
                     ToolbarItem(placement: .primaryAction) {
                         Button("Save & Add Another") {
                             saveControl(andAddAnother: true)
@@ -603,7 +641,7 @@ struct CBControlEditorSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button((editing?.title.isEmpty ?? true) ? "Add" : "Save") {
+                    Button(isEditMode ? "Save" : "Add") {
                         saveControl(andAddAnother: false)
                     }
                     .disabled(conflictOwner() != nil || showSpaceWarning || isOutOfRoom)
@@ -613,6 +651,14 @@ struct CBControlEditorSheet: View {
                 preset()
                 // Validate space for add mode on sheet open
                 isOutOfRoom = !validateSpaceForAddMode()
+            }
+            .onChange(of: editing) { oldValue, newValue in
+                // When editing changes (especially when set to nil for "Add Another"),
+                // re-run preset to ensure form is properly initialized
+                if oldValue != nil && newValue == nil {
+                    preset()
+                    isOutOfRoom = !validateSpaceForAddMode()
+                }
             }
             .onChange(of: autoAssign) { _, newValue in
                 if newValue {
@@ -658,9 +704,26 @@ struct CBControlEditorSheet: View {
     }
 
     private func preset() {
+        debugPrint("📋 [CONTROL] preset() called, editing: \(editing != nil ? "exists" : "nil")")
         guard let b = editing else {
-            // For new buttons without a draft, enable auto-assign by default
+            // For new controls without editing state
+            // Check if this is "Add Another" by seeing if number is already set to a valid value
+            if number > 0 {
+                // "Add Another" already set the correct number - DON'T recalculate!
+                debugPrint("  🎯 [CONTROL] Number already set by 'Add Another': \(number), skipping recalculation")
+                // autoAssign is already set to true above
+                // All other values are already reset correctly
+                return
+            }
+
+            // This is a fresh "Add Control" (not "Add Another")
             autoAssign = true
+            // FIX: Use global channel if enabled, otherwise default to 1
+            let nextChannel = isGlobalChannel ? globalChannel : 1
+            channel = nextChannel
+            debugPrint("  🆕 [CONTROL] No editing state, finding free number for \(kind) ch\(channel)")
+            number = firstFreeNumber(for: kind, channel: channel)
+            debugPrint("  ✅ [CONTROL] preset() set number to \(number)")
             return
         }
 
@@ -684,14 +747,14 @@ struct CBControlEditorSheet: View {
             buttonType = (b.isSmall == true) ? .small : .regular
         }
 
-        // For new buttons (empty title), enable auto-assign
-        // For existing buttons (has title), disable auto-assign to allow manual editing
-        autoAssign = b.title.isEmpty
+        // For new buttons (add mode), enable auto-assign
+        // For existing buttons (edit mode), disable auto-assign to allow manual editing
+        autoAssign = !isEditMode
     }
 
     private func titleForSheet() -> String {
-        // Check if we're adding a new control (empty title) or editing existing (has title)
-        let isAddingNew = editing?.title.isEmpty ?? true
+        // Check if we're adding a new control or editing existing (use explicit mode flag)
+        let isAddingNew = !isEditMode
 
         if isAddingNew {
             // Adding new control - show specific type
@@ -701,8 +764,12 @@ struct CBControlEditorSheet: View {
                 return buttonType == .small ? "Add Small Button" : "Add Button"
             }
         } else {
-            // Editing existing control
-            return "Edit Control"
+            // Editing existing control - show specific type
+            if controlType == .fader {
+                return "Edit Fader"
+            } else {
+                return buttonType == .small ? "Edit Small Button" : "Edit Button"
+            }
         }
     }
 
@@ -729,19 +796,25 @@ struct CBControlEditorSheet: View {
     }
 
     private func firstFreeNumber(for kind: MIDIKind, channel: Int) -> Int {
+        debugPrint("🔍 [CONTROL] Finding first free \(kind) number on channel \(channel), editing: \(editing?.title ?? "nil")")
         for n in 0...127 {
             let key = MIDIKey(kind: kind, channel: channel, number: n)
-            if currentOwnerName(key) != nil {
+            let owner = currentOwnerName(key)
+            if owner != nil {
                 // Skip if occupied by a different control
                 if let edit = editing, edit.kind == kind, edit.channel == channel, edit.number == n {
                     // This is the control we're editing, so this number is available for it
+                    debugPrint("  ✓ [CONTROL] \(n) is taken by editing control, available")
                 } else {
                     // Occupied by a different control, skip this number
+                    debugPrint("  ✗ [CONTROL] \(n) is taken by '\(owner!)', skipping")
                     continue
                 }
             }
+            debugPrint("  ✅ [CONTROL] First free number: \(n)")
             return n
         }
+        debugPrint("  ⚠️ [CONTROL] No free numbers found, returning 0")
         return 0
     }
 
@@ -822,19 +895,41 @@ struct CBControlEditorSheet: View {
         onSave(b, andAddAnother)
 
         if andAddAnother {
-            // Reset form for next control
-            editing = nil  // Clear editing state for new control
+            debugPrint("➕ [CONTROL] Save & Add Another clicked")
+            // CRITICAL FIX: Reset state variables BEFORE setting editing = nil
+            // This prevents race condition where preset() uses old values when .onChange fires
+
+            // Reset all form fields to defaults FIRST
             title = ""
             symbol = "square.grid.2x2.fill"
             kind = .cc
-            channel = 1
             velocity = 127
             isToggle = false
             autoAssign = true
-            // Reset fader properties to defaults
-            faderOrientation = "vertical"
-            faderDirection = "up"
-            if autoAssign { assignFreeNumber() }
+            // FIX: Preserve controlType to keep fader/button mode for "Add Another"
+            // Don't reset controlType - if adding fader, stay in fader mode
+            // controlType = .button  // ← REMOVED
+            // Only reset button-specific properties if it was a button
+            if controlType == .button {
+                buttonType = .regular
+            }
+            // Fader orientation and direction are preserved for next fader
+
+            // Calculate next channel and number with the reset values
+            debugPrint("  🔢 [CONTROL] Calculating next free number BEFORE setting editing=nil")
+            let nextChannel = isGlobalChannel ? globalChannel : 1
+            channel = nextChannel
+            let nextNumber = firstFreeNumber(for: .cc, channel: nextChannel)
+            number = nextNumber
+            debugPrint("  ✅ [CONTROL] Set channel to \(nextChannel), number to \(nextNumber)")
+
+            // NOW set editing to nil (triggers .onChange which calls preset())
+            // preset() will now see the correct reset values above
+            debugPrint("  🔄 [CONTROL] Setting editing=nil (will trigger .onChange)")
+            editing = nil
+
+            // Recalculate space validation after reset
+            isOutOfRoom = !validateSpaceForAddMode()
         }
     }
 
@@ -955,8 +1050,15 @@ struct CBEditControlSheet: View {
                             Text("\(ch)").tag(ch)
                         }
                     }
-                    MIDINumberPicker(kind: kind, number: $number, disabled: autoAssign)
-                        .id(kind == .note ? "note-picker-edit" : "cc-picker-edit")
+                    MIDINumberPicker(
+                        kind: kind,
+                        number: $number,
+                        disabled: autoAssign,
+                        channel: channel,
+                        currentOwnerName: currentOwnerName,
+                        editingControl: editing
+                    )
+                    .id(kind == .note ? "note-picker-edit" : "cc-picker-edit")
                     if !isFaderUI && kind == .note {
                         VelocityPicker(velocity: $velocity, disabled: false)
                     }
@@ -1355,10 +1457,14 @@ internal struct ContentView: View {
     @State private var tempName: String = ""
     @State private var showSaveChangesAlert: Bool = false
     @State private var pendingAction: (() -> Void)? = nil
-    
+
     // Song deletion confirmation
     @State private var showDeleteConfirmation: Bool = false
     @State private var songToDelete: Song? = nil
+
+    // Document loading error alert
+    @State private var showDocumentLoadError: Bool = false
+    @State private var documentLoadErrorMessage: String = ""
 
     // Control Area (formerly transport)
     @State private var controlButtons: [ControlButton] = []
@@ -1476,7 +1582,7 @@ internal struct ContentView: View {
                 }
             )
             } else {
-            let _ = debugPrint("🎬 Rendering CBPerformanceList - isCueMode: \(store.mode == .cue)")
+            // Debug print removed - was causing console spam on every render
             return AnyView(
                 CBPerformanceList(
                     songs: store.setlist.songs,
@@ -1541,8 +1647,8 @@ internal struct ContentView: View {
                 conflictFor: conflictLookup(),
                 onTap: { btn in triggerControl(btn) },
                 onEditButton: { btn in
-                    editingControl = btn
-                    showControlEditor = true
+                    editingControlForEdit = btn
+                    showEditControlSheet = true
                 },
             onAddButton: { if canAddMoreControls() { beginAddControlOfType(.button) } },
             onAddFader: { if canAddMoreControls() { beginAddControlOfType(.fader) } },
@@ -1726,7 +1832,8 @@ internal struct ContentView: View {
     private func beginAddControlOfType(_ kind: AddKind) {
         // Always compute fresh conflicts to ensure we have the latest control buttons
         let conflicts = computeConflictLookup()
-        let freeCC = (0...127).first { conflicts[MIDIKey(kind: .cc, channel: 1, number: $0)] == nil } ?? 0
+        // FIX: Start from 1 instead of 0 to avoid assigning CC# 0 by default
+        let freeCC = (1...127).first { conflicts[MIDIKey(kind: .cc, channel: 1, number: $0)] == nil } ?? 1
         debugPrint("🎹 beginAddControlOfType: Found free CC = \(freeCC), total conflicts = \(conflicts.count)")
         var draft = ControlButton(title: "", symbol: "square.grid.2x2.fill", kind: .cc, number: freeCC, channel: 1, velocity: 127, isToggle: nil)
         switch kind {
@@ -1751,41 +1858,60 @@ internal struct ContentView: View {
         markDirty()
     }
 
-    var body: some View {
-        let content: AnyView = showSplash
-        ? AnyView(SplashScreen().transition(.opacity))
-        : AnyView(mainStack().ignoresSafeArea(.keyboard, edges: .bottom))
-        content
-        .onChange(of: scenePhase) { _, phase in
-            // Ensure connections are properly managed when app becomes active
-            if phase == .active {
-                debugPrint("📱 App became active, managing connections...")
-                
-                // Restart USB tunnel
-                // usb.stop() // Removed to prevent restart loop
-                
-                // Small delay to ensure clean restart
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    // Simple connection management - USB server is already running
-                    debugPrint("📱 App became active, USB server should be running")
-                    if !wifiClient.isConnected {
-                        wifiClient.restartDiscovery()
-                    }
-                }
-            } else if phase == .background {
-                // Save project when app goes to background
-                if isDirty && projectName != "Untitled" {
-                    debugPrint("💾 App going to background, saving project: \(projectName)")
-                    do {
-                        try ProjectIO.save(name: projectName, setlist: store.setlist.songs, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel)
-                        isDirty = false
-                        debugPrint("✅ Background save completed: \(projectName)")
-                    } catch {
-                        debugPrint("❌ Background save failed: \(error)")
-                    }
-                }
-            }
+    @ViewBuilder
+    private var contentView: some View {
+        if showSplash {
+            SplashScreen().transition(.opacity)
+        } else {
+            mainStack().ignoresSafeArea(.keyboard, edges: .bottom)
         }
+    }
+
+    var body: some View {
+        applyLifecycle(
+            applyAlerts(
+                applySheets(
+                    contentView
+                        .onChange(of: scenePhase) { _, phase in
+                            // Ensure connections are properly managed when app becomes active
+                            if phase == .active {
+                                debugPrint("📱 App became active, managing connections...")
+
+                                // Restart USB tunnel
+                                // usb.stop() // Removed to prevent restart loop
+
+                                // Small delay to ensure clean restart
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    // Simple connection management - USB server is already running
+                                    debugPrint("📱 App became active, USB server should be running")
+                                    if !wifiClient.isConnected {
+                                        wifiClient.restartDiscovery()
+                                    }
+                                }
+                            } else if phase == .background {
+                                // Save project when app goes to background
+                                if isDirty && projectName != "Untitled" {
+                                    debugPrint("💾 App going to background, saving project: \(projectName)")
+                                    do {
+                                        try ProjectIO.save(name: projectName, setlist: store.setlist.songs, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel)
+                                        isDirty = false
+                                        debugPrint("✅ Background save completed: \(projectName)")
+                                    } catch {
+                                        debugPrint("❌ Background save failed: \(error)")
+                                    }
+                                }
+                            }
+                        }
+                )
+            )
+        )
+    }
+
+    // MARK: - View Modifiers (extracted to fix compiler type-checking timeout)
+
+    @ViewBuilder
+    private func applySheets<V: View>(_ view: V) -> some View {
+        view
         // MARK: Sheets
         .sheet(isPresented: $showConnections) {
             CBConnectionsSheet(
@@ -1847,7 +1973,9 @@ internal struct ContentView: View {
                 onDelete: { song in
                     deleteFromLibrary(song)
                     showAddEdit = false
-                }
+                },
+                isGlobalChannel: isGlobalChannel,
+                globalChannel: globalChannel
             )
         }
         .sheet(isPresented: $showAddEditMIDIOnly) {
@@ -1947,7 +2075,8 @@ internal struct ContentView: View {
                 },
                 allButtons: controlButtons,
                 columns: 8,
-                icons: icons
+                icons: icons,
+                isEditMode: false
             )
         }
         .sheet(isPresented: $showEditControlSheet) {
@@ -1982,7 +2111,8 @@ internal struct ContentView: View {
                 },
                 allButtons: controlButtons,
                 columns: 8,
-                icons: icons
+                icons: icons,
+                isEditMode: true
             )
         }
         .sheet(isPresented: $showProjects) {
@@ -2021,6 +2151,11 @@ internal struct ContentView: View {
                 }
             )
         }
+    }
+
+    @ViewBuilder
+    private func applyAlerts<V: View>(_ view: V) -> some View {
+        view
         .alert("Project Name", isPresented: $showNamePrompt, actions: {
             TextField("Name", text: $tempName)
             Button("Cancel", role: .cancel) {}
@@ -2048,6 +2183,13 @@ internal struct ContentView: View {
         }, message: {
             Text("You have unsaved changes. Do you want to save them before continuing?")
         })
+        .alert("Error Loading Project", isPresented: $showDocumentLoadError, actions: {
+            Button("OK", role: .cancel) {
+                documentLoadErrorMessage = ""
+            }
+        }, message: {
+            Text(documentLoadErrorMessage)
+        })
         .alert("Delete Song", isPresented: $showDeleteConfirmation, actions: {
             Button("Cancel", role: .cancel) { 
                 songToDelete = nil
@@ -2065,11 +2207,18 @@ internal struct ContentView: View {
                 Text("")
             }
         })
+    }
 
+    @ViewBuilder
+    private func applyLifecycle<V: View>(_ view: V) -> some View {
+        view
         // MARK: Lifecycle
         // FIX #1: Setup notification subscriptions on appear
         .onAppear {
             setupNotificationSubscriptions()
+            // FIX: Initialize conflict cache immediately to prevent freeze during first render
+            // This prevents conflictLookup() from returning empty cache during mode switch
+            cachedConflictLookup = computeConflictLookup()
         }
         .task {
             debugPrint("🚀 App initialization starting...")
@@ -2186,14 +2335,12 @@ internal struct ContentView: View {
             }
     }
 
-    // MARK: - Conflict map (computed without caching to avoid state modification issues)
+    // MARK: - Conflict map (always use cached version to prevent main thread blocking)
     private func conflictLookup() -> [MIDIKey: String] {
-        // If cache is empty, compute it on-the-fly without modifying state
-        // This prevents views from rendering with empty conflict data
-        // The cache will be populated asynchronously by .task modifiers
-        if cachedConflictLookup.isEmpty {
-            return computeConflictLookup()
-        }
+        // FIX: NEVER compute synchronously during rendering - this was causing app freeze
+        // Always return cached value (even if empty). The cache will be populated
+        // asynchronously by .task modifiers within ~500ms
+        // Empty cache temporarily shows no conflicts, which is acceptable vs freezing the app
         return cachedConflictLookup
     }
 
@@ -2221,9 +2368,12 @@ internal struct ContentView: View {
     }
 
     private func invalidateConflictCache() {
-        cachedConflictLookup = [:]
+        // FIX: Immediately rebuild cache instead of clearing it
+        // Clearing causes "Save & Add Another" to see empty cache and assign CC#0
+        cachedConflictLookup = computeConflictLookup()
         cachedUsedCCs = []
         cacheVersion += 1
+        debugPrint("🔄 Conflict cache rebuilt immediately with \(cachedConflictLookup.count) entries")
     }
 
     // FIX #5: Throttled conflict cache update (500ms throttle)
@@ -2820,12 +2970,22 @@ internal struct ContentView: View {
             return
         }
         
+        debugPrint("📁 ContentView: Presenting document picker from root view controller")
+
         DocumentProjectIO.presentDocumentPicker(from: rootViewController) { url in
-            guard let url = url else { return }
-            
+            debugPrint("📁 ContentView: Document picker completion called with URL: \(url?.absoluteString ?? "nil")")
+
+            guard let url = url else {
+                debugPrint("📁 ContentView: No URL received (user cancelled)")
+                return
+            }
+
+            debugPrint("📁 ContentView: Calling openProject with URL: \(url.path)")
+
             DocumentProjectIO.openProject(from: url) { payload in
                 DispatchQueue.main.async {
                     if let payload = payload {
+                        debugPrint("✅ ContentView: Project payload received: \(payload.name)")
                         self.projectName = payload.name
                         self.store.setlist.songs = payload.setlist
                         self.songLibrary = payload.library
@@ -2833,13 +2993,15 @@ internal struct ContentView: View {
                         self.isGlobalChannel = payload.isGlobalChannel ?? false
                         self.globalChannel = payload.globalChannel ?? 1
                         let now = Date()
-                        for s in self.songLibrary where self.libAddedAt[s.id] == nil { 
-                            self.libAddedAt[s.id] = now 
+                        for s in self.songLibrary where self.libAddedAt[s.id] == nil {
+                            self.libAddedAt[s.id] = now
                         }
                         self.isDirty = false
-                        debugPrint("✅ Project loaded from document: \(payload.name)")
+                        debugPrint("✅ ContentView: Project loaded successfully: \(payload.name)")
                     } else {
-                        debugPrint("❌ Failed to load project from document")
+                        debugPrint("❌ ContentView: Failed to load project - showing error alert")
+                        self.documentLoadErrorMessage = "Could not open the selected project file. The file may be corrupted or in an unsupported format."
+                        self.showDocumentLoadError = true
                     }
                 }
             }
@@ -3173,12 +3335,17 @@ private struct CBControlSection: View {
     @State private var dragTranslation: CGSize = .zero
     @State private var dragStartLocation: CGPoint = .zero
     @State private var shadowOffset: CGSize = .zero // For smooth shadow tracking
-    
+
     // Track actual width for proper orientation handling
     @State private var actualWidth: CGFloat = UIScreen.main.bounds.width
 
     // Track calculated height to avoid infinite render loops
     @State private var cachedHeight: CGFloat = 0
+
+    // PERFORMANCE FIX: Cache displacement calculations to prevent O(n²) recomputation during drag
+    @State private var displacementCache: [UUID: (col: Int, row: Int)] = [:]
+    @State private var displacementCacheKey: String = ""
+    @State private var hasInvalidDisplacement: Bool = false
 
     // Pixel snapping to prevent jitter (from cue capsule success)
     private func snap(_ value: CGFloat) -> CGFloat {
@@ -3198,13 +3365,38 @@ private struct CBControlSection: View {
         }
         dragging = nil
         previewLocation = nil
+        displacementCache.removeAll()
+        displacementCacheKey = ""
+        hasInvalidDisplacement = false
         dropSurfaceElevated = false
         isDragOperation = false
         dragTranslation = .zero
         dragStartLocation = .zero
         shadowOffset = .zero
     }
-    
+
+    // Update displacement cache (called from onChange to avoid state modification during view update)
+    private func updateDisplacementCache() {
+        guard let dragging = dragging, let preview = previewLocation else {
+            // No active drag - clear cache
+            displacementCache.removeAll()
+            displacementCacheKey = ""
+            hasInvalidDisplacement = false
+            return
+        }
+
+        // Generate cache key for current drag state
+        let cacheKey = "\(dragging.id)_\(preview.col)_\(preview.row)"
+
+        // Only rebuild if cache key changed
+        if displacementCacheKey != cacheKey {
+            displacementCacheKey = cacheKey
+            let result = computeAllDisplacements(draggedButton: dragging, targetPosition: preview, columns: columns)
+            displacementCache = result.displacements
+            hasInvalidDisplacement = result.hasInvalidDisplacement
+        }
+    }
+
     // Grid configuration (same as Mac editor)
     private let columns = 8
     private let columnSpacing: CGFloat = 12
@@ -3248,6 +3440,8 @@ private struct CBControlSection: View {
                             if !isEditing {
                                 clearDragState(reason: "exiting edit mode")
                             } else {
+                                // Entering edit mode - always unfold control area
+                                isCollapsed = false
                                 editSessionNonce &+= 1
                                 clearDragState(reason: "entering edit mode")
                             }
@@ -3454,7 +3648,15 @@ private struct CBControlSection: View {
                 .onChange(of: previewLocation) { _, newValue in
                     debugPrint("🔄 Preview location changed: \(newValue?.col ?? -1),\(newValue?.row ?? -1)")
                 }
-        
+                .onChange(of: dragging?.id) { _, _ in
+                    // Update displacement cache when drag state changes
+                    updateDisplacementCache()
+                }
+                .onChange(of: previewLocation) { _, _ in
+                    // Update displacement cache when preview location changes
+                    updateDisplacementCache()
+                }
+
         return VStack(spacing: 0) {
             headerView
             gridWithLifecycle
@@ -3709,66 +3911,55 @@ private struct CBControlSection: View {
         guard let dragging = dragging, let preview = preview else {
             return (baseCol, baseRow)
         }
-        
+
         // If this IS the dragged button, keep it at its original position
         // The dragTranslation offset will handle the visual movement
         if dragging.id == button.id {
             return (baseCol, baseRow)
         }
-        
-        // Create the dragged button's shadow rectangle
-        let draggedW = dragging.gridWidth
-        let draggedH = dragging.gridHeight
-        let draggedButtonShadow = GridRect(col: preview.col, row: preview.row, width: draggedW, height: draggedH)
-        
-        // Check if this button overlaps with the dragged button's shadow
-        let buttonRect = GridRect(col: baseCol, row: baseRow, width: button.gridWidth, height: button.gridHeight)
-        
-        if rectsOverlap(buttonRect, draggedButtonShadow) {
-            // This button needs to move to avoid the shadow
-            // Use the same logic as the commitment to ensure preview matches final position
-            return calculateDisplacementPosition(for: button, draggedButton: dragging, targetPosition: preview, columns: columns)
+
+        // PERFORMANCE FIX: Generate cache key for current drag state
+        let cacheKey = "\(dragging.id)_\(preview.col)_\(preview.row)"
+
+        // PERFORMANCE FIX: Check if we need to rebuild cache (but don't modify state here!)
+        // If cache is stale, compute on-the-fly. Cache will be updated via onChange modifier.
+        if displacementCacheKey != cacheKey {
+            // Cache is stale - compute directly without modifying state
+            let result = computeAllDisplacements(draggedButton: dragging, targetPosition: preview, columns: columns)
+            return result.displacements[button.id] ?? (baseCol, baseRow)
         }
-        
+
+        // PERFORMANCE FIX: Use cached result (O(1) lookup instead of O(n) computation)
+        if let cachedPos = displacementCache[button.id] {
+            return cachedPos
+        }
+
         return (baseCol, baseRow)
     }
-    
-    // Calculate displacement position for a single button (for live preview)
-    private func calculateDisplacementPosition(for button: ControlButton, draggedButton: ControlButton, targetPosition: GridPosition, columns: Int) -> (col: Int, row: Int) {
+
+    // PERFORMANCE FIX: Compute all displacement positions at once (called once per preview location change)
+    private func computeAllDisplacements(draggedButton: ControlButton, targetPosition: GridPosition, columns: Int) -> (displacements: [UUID: (col: Int, row: Int)], hasInvalidDisplacement: Bool) {
+        var result: [UUID: (col: Int, row: Int)] = [:]
+        var hasInvalidDisplacement = false
+
         let draggedW = draggedButton.gridWidth
         let draggedH = draggedButton.gridHeight
         let draggedButtonShadow = GridRect(col: targetPosition.col, row: targetPosition.row, width: draggedW, height: draggedH)
-        
-        // Check if this button would be displaced
-        let buttonRect = GridRect(
-            col: button.gridCol ?? 0,
-            row: button.gridRow ?? 0,
-            width: button.gridWidth,
-            height: button.gridHeight
-        )
-        
-        if !rectsOverlap(buttonRect, draggedButtonShadow) {
-            return (button.gridCol ?? 0, button.gridRow ?? 0) // Not displaced
-        }
 
-        let buttonW = button.gridWidth
-        let buttonH = button.gridHeight
-        
-        // Create occupied positions set (same logic as commitment)
+        // Build occupancy map once for all buttons
         var occupiedPositions: Set<String> = []
-        
+
         // Mark the dragged button's new position as occupied
         for c in targetPosition.col..<(targetPosition.col + draggedW) {
             for r in targetPosition.row..<(targetPosition.row + draggedH) {
                 occupiedPositions.insert("\(c),\(r)")
             }
         }
-        
-        // Mark all existing button positions as occupied (excluding this button and dragged button)
-        for i in 0..<buttons.count {
-            let otherButton = buttons[i]
-            if otherButton.id == draggedButton.id || otherButton.id == button.id { continue }
-            
+
+        // Mark all existing button positions as occupied (excluding dragged button)
+        for otherButton in buttons {
+            if otherButton.id == draggedButton.id { continue }
+
             if let col = otherButton.gridCol, let row = otherButton.gridRow {
                 let width = otherButton.gridWidth
                 let height = otherButton.gridHeight
@@ -3779,11 +3970,65 @@ private struct CBControlSection: View {
                 }
             }
         }
-        
-        // iPhone-like smart positioning: try positions in order of preference
-        // 1. Try swapping with dragged button's original position first (simple swap)
+
+        // Now compute displacement for each button that overlaps
+        for button in buttons {
+            if button.id == draggedButton.id { continue }
+
+            let baseCol = button.gridCol ?? 0
+            let baseRow = button.gridRow ?? 0
+            let buttonRect = GridRect(col: baseCol, row: baseRow, width: button.gridWidth, height: button.gridHeight)
+
+            if rectsOverlap(buttonRect, draggedButtonShadow) {
+                // This button needs to move - calculate its new position
+                let newPos = calculateDisplacementPosition(
+                    for: button,
+                    draggedButton: draggedButton,
+                    targetPosition: targetPosition,
+                    columns: columns,
+                    occupiedPositions: occupiedPositions
+                )
+
+                if let validPos = newPos {
+                    result[button.id] = validPos
+                } else {
+                    // No valid position found - keep button in original position and mark as invalid
+                    hasInvalidDisplacement = true
+                    result[button.id] = (baseCol, baseRow)
+                }
+            }
+        }
+
+        return (displacements: result, hasInvalidDisplacement: hasInvalidDisplacement)
+    }
+    
+    // PERFORMANCE FIX: Calculate displacement position using pre-computed occupancy map
+    private func calculateDisplacementPosition(
+        for button: ControlButton,
+        draggedButton: ControlButton,
+        targetPosition: GridPosition,
+        columns: Int,
+        occupiedPositions: Set<String>
+    ) -> (col: Int, row: Int)? {
+        let buttonW = button.gridWidth
+        let buttonH = button.gridHeight
         let draggedOriginalCol = draggedButton.gridCol ?? 0
         let draggedOriginalRow = draggedButton.gridRow ?? 0
+
+        // Create a mutable copy to track positions occupied by other displaced buttons
+        var mutableOccupied = occupiedPositions
+
+        // Remove this button's current position from occupancy check
+        if let col = button.gridCol, let row = button.gridRow {
+            for c in col..<(col + buttonW) {
+                for r in row..<(row + buttonH) {
+                    mutableOccupied.remove("\(c),\(r)")
+                }
+            }
+        }
+
+        // iPhone-like smart positioning: try positions in order of preference
+        // 1. Try swapping with dragged button's original position first (simple swap)
 
         if draggedOriginalCol + buttonW <= columns {
             var canSwap = true
@@ -3865,10 +4110,9 @@ private struct CBControlSection: View {
                 }
             }
         }
-        
-        // Fallback
-        let maxRow = buttons.compactMap { $0.gridRow }.max() ?? 0
-        return (0, maxRow + 2)
+
+        // No valid position found - return nil to signal "no space available"
+        return nil
     }
     
     // Commit positions for all buttons that were displaced during the drag
@@ -4302,8 +4546,8 @@ private struct CBControlSection: View {
                 .animation(.easeInOut(duration: 0.15), value: dragging?.id == button.id) // Smooth scale animation
                 .allowsHitTesting(true)
                 .simultaneousGesture(
-                    isEditing ? 
-                    DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                    isEditing ?
+                    DragGesture(minimumDistance: 10, coordinateSpace: .global)
                         .onChanged { value in
                             if dragging?.id != button.id {
                                 // Start iOS-style drag
@@ -4509,19 +4753,22 @@ private struct CBControlSection: View {
             let shadowX = CGFloat(preview.col) * (cellSize + columnSpacing)
             let shadowY = CGFloat(preview.row) * (cellSize + rowSpacing)
             
+            // Choose shadow color based on whether displacement is valid
+            let shadowColor = hasInvalidDisplacement ? Color.red : Color.blue
+
             let previewView = ZStack {
-                // Blue shadow effect
+                // Shadow effect (blue if valid, red if no space available)
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue.opacity(0.2))
+                    .fill(shadowColor.opacity(0.2))
                     .blur(radius: 8)
                     .scaleEffect(1.1)
-                
+
                 // Main preview shape
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue.opacity(0.3))
+                    .fill(shadowColor.opacity(0.3))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.blue, lineWidth: 3)
+                            .stroke(shadowColor, lineWidth: 3)
                     )
             }
                     .frame(width: width, height: height)
@@ -5466,6 +5713,7 @@ private struct iPadControlTile: View {
     var onFaderMIDI: (Int, Int, Int, String, UUID) -> Void
     
     @State private var isPressed = false
+    @State private var isTouching = false // Track touch state for instant feedback
     @State private var faderValue: Double = 0.66 // 0.0 to 1.0
     @State private var faderVisualValue: Double = 0.66
     @State private var lastSentValue: Double = 0.0 // Track last MIDI value sent
@@ -5537,9 +5785,23 @@ private struct iPadControlTile: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .modifier(PressEffectWhenNotEditing(isEditing: isEditing,
-                                                        onChange: { withAnimation(.easeOut(duration: 0.08)) { isPressed = true } },
-                                                        onEnd: { withAnimation(.easeOut(duration: 0.12)) { isPressed = false } }))
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in
+                                if !isTouching {
+                                    withAnimation(.easeOut(duration: 0.08)) {
+                                        isTouching = true
+                                        isPressed = true
+                                    }
+                                }
+                            }
+                            .onEnded { _ in
+                                withAnimation(.easeOut(duration: 0.12)) {
+                                    isTouching = false
+                                    isPressed = false
+                                }
+                            }
+                    )
                 }
             }
             
@@ -5672,8 +5934,10 @@ private struct iPadControlTile: View {
                     .opacity(flashOpacity)
             )
             .animation(.easeOut(duration: 0.12), value: flashOpacity)
-            .scaleEffect(isPressed ? 0.94 : 1.0)
-            .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isPressed)
+            .scaleEffect(isTouching ? 1.05 : 1.0)
+            .shadow(color: (isTouching || (isEditing && isDragging)) ? .blue.opacity(0.6) : .clear, radius: 8, x: 0, y: 0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isTouching)
+            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isDragging)
     }
     
     @ViewBuilder
@@ -5718,6 +5982,13 @@ private struct iPadControlTile: View {
                     // Apply drag gesture directly to the fader track area
                     isEditing ? nil : DragGesture(minimumDistance: 0)
                         .onChanged { value in
+                            // Instant touch feedback on first touch
+                            if !isTouching {
+                                withAnimation(.easeOut(duration: 0.08)) {
+                                    isTouching = true
+                                }
+                            }
+
                             let dragX = value.location.x
                             let faderTrackWidth = w
 
@@ -5749,6 +6020,11 @@ private struct iPadControlTile: View {
                             }
                         }
                         .onEnded { _ in
+                            // End touch feedback
+                            withAnimation(.easeOut(duration: 0.12)) {
+                                isTouching = false
+                            }
+
                             // Ensure final MIDI value is sent
                             let finalMidiValue = Int(round(faderValue * 127))
                             onFaderMIDI(button.channel, button.number, finalMidiValue, button.title, button.id)
@@ -5810,6 +6086,13 @@ private struct iPadControlTile: View {
                     // Apply drag gesture directly to the fader track area
                     isEditing ? nil : DragGesture(minimumDistance: 0)
                         .onChanged { value in
+                            // Instant touch feedback on first touch
+                            if !isTouching {
+                                withAnimation(.easeOut(duration: 0.08)) {
+                                    isTouching = true
+                                }
+                            }
+
                             let dragY = value.location.y
                             let faderTrackHeight = h
 
@@ -5841,6 +6124,11 @@ private struct iPadControlTile: View {
                             }
                         }
                         .onEnded { _ in
+                            // End touch feedback
+                            withAnimation(.easeOut(duration: 0.12)) {
+                                isTouching = false
+                            }
+
                             // Ensure final MIDI value is sent
                             let finalMidiValue = Int(round(faderValue * 127))
                             onFaderMIDI(button.channel, button.number, finalMidiValue, button.title, button.id)
@@ -5872,13 +6160,19 @@ private struct iPadControlTile: View {
         .padding(4)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.clear))
         .contentShape(Rectangle())  // Ensure entire frame is tappable
-        .onTapGesture {
-            if isEditing {
-                onEdit()
-            } else {
-                onTap()
+        .highPriorityGesture(
+            TapGesture().onEnded {
+                if isEditing {
+                    onEdit()
+                } else {
+                    onTap()
+                }
             }
-        }
+        )
+        .scaleEffect(isTouching ? 1.05 : 1.0)
+        .shadow(color: (isTouching || (isEditing && isDragging)) ? .blue.opacity(0.6) : .clear, radius: 8, x: 0, y: 0)
+        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isTouching)
+        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isDragging)
     }
     
     private func midiLabel() -> String {
