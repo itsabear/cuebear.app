@@ -286,15 +286,15 @@ final class IProxyManager: ObservableObject {
     private func handleSystemWake() {
         Logger.shared.log("🔧 IProxyManager: ⏰ System woke up - restarting iproxy after 2s delay")
 
-        // Wait a moment for USB subsystem to be ready after wake
+        // Try quickly first, but retry if needed - iOS devices sometimes need extra time
         DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) { [weak self] in
             do {
                 try self?.start()
                 Logger.shared.log("🔧 IProxyManager: ✅ iproxy restarted successfully after wake")
             } catch {
                 Logger.shared.log("🔧 IProxyManager: ❌ Failed to restart iproxy after wake: \(error)")
-                // Retry after a longer delay if first attempt fails
-                DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                // Retry after 2 more seconds if first attempt fails
+                DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) { [weak self] in
                     do {
                         try self?.start()
                         Logger.shared.log("🔧 IProxyManager: ✅ iproxy restarted on retry after wake")

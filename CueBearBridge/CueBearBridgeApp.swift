@@ -30,16 +30,27 @@ struct MenuBarView: View {
     
     var body: some View {
         VStack(spacing: 8) {
-            // Header
-            HStack {
-                Text("Cue Bear Bridge")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                Spacer()
+            // Header with version
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("Cue Bear Bridge")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    Text("v1.1.2 (884ca44)")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                HStack {
+                    Text("Created by Omri Behr")
+                        .font(.system(size: 8))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
-            
+
             Divider()
             
             // Status Indicators
@@ -137,16 +148,6 @@ struct MenuBarView: View {
             }
             .buttonStyle(PlainButtonStyle())
             .background(Color.clear)
-            
-            // Creator credit
-            HStack {
-                Text("Created by Omri Behr")
-                    .font(.system(size: 8))
-                    .foregroundColor(.secondary)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8)
         }
         .frame(width: 200)
         .background(Color(NSColor.controlBackgroundColor))

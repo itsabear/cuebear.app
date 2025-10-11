@@ -171,7 +171,7 @@ final class MacConnectionManager: ObservableObject {
                 if shouldSendHandshake {
                     self.sendHandshake()
                 }
-                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "Looking for Cue Bear" }
+                // Don't update status here - let sendHandshake handle it
 
             case .failed(let err):
                 self.stateLock.lock()
@@ -190,7 +190,7 @@ final class MacConnectionManager: ObservableObject {
                 self.disconnect()
                 self.startReconnectTimer()
                 DispatchQueue.main.async { [weak self] in self?.connectionStatus = "Disconnected" }
-
+    
             default:
                 break
             }
