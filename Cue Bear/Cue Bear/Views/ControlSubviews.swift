@@ -715,7 +715,21 @@ struct CBConnectionsSheet: View {
                         }
                     }
                 }
-                
+
+                // Version info
+                Section {
+                    VStack(spacing: 4) {
+                        Text("Cue Bear 1.0.0 (86215d9)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("Created by Omri Behr")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .listRowBackground(Color.clear)
+
             }
             .navigationTitle("Connections")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
