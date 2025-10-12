@@ -1,0 +1,188 @@
+{
+  "name": "Beethoven Live",
+  "setlist": [
+    {
+      "id": "11111111-1111-1111-1111-111111111101",
+      "name": "Symphony No. 5",
+      "subtitle": "Allegro con brio",
+      "cc": 60,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111102",
+      "name": "Symphony No. 9",
+      "subtitle": "Ode to Joy",
+      "cc": 61,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111103",
+      "name": "Moonlight Sonata",
+      "subtitle": "Op. 27, No. 2",
+      "cc": 62,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111104",
+      "name": "Für Elise",
+      "subtitle": "Bagatelle in A minor",
+      "cc": 63,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111105",
+      "name": "Symphony No. 6",
+      "subtitle": "Pastoral",
+      "cc": 64,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111106",
+      "name": "Piano Concerto No. 5",
+      "subtitle": "Emperor",
+      "cc": 65,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111107",
+      "name": "Symphony No. 3",
+      "subtitle": "Eroica",
+      "cc": 66,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111108",
+      "name": "Violin Concerto",
+      "subtitle": "Op. 61 in D major",
+      "cc": 67,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111109",
+      "name": "Pathétique Sonata",
+      "subtitle": "Op. 13",
+      "cc": 68,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111110",
+      "name": "Symphony No. 7",
+      "subtitle": "Allegretto",
+      "cc": 69,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Appassionata Sonata",
+      "subtitle": "Op. 57",
+      "cc": 70,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111112",
+      "name": "Waldstein Sonata",
+      "subtitle": "Op. 53",
+      "cc": 71,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111113",
+      "name": "Symphony No. 1",
+      "subtitle": "Op. 21 in C major",
+      "cc": 72,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111114",
+      "name": "Fidelio Overture",
+      "subtitle": "Op. 72",
+      "cc": 73,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111115",
+      "name": "Piano Concerto No. 4",
+      "subtitle": "Op. 58 in G major",
+      "cc": 74,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111116",
+      "name": "Triple Concerto",
+      "subtitle": "Op. 56",
+      "cc": 75,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111117",
+      "name": "Coriolan Overture",
+      "subtitle": "Op. 62",
+      "cc": 76,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111118",
+      "name": "Egmont Overture",
+      "subtitle": "Op. 84",
+      "cc": 77,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111119",
+      "name": "Piano Sonata No. 32",
+      "subtitle": "Op. 111 in C minor",
+      "cc": 78,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    },
+    {
+      "id": "11111111-1111-1111-1111-111111111120",
+      "name": "String Quartet No. 14",
+      "subtitle": "Op. 131 in C-sharp minor",
+      "cc": 79,
+      "channel": 1,
+      "kind": "cc",
+      "velocity": 127
+    }
+  ],
+  "library": [],
+  "controls": [],
+  "isGlobalChannel": false
+}
