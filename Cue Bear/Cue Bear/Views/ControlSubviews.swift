@@ -715,7 +715,23 @@ struct CBConnectionsSheet: View {
                         }
                     }
                 }
-                
+
+                Section {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 4) {
+                            Text("Cue Bear for iPad")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("v1.0.1 (bdb295c)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                }
+
             }
             .navigationTitle("Connections")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
