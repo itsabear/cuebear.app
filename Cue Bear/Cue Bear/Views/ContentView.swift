@@ -1430,6 +1430,7 @@ internal struct ContentView: View {
 
     // UI state
     @State private var showConnections = false
+    @State private var showOnboarding = false
     @State private var showAddEdit = false
     @State private var editingSong: Song? = nil
     @State private var isEditing = false
@@ -2151,6 +2152,12 @@ internal struct ContentView: View {
                 }
             )
         }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView()
+                .presentationBackground(Color(.systemBackground))
+                .presentationCornerRadius(20)
+                .interactiveDismissDisabled(false)
+        }
     }
 
     @ViewBuilder
@@ -2252,6 +2259,13 @@ internal struct ContentView: View {
                 debugPrint("🎬 Hiding splash screen")
                 showSplash = false
             }
+
+            // Show onboarding after splash screen if user hasn't seen it
+            if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+                try? await Task.sleep(nanoseconds: 500_000_000) // Wait 0.5s after splash
+                showOnboarding = true
+            }
+
             debugPrint("✅ App initialization complete")
         }
         .onDisappear {

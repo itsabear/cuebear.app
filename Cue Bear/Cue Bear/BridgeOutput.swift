@@ -106,14 +106,21 @@ final class BridgeOutput: ObservableObject {
                 debugPrint("BridgeOutput: Discovered bridge: \(cleanName)")
                 return Item(name: cleanName, endpoint: res.endpoint)
             }
-            DispatchQueue.main.async { 
+            DispatchQueue.main.async {
                 self.discovered = items.sorted { $0.name < $1.name }
                 debugPrint("🔌 DEBUG: BridgeOutput.discovered updated to \(self.discovered.count) items")
                 debugPrint("🔌 DEBUG: BridgeOutput.discovered contents: \(self.discovered.map { $0.name })")
                 debugPrint("BridgeOutput: Updated discovered list with \(items.count) bridges")
-                
-                // Don't auto-connect - let user choose connection method
-                debugPrint("BridgeOutput: Found \(items.count) bridges - waiting for user to choose connection")
+
+                // Auto-connect if only one bridge is found and not currently connected
+                if items.count == 1 && !self.isConnected && !self.isConnecting && self.current == nil {
+                    debugPrint("BridgeOutput: Found single bridge '\(items[0].name)' - auto-connecting")
+                    self.connect(to: items[0])
+                } else if items.count > 1 {
+                    debugPrint("BridgeOutput: Found \(items.count) bridges - waiting for user to choose connection")
+                } else if self.isConnected {
+                    debugPrint("BridgeOutput: Already connected, ignoring discovered bridges")
+                }
             }
         }
         browser.start(queue: queue)
