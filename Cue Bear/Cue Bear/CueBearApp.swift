@@ -6,6 +6,7 @@ struct CueBearApp: App {
     @StateObject private var usbServer = ConnectionManager()
     @StateObject private var wifiClient = BridgeOutput()
     @StateObject private var connectionCoordinator = ConnectionCoordinator()
+    @StateObject private var purchaseManager = PurchaseManager.shared
 
     var body: some Scene {
         WindowGroup {
@@ -14,8 +15,13 @@ struct CueBearApp: App {
                 .environmentObject(usbServer)
                 .environmentObject(wifiClient)
                 .environmentObject(connectionCoordinator)
+                .environmentObject(purchaseManager)
                 .task {
                     debugPrint("📱 iPad: starting connection coordinator")
+
+                    // Check purchase status on launch
+                    await purchaseManager.checkPurchaseStatus()
+                    debugPrint("💰 Purchase status checked - Lifetime: \(purchaseManager.hasLifetimeAccess), Subscription: \(purchaseManager.hasActiveSubscription)")
 
                     // Install demo projects on first launch
                     installDemoProjectsIfNeeded()
