@@ -745,6 +745,7 @@ struct CBProjectsSheet: View {
     var onLoad: (String) -> Void
     var onDelete: (String) -> Void
     var onOpenDocument: () -> Void  // New: Open document picker
+    var onExportProject: () -> Void  // New: Export current project
 
     @Environment(\.dismiss) private var dismiss
     @State private var confirmDelete: String? = nil
@@ -774,9 +775,14 @@ struct CBProjectsSheet: View {
                         onSaveAs(tempSaveAs)
                     }
                     Button("New Project") { onNew() }
-                    Button("Open from Files") { 
+                    Button("Open from Files") {
                         // Simple document picker - will be handled in ContentView
                         onOpenDocument()
+                    }
+                    .foregroundColor(.blue)
+                    Button("Export Project") {
+                        // Export current project to share/save elsewhere
+                        onExportProject()
                     }
                     .foregroundColor(.blue)
                 }

@@ -108,7 +108,7 @@ enum DocumentProjectIO {
     }
     
     // MARK: - Document Picker
-    
+
     /// Present document picker for opening projects
     static func presentDocumentPicker(from viewController: UIViewController, completion: @escaping (URL?) -> Void) {
         debugPrint("📁 DocumentProjectIO: Presenting document picker")
@@ -124,6 +124,70 @@ enum DocumentProjectIO {
         debugPrint("📁 DocumentProjectIO: About to present picker from view controller: \(viewController)")
         viewController.present(picker, animated: true) {
             debugPrint("📁 DocumentProjectIO: Document picker presented successfully")
+        }
+    }
+
+    // MARK: - Export/Share
+
+    /// Export current project and present share sheet
+    static func exportProject(name: String, data: ProjectPayload, from viewController: UIViewController) {
+        debugPrint("📤 DocumentProjectIO: Exporting project: \(name)")
+
+        // Create temporary file with project data
+        let fileName = name.isEmpty ? "Untitled" : name
+        let sanitizedName = fileName.replacingOccurrences(of: "/", with: "-")
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(sanitizedName).cuebear")
+
+        do {
+            // Encode project data to JSON
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let jsonData = try encoder.encode(data)
+
+            // Write to temporary file
+            try jsonData.write(to: tempURL)
+            debugPrint("📤 DocumentProjectIO: Created temporary file at: \(tempURL.path)")
+
+            // Present share sheet
+            let activityVC = UIActivityViewController(
+                activityItems: [tempURL],
+                applicationActivities: nil
+            )
+
+            // For iPad: set source view to avoid crash
+            if let popover = activityVC.popoverPresentationController {
+                popover.sourceView = viewController.view
+                popover.sourceRect = CGRect(
+                    x: viewController.view.bounds.midX,
+                    y: viewController.view.bounds.midY,
+                    width: 0,
+                    height: 0
+                )
+                popover.permittedArrowDirections = []
+            }
+
+            // Clean up temp file after sharing completes
+            activityVC.completionWithItemsHandler = { _, _, _, _ in
+                try? FileManager.default.removeItem(at: tempURL)
+                debugPrint("📤 DocumentProjectIO: Cleaned up temporary file")
+            }
+
+            viewController.present(activityVC, animated: true) {
+                debugPrint("📤 DocumentProjectIO: Share sheet presented")
+            }
+
+        } catch {
+            debugPrint("❌ DocumentProjectIO: Export failed: \(error)")
+
+            // Show error alert
+            let alert = UIAlertController(
+                title: "Export Failed",
+                message: "Could not export project: \(error.localizedDescription)",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            viewController.present(alert, animated: true)
         }
     }
 }

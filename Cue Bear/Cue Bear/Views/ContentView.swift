@@ -2148,6 +2148,14 @@ internal struct ContentView: View {
                             openDocumentPicker()
                         }
                     }
+                },
+                onExportProject: {
+                    // Dismiss the projects sheet first before opening share sheet
+                    showProjects = false
+                    // Delay to allow sheet dismissal animation to complete
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        exportCurrentProject()
+                    }
                 }
             )
         }
@@ -3006,6 +3014,35 @@ internal struct ContentView: View {
                 }
             }
         }
+    }
+
+    /// Export current project to share sheet (save to Files, AirDrop, etc.)
+    private func exportCurrentProject() {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first,
+              let rootViewController = window.rootViewController else {
+            debugPrint("❌ Could not find root view controller for export")
+            return
+        }
+
+        debugPrint("📤 ContentView: Exporting project: \(projectName)")
+
+        // Create payload from current state
+        let payload = ProjectPayload(
+            name: projectName,
+            setlist: store.setlist.songs,
+            library: songLibrary,
+            controls: controlButtons,
+            isGlobalChannel: isGlobalChannel,
+            globalChannel: globalChannel
+        )
+
+        // Present share sheet
+        DocumentProjectIO.exportProject(
+            name: projectName,
+            data: payload,
+            from: rootViewController
+        )
     }
 
     private func newProjectFlow() {
