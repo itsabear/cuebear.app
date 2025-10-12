@@ -137,23 +137,38 @@ IPROXY_BINARY="$MACOS_DIR/iproxy"
 log_info "  Current iproxy dependencies:"
 otool -L "$IPROXY_BINARY" | tail -n +2
 
-# Fix each dependency in iproxy
+# Fix each dependency in iproxy (handle both /opt and /Cellar paths)
+# libusbmuxd can be in either Cellar or opt
 install_name_tool -change \
     "/opt/homebrew/Cellar/libusbmuxd/2.1.1/lib/libusbmuxd-2.0.7.dylib" \
     "@executable_path/../Frameworks/libusbmuxd-2.0.7.dylib" \
-    "$IPROXY_BINARY"
+    "$IPROXY_BINARY" 2>/dev/null || true
+install_name_tool -change \
+    "/opt/homebrew/opt/libusbmuxd/lib/libusbmuxd-2.0.7.dylib" \
+    "@executable_path/../Frameworks/libusbmuxd-2.0.7.dylib" \
+    "$IPROXY_BINARY" 2>/dev/null || true
 log_info "  ✓ Fixed libusbmuxd-2.0.7.dylib reference"
 
+# libimobiledevice-glue can be in either Cellar or opt
+install_name_tool -change \
+    "/opt/homebrew/Cellar/libimobiledevice-glue/1.3.2/lib/libimobiledevice-glue-1.0.0.dylib" \
+    "@executable_path/../Frameworks/libimobiledevice-glue-1.0.0.dylib" \
+    "$IPROXY_BINARY" 2>/dev/null || true
 install_name_tool -change \
     "/opt/homebrew/opt/libimobiledevice-glue/lib/libimobiledevice-glue-1.0.0.dylib" \
     "@executable_path/../Frameworks/libimobiledevice-glue-1.0.0.dylib" \
-    "$IPROXY_BINARY"
+    "$IPROXY_BINARY" 2>/dev/null || true
 log_info "  ✓ Fixed libimobiledevice-glue-1.0.0.dylib reference"
 
+# libplist can be in either Cellar or opt
+install_name_tool -change \
+    "/opt/homebrew/Cellar/libplist/2.7.0/lib/libplist-2.0.4.dylib" \
+    "@executable_path/../Frameworks/libplist-2.0.4.dylib" \
+    "$IPROXY_BINARY" 2>/dev/null || true
 install_name_tool -change \
     "/opt/homebrew/opt/libplist/lib/libplist-2.0.4.dylib" \
     "@executable_path/../Frameworks/libplist-2.0.4.dylib" \
-    "$IPROXY_BINARY"
+    "$IPROXY_BINARY" 2>/dev/null || true
 log_info "  ✓ Fixed libplist-2.0.4.dylib reference"
 
 log_info "  Updated iproxy dependencies:"

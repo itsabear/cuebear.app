@@ -36,7 +36,7 @@ struct MenuBarView: View {
                     Text("Cue Bear Bridge")
                         .font(.headline)
                         .fontWeight(.semibold)
-                    Text("v1.1.2 (884ca44)")
+                    Text("v1.1.3 (af1d3e3)")
                         .font(.system(size: 9))
                         .foregroundColor(.secondary)
                     Spacer()
