@@ -20,8 +20,14 @@ struct OnboardingView: View {
         ),
         OnboardingPage(
             title: "Connect Your Mac",
-            description: "Go to cuebear.app/bridge to download our companion app and enjoy seamless connection to your Mac via USB or WiFi.",
+            description: "Go to cuebear.app/bridge to download our companion app and install it on your Mac to connect seamlessly to your iPad over USB or WiFi.",
             systemIcon: "laptopcomputer",
+            accentColor: .blue
+        ),
+        OnboardingPage(
+            title: "Enable MIDI Device",
+            description: "Enable \"Bear Bridge\" virtual MIDI device in your DAW.",
+            systemIcon: "slider.horizontal.3",
             accentColor: .blue
         ),
         OnboardingPage(
@@ -330,7 +336,25 @@ struct OnboardingViewCompact: View {
     }
 }
 
-#Preview("Onboarding - Step 3 (Final)") {
+#Preview("Onboarding - Step 3") {
+    NavigationView {
+        OnboardingPageView(
+            page: OnboardingPage(
+                title: "Enable MIDI Device",
+                description: "Enable \"Bear Bridge\" virtual MIDI device in your DAW.",
+                systemIcon: "slider.horizontal.3",
+                accentColor: .blue
+            ),
+            isLastPage: false,
+            dontShowAgain: .constant(false),
+            onGetStarted: {}
+        )
+        .navigationTitle("Get Started")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+#Preview("Onboarding - Step 4 (Final)") {
     NavigationView {
         OnboardingPageView(
             page: OnboardingPage(
