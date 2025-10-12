@@ -514,6 +514,7 @@ struct CBControlEditorSheet: View {
 
                     if controlType != .fader {
                         IconPicker(symbol: $symbol, icons: icons)
+                            .id("icon-picker")
                         Picker("Behavior", selection: $isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
@@ -818,6 +819,31 @@ struct CBControlEditorSheet: View {
         return 0
     }
 
+    private func firstFreeNumberStartingFrom(_ start: Int, for kind: MIDIKind, channel: Int) -> Int {
+        debugPrint("🔍 [CONTROL] Finding first free \(kind) number on channel \(channel) starting from \(start)")
+        for n in start...127 {
+            let key = MIDIKey(kind: kind, channel: channel, number: n)
+            let owner = currentOwnerName(key)
+            if owner == nil {
+                debugPrint("  ✅ [CONTROL] First free number: \(n)")
+                return n
+            } else {
+                debugPrint("  ✗ [CONTROL] \(n) is taken by '\(owner!)', skipping")
+            }
+        }
+        // Wrap around and search from 0 if nothing found above start
+        for n in 0..<start {
+            let key = MIDIKey(kind: kind, channel: channel, number: n)
+            let owner = currentOwnerName(key)
+            if owner == nil {
+                debugPrint("  ✅ [CONTROL] First free number (wrapped): \(n)")
+                return n
+            }
+        }
+        debugPrint("  ⚠️ [CONTROL] No free numbers found, returning 0")
+        return 0
+    }
+
     private func saveControl(andAddAnother: Bool) {
         var b = editing ?? ControlButton(title: "", symbol: "square.grid.2x2.fill", kind: .cc, number: 0, channel: 1, velocity: 127, isToggle: nil)
         b.title = title
@@ -919,7 +945,10 @@ struct CBControlEditorSheet: View {
             debugPrint("  🔢 [CONTROL] Calculating next free number BEFORE setting editing=nil")
             let nextChannel = isGlobalChannel ? globalChannel : 1
             channel = nextChannel
-            let nextNumber = firstFreeNumber(for: .cc, channel: nextChannel)
+            // FIX: After saving, find next free number starting from the one we just saved + 1
+            // The just-saved control is now in the array, so we need to search past it
+            let savedNumber = b.number
+            let nextNumber = firstFreeNumberStartingFrom(savedNumber + 1, for: kind, channel: nextChannel)
             number = nextNumber
             debugPrint("  ✅ [CONTROL] Set channel to \(nextChannel), number to \(nextNumber)")
 
@@ -1000,6 +1029,7 @@ struct CBEditControlSheet: View {
                     }
                     if !isFaderUI {
                         IconPicker(symbol: $symbol, icons: icons)
+                            .id("icon-picker-cue")
                         Picker("Behavior", selection: $isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
@@ -5992,12 +6022,24 @@ private struct iPadControlTile: View {
                     Text(midiLabel())
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                } else if button.title.isEmpty {
+                    // Icon only - center it vertically with MIDI label at bottom
+                    VStack {
+                        Spacer()
+                        Image(systemName: button.symbol).font(.system(size: 32, weight: .semibold))
+                        Spacer()
+                        Text(midiLabel())
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, 4)
+                    }
                 } else {
-            Image(systemName: button.symbol).font(.system(size: 24, weight: .semibold))
-            Text(button.title).font(.footnote.weight(.semibold))
-            Text(midiLabel())
-                .font(.caption2)
-                .foregroundColor(.secondary)
+                    // Icon + text
+                    Image(systemName: button.symbol).font(.system(size: 24, weight: .semibold))
+                    Text(button.title).font(.footnote.weight(.semibold))
+                    Text(midiLabel())
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
         }
         .foregroundColor(buttonTextColor)
