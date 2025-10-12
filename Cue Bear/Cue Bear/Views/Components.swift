@@ -313,7 +313,13 @@ struct DraggableTransportDock: View {
                 // Initialize to bottom center position (not middle of screen)
                 let bottomCenterY = max(upperLimit, height - controlAreaHeight - 20) // 20 points above control area
                 let bottomCenterX = max(50, min(width - 50, width / 2))
-                position = CGPoint(x: bottomCenterX, y: bottomCenterY)
+
+                // FIX: Disable animation for initial positioning to prevent "flying in" from (0,0)
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    position = CGPoint(x: bottomCenterX, y: bottomCenterY)
+                }
             }
         }
         .onChange(of: controlAreaHeight) { _, _ in
@@ -323,7 +329,13 @@ struct DraggableTransportDock: View {
                 // Initialize to bottom center position (not middle of screen)
                 let bottomCenterY = max(upperLimit, height - controlAreaHeight - 20) // 20 points above control area
                 let bottomCenterX = max(50, min(width - 50, width / 2))
-                position = CGPoint(x: bottomCenterX, y: bottomCenterY)
+
+                // FIX: Disable animation for initial positioning
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    position = CGPoint(x: bottomCenterX, y: bottomCenterY)
+                }
                 return
             }
 
