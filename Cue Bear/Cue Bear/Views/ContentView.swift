@@ -2230,6 +2230,11 @@ internal struct ContentView: View {
         }
         .task {
             debugPrint("🚀 App initialization starting...")
+
+            // FIX: Build initial conflict cache BEFORE any data loads to prevent false "Taken by:" flashes
+            cachedConflictLookup = computeConflictLookup()
+            debugPrint("🔄 Initial conflict cache built with \(cachedConflictLookup.count) entries")
+
             // Clear any existing data for shipping - start completely blank (only on first launch)
             if !hasInitialized {
                 debugPrint("🔄 First launch - clearing all data")
@@ -2248,8 +2253,9 @@ internal struct ContentView: View {
             debugPrint("🔄 Attempting to auto-open last project...")
             autoOpenLastProject()
 
-            // Initialize conflict cache after loading project
-            updateConflictCache()
+            // FIX: Rebuild conflict cache SYNCHRONOUSLY after loading project (no 500ms delay)
+            cachedConflictLookup = computeConflictLookup()
+            debugPrint("🔄 Conflict cache rebuilt after project load with \(cachedConflictLookup.count) entries")
 
             // Connections are now managed by ConnectionCoordinator
             debugPrint("🔌 Connections managed by ConnectionCoordinator")
