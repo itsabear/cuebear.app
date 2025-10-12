@@ -1450,6 +1450,7 @@ internal struct ContentView: View {
     @State private var hasInitialized = false
     // Projects
     @State private var showProjects = false
+    @State private var showOnboarding = false
     @AppStorage("lastProjectName") private var projectName: String = "Untitled"
     @State private var projectsList: [String] = []
     @State private var isDirty: Bool = false
@@ -2159,6 +2160,12 @@ internal struct ContentView: View {
                 }
             )
         }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView()
+                .presentationBackground(Color(.systemBackground))
+                .presentationCornerRadius(20)
+                .interactiveDismissDisabled(false)
+        }
     }
 
     @ViewBuilder
@@ -2266,6 +2273,13 @@ internal struct ContentView: View {
                 debugPrint("🎬 Hiding splash screen")
                 showSplash = false
             }
+
+            // Show onboarding after splash screen if user hasn't seen it
+            if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+                try? await Task.sleep(nanoseconds: 500_000_000) // Wait 0.5s after splash
+                showOnboarding = true
+            }
+
             debugPrint("✅ App initialization complete")
         }
         .onDisappear {
@@ -2696,6 +2710,24 @@ internal struct ContentView: View {
         } catch { debugPrint("Save failed: \(error)") }
     }
 
+    /// Generate a unique project name by appending (1), (2), etc. if name already exists
+    private func uniqueProjectName(baseName: String) -> String {
+        let existingProjects = projectsList
+
+        // If name doesn't exist, return as-is
+        if !existingProjects.contains(baseName) {
+            return baseName
+        }
+
+        // Find the next available number
+        var counter = 1
+        while existingProjects.contains("\(baseName) (\(counter))") {
+            counter += 1
+        }
+
+        return "\(baseName) (\(counter))"
+    }
+
     // MARK: - Undo/Redo helpers
     private func pushSetlistUndo() {
         setlistUndoStack.append(store.setlist.songs)
@@ -3000,7 +3032,14 @@ internal struct ContentView: View {
                 DispatchQueue.main.async {
                     if let payload = payload {
                         debugPrint("✅ ContentView: Project payload received: \(payload.name)")
-                        self.projectName = payload.name
+
+                        // Generate unique name if project with same name already exists
+                        let uniqueName = self.uniqueProjectName(baseName: payload.name)
+                        if uniqueName != payload.name {
+                            debugPrint("📝 ContentView: Project renamed from '\(payload.name)' to '\(uniqueName)' to avoid overwrite")
+                        }
+
+                        self.projectName = uniqueName
                         self.store.setlist.songs = payload.setlist
                         self.songLibrary = payload.library
                         self.controlButtons = payload.controls
@@ -3010,8 +3049,8 @@ internal struct ContentView: View {
                         for s in self.songLibrary where self.libAddedAt[s.id] == nil {
                             self.libAddedAt[s.id] = now
                         }
-                        self.isDirty = false
-                        debugPrint("✅ ContentView: Project loaded successfully: \(payload.name)")
+                        self.isDirty = true  // Mark as dirty so user needs to save the imported project
+                        debugPrint("✅ ContentView: Project loaded successfully as: \(uniqueName)")
                     } else {
                         debugPrint("❌ ContentView: Failed to load project - showing error alert")
                         self.documentLoadErrorMessage = "Could not open the selected project file. The file may be corrupted or in an unsupported format."
@@ -5181,7 +5220,7 @@ private struct ControlButtonTile: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(4)  // Minimal padding to fit in grid
+                // FIX: Removed padding to make faders fill grid cells like buttons
                 .background(
                     RoundedRectangle(cornerRadius: 14)
                         .fill(Color.clear)
@@ -5206,8 +5245,8 @@ private struct ControlButtonTile: View {
             }
             .opacity(1.0)
             .disabled(takenBy != nil && !isEditing)
-            // Avoid conflicting with drag in edit mode; tap-to-edit only outside edit mode
-            .onTapGesture { if !isEditing { onTap() } }
+            // FIX: Removed .onTapGesture to eliminate delay - edit by tapping delete button instead
+            // The onTapGesture was causing ~300ms delay because SwiftUI waits to disambiguate tap vs drag
             .modifier(TimeBasedWobbleModifier(wobbleID: wobbleID, wobbleAnimator: wobbleAnimator))
             .onChange(of: isEditing) { _, editing in
                 if editing { startWobble() } else { stopWobble() }
@@ -6200,11 +6239,11 @@ private struct iPadControlTile: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(4)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.clear))
         .contentShape(Rectangle())  // Ensure entire frame is tappable
         .highPriorityGesture(
-            TapGesture().onEnded {
+            // Only apply TapGesture for buttons, not faders (faders have DragGesture with minimumDistance: 0)
+            button.isFader == true ? nil : TapGesture().onEnded {
                 if isEditing {
                     onEdit()
                 } else {
