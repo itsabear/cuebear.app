@@ -128,7 +128,7 @@ struct PaywallView: View {
                 }
             }
         }
-        .onChange(of: purchaseManager.hasLifetimeAccess) { hasAccess in
+        .onChange(of: purchaseManager.hasLifetimeAccess) { _, hasAccess in
             if hasAccess {
                 // Purchase successful - dismiss paywall
                 dismiss()
