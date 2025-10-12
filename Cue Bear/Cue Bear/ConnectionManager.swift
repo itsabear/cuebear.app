@@ -1466,7 +1466,16 @@ class ConnectionManager: ObservableObject {
     @objc private func appWillEnterForeground() {
         debugPrint("🔗 ConnectionManager: App entering foreground - ending background task")
         endBackgroundTask()
-        
+
+        // FIX: Ensure listener is running when returning to foreground
+        // The listener may have stopped while in background, so restart it if needed
+        if !isListening && shouldReconnect {
+            debugPrint("🔗 ConnectionManager: Listener not running - restarting on foreground")
+            DispatchQueue.main.async { [weak self] in
+                self?.startListening()
+            }
+        }
+
         // Check connection health when returning to foreground
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.checkConnectionAfterWake()
