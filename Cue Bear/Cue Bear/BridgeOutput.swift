@@ -9,7 +9,7 @@ import UIKit
 
 final class BridgeOutput: ObservableObject {
     struct Item: Identifiable {
-        let id = UUID()
+        var id: String { name } // Use name as stable ID instead of random UUID
         let name: String
         let endpoint: NWEndpoint
     }
@@ -112,15 +112,9 @@ final class BridgeOutput: ObservableObject {
                 debugPrint("🔌 DEBUG: BridgeOutput.discovered contents: \(self.discovered.map { $0.name })")
                 debugPrint("BridgeOutput: Updated discovered list with \(items.count) bridges")
 
-                // Auto-connect if only one bridge is found and not currently connected
-                if items.count == 1 && !self.isConnected && !self.isConnecting && self.current == nil {
-                    debugPrint("BridgeOutput: Found single bridge '\(items[0].name)' - auto-connecting")
-                    self.connect(to: items[0])
-                } else if items.count > 1 {
-                    debugPrint("BridgeOutput: Found \(items.count) bridges - waiting for user to choose connection")
-                } else if self.isConnected {
-                    debugPrint("BridgeOutput: Already connected, ignoring discovered bridges")
-                }
+                // WiFi connections require manual user selection - no auto-connect
+                // (USB connections are handled by ConnectionManager with auto-connect)
+                debugPrint("BridgeOutput: Found \(items.count) WiFi bridges - waiting for user to choose connection")
             }
         }
         browser.start(queue: queue)
