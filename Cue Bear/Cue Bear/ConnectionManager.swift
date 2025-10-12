@@ -388,10 +388,17 @@ class ConnectionManager: ObservableObject {
             listener?.newConnectionHandler = { [weak self] connection in
                 debugPrint("🔗 ConnectionManager: *** NEW CONNECTION HANDLER CALLED ***")
                 debugPrint("🔗 ConnectionManager: Connection from: \(connection.endpoint)")
-                guard let self = self else { 
+                guard let self = self else {
                     debugPrint("🔗 ConnectionManager: Self is nil, returning")
-                    return 
+                    return
                 }
+
+                // Mark USB cable as connected when we receive an incoming connection
+                DispatchQueue.main.async {
+                    self.isUSBCableConnected = true
+                    debugPrint("🔗 ConnectionManager: ✅ USB connection received - cable is connected")
+                }
+
                 self.usbQueue.async {
                     self.logMain("🔗 USB: accepted \(connection.endpoint)")
                     // Gate: only one active connection (but check if existing connection is actually valid)
@@ -422,6 +429,8 @@ class ConnectionManager: ObservableObject {
                                 self?.isConnected = false
                                 self?.isConnecting = false
                                 self?.connectionHealth = .disconnected
+                                self?.isUSBCableConnected = false
+                                debugPrint("🔗 ConnectionManager: ❌ USB connection cancelled - cable disconnected")
                                 // Don't clear connectedComputerName to keep USB chip visible
                                 // self?.connectedComputerName = nil
                                 self?.connectionQuality = .disconnected
