@@ -272,6 +272,13 @@ struct IconPicker: View {
     }
 }
 
+extension IconPicker: Equatable {
+    static func == (lhs: IconPicker, rhs: IconPicker) -> Bool {
+        // Only re-render if symbol binding actually changed
+        lhs.symbol == rhs.symbol && lhs.icons == rhs.icons
+    }
+}
+
 // MARK: - Isolated Velocity Picker Component
 // This component is isolated to prevent scroll position reset when other state changes
 struct VelocityPicker: View {
@@ -514,7 +521,7 @@ struct CBControlEditorSheet: View {
 
                     if controlType != .fader {
                         IconPicker(symbol: $symbol, icons: icons)
-                            .id("icon-picker")
+                            .equatable()
                         Picker("Behavior", selection: $isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
@@ -1029,7 +1036,7 @@ struct CBEditControlSheet: View {
                     }
                     if !isFaderUI {
                         IconPicker(symbol: $symbol, icons: icons)
-                            .id("icon-picker-cue")
+                            .equatable()
                         Picker("Behavior", selection: $isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
@@ -4989,8 +4996,9 @@ private struct ControlButtonTile: View {
                                 }
                         }
                         .buttonStyle(.plain)
-                            .padding(1)
-                            .offset(x: -6, y: -6)
+                        .contentShape(Rectangle())
+                        .frame(width: 44, height: 44)
+                            .offset(x: -17, y: -17)
                     }
                 }
             }
@@ -5268,8 +5276,9 @@ private struct ControlButtonTile: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .padding(1)
-                    .offset(x: -6, y: -6)
+                    .contentShape(Rectangle())
+                    .frame(width: 44, height: 44)
+                    .offset(x: -17, y: -17)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
@@ -5930,8 +5939,9 @@ private struct iPadControlTile: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .padding(2)
-                .offset(x: -4, y: -4)
+                .contentShape(Rectangle())
+                .frame(width: 44, height: 44)
+                .offset(x: -15, y: -15)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
