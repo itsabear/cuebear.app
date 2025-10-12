@@ -26,7 +26,10 @@
 			<key>CFBundleTypeExtensions</key>
 			<array>
 				<string>cuebearproj</string>
+				<string>cuebear</string>
 			</array>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
 		</dict>
 	</array>
 	
@@ -48,6 +51,7 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>cuebearproj</string>
+					<string>cuebear</string>
 				</array>
 			</dict>
 		</dict>
