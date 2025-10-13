@@ -74,8 +74,32 @@ final class IProxyManager: ObservableObject {
         proc.terminationHandler = { [weak self] p in
             DispatchQueue.main.async {
                 self?.isRunning = false
-                self?.status = "Stopped (code: \(p.terminationStatus))"
-                Logger.shared.log("🔧 IProxyManager: iproxy stopped with code \(p.terminationStatus)")
+                let exitCode = p.terminationStatus
+                self?.status = "Stopped (code: \(exitCode))"
+                Logger.shared.log("🔧 IProxyManager: iproxy stopped with code \(exitCode)")
+
+                // Auto-restart iproxy if it crashed unexpectedly (non-zero exit code)
+                // Don't restart if it was manually stopped (exit code 15 = SIGTERM)
+                if exitCode != 0 && exitCode != 15 {
+                    Logger.shared.log("🔧 IProxyManager: ⚠️ iproxy crashed unexpectedly - auto-restarting in 2s...")
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                        do {
+                            try self?.start()
+                            Logger.shared.log("🔧 IProxyManager: ✅ iproxy auto-restarted successfully after crash")
+                        } catch {
+                            Logger.shared.log("🔧 IProxyManager: ❌ Failed to auto-restart iproxy: \(error)")
+                            // Retry once more after a longer delay
+                            DispatchQueue.global().asyncAfter(deadline: .now() + 5.0) { [weak self] in
+                                do {
+                                    try self?.start()
+                                    Logger.shared.log("🔧 IProxyManager: ✅ iproxy auto-restarted on retry")
+                                } catch {
+                                    Logger.shared.log("🔧 IProxyManager: ❌ Failed to auto-restart iproxy on retry: \(error)")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         
