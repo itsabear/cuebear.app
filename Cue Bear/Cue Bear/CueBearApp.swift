@@ -9,7 +9,7 @@ struct CueBearApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Cue_Bear.ContentView()
+            ContentView()
                 .environmentObject(store)
                 .environmentObject(usbServer)
                 .environmentObject(wifiClient)

@@ -723,7 +723,7 @@ struct CBConnectionsSheet: View {
                             Text("Cue Bear for iPad")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("v1.0.1 (7f0161b)")
+                            Text("v1.0.1 (4ee9f55)")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
