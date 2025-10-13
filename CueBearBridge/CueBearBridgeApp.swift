@@ -27,16 +27,19 @@ struct CueBearBridgeApp: App {
 
 struct MenuBarView: View {
     @EnvironmentObject var app: BridgeApp
-    
+
     var body: some View {
         VStack(spacing: 8) {
             // Header
-            HStack {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Cue Bear Bridge")
                     .font(.headline)
                     .fontWeight(.semibold)
-                Spacer()
+                Text(versionString())
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.top, 8)
             
@@ -150,6 +153,45 @@ struct MenuBarView: View {
         }
         .frame(width: 200)
         .background(Color(NSColor.controlBackgroundColor))
+    }
+
+    private func versionString() -> String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+
+        // Get git commit hash
+        let commitHash = getGitCommitHash()
+
+        if !commitHash.isEmpty {
+            return "v\(version).\(build) (\(commitHash))"
+        } else {
+            return "v\(version).\(build)"
+        }
+    }
+
+    private func getGitCommitHash() -> String {
+        let task = Process()
+        task.launchPath = "/usr/bin/git"
+        task.arguments = ["rev-parse", "--short", "HEAD"]
+        task.currentDirectoryPath = Bundle.main.bundlePath
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = Pipe()
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let hash = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                return hash
+            }
+        } catch {
+            // Git not available or not in repo
+        }
+
+        return ""
     }
 }
 
