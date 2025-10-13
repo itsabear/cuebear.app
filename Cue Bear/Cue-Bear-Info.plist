@@ -67,10 +67,6 @@
 	     disconnection and reconnects automatically when returning to foreground (1-3 seconds).
 	     This provides optimal live performance UX without risk of App Store rejection. -->
 
-	<!-- Prevent app from being terminated during background -->
-	<key>UIApplicationExitsOnSuspend</key>
-	<false/>
-
 	<!-- Require full screen (disable resize on iPadOS 18+) -->
 	<key>UIRequiresFullScreen</key>
 	<true/>
