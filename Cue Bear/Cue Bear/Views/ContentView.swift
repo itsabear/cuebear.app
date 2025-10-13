@@ -4997,8 +4997,8 @@ private struct ControlButtonTile: View {
                         }
                         .buttonStyle(.plain)
                         .contentShape(Rectangle())
-                        .frame(width: 44, height: 44)
-                            .offset(x: -17, y: -17)
+                        .frame(width: 60, height: 60)
+                            .offset(x: -25, y: -25)
                     }
                 }
             }
@@ -5277,8 +5277,8 @@ private struct ControlButtonTile: View {
                     }
                     .buttonStyle(.plain)
                     .contentShape(Rectangle())
-                    .frame(width: 44, height: 44)
-                    .offset(x: -17, y: -17)
+                    .frame(width: 60, height: 60)
+                    .offset(x: -25, y: -25)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
@@ -5940,8 +5940,8 @@ private struct iPadControlTile: View {
                 }
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
-                .frame(width: 44, height: 44)
-                .offset(x: -15, y: -15)
+                .frame(width: 60, height: 60)
+                .offset(x: -23, y: -23)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
