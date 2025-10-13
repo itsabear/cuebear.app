@@ -110,7 +110,7 @@ log_success "Found: $XCODE_VERSION"
 log_info "Checking code signing certificates..."
 
 APP_CERT=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 || true)
-INSTALLER_CERT=$(security find-identity -v -p codesigning | grep "Developer ID Installer" | head -1 || true)
+INSTALLER_CERT=$(security find-identity -v -p basic | grep "Developer ID Installer" | head -1 || true)
 
 if [ -z "$APP_CERT" ]; then
     log_error "Developer ID Application certificate not found"
