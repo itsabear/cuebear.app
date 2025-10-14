@@ -873,8 +873,8 @@ final class BridgeApp: ObservableObject {
             self.bonjour.publish(port: 8078)
         }
 
-            do {
-                try iproxy.start()
+        do {
+            try iproxy.start()
             iproxy.$status.receive(on: DispatchQueue.main).sink { [weak self] s in
                 self?.iproxyStatus = "iproxy: " + s
                 self?.isRunning = s.contains("Running")
@@ -889,12 +889,12 @@ final class BridgeApp: ObservableObject {
                 self?.usbStatus = s
                 self?.isConnected = s.contains("Connected")
             }.store(in: &cancellables)
-            
+
             // Monitor WiFi status
             wifiServer.$status.receive(on: DispatchQueue.main).sink { [weak self] s in
                 self?.wifiStatus = "WiFi: " + s
             }.store(in: &cancellables)
-            
+
             status = "Running"
         } catch {
             status = "Error: \(error.localizedDescription)"
