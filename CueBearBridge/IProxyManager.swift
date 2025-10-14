@@ -33,30 +33,13 @@ final class IProxyManager: ObservableObject {
     func start() throws {
         Logger.shared.log("🔧 IProxyManager: Starting minimal iproxy...")
         stop()
-        
+
         status = "Starting..."
-        
-        // Check if iOS device is connected before starting iproxy
-        let task = Process()
-        task.launchPath = "/usr/bin/which"
-        task.arguments = ["idevice_id"]
-        task.launch()
-        task.waitUntilExit()
-        
-        if task.terminationStatus == 0 {
-            let deviceTask = Process()
-            deviceTask.launchPath = "/opt/homebrew/bin/idevice_id" // Assuming Homebrew path
-            deviceTask.arguments = ["-l"]
-            deviceTask.launch()
-            deviceTask.waitUntilExit()
-            
-            if deviceTask.terminationStatus != 0 {
-                status = "No iOS device connected"
-                Logger.shared.log("🔧 IProxyManager: ❌ No iOS device detected - connect iPad via USB cable")
-                throw NSError(domain: "IProxyManager", code: 1003, userInfo: [NSLocalizedDescriptionKey: "No iOS device connected"])
-            }
-        }
-        
+
+        // Let bundled iproxy handle device detection - it will fail gracefully if no device is connected
+        // The bundled iproxy doesn't need external tools like idevice_id to detect iOS devices
+        // Removing this check fixes auto-start issues when idevice_id is not installed
+
         guard let iproxyPath = findBundledIproxy(), FileManager.default.isExecutableFile(atPath: iproxyPath) else {
             status = "Missing helper"
             Logger.shared.log("🔧 IProxyManager: ❌ iproxy helper not found")
