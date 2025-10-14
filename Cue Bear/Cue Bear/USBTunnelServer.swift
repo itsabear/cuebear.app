@@ -42,7 +42,8 @@ final class USBTunnelServer {
         conn.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:
-                self?.updateStatus(true)
+                // Don't set status to true yet - wait for handshake to complete
+                debugPrint("🔌 USBTunnelServer: Connection ready, waiting for handshake...")
                 self?.receive(from: conn)
             case .failed, .cancelled:
                 self?.updateStatus(false)
@@ -54,10 +55,67 @@ final class USBTunnelServer {
     }
 
     private func receive(from conn: NWConnection) {
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] _, _, isComplete, err in
-            if isComplete || err != nil { self?.updateStatus(false); return }
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, isComplete, err in
+            if isComplete || err != nil {
+                debugPrint("🔌 USBTunnelServer: Connection closed")
+                self?.updateStatus(false)
+                return
+            }
+
+            // Handle incoming data (CB/2 handshake and messages)
+            if let data = data, !data.isEmpty {
+                self?.handleIncomingData(data, from: conn)
+            }
+
             self?.receive(from: conn)
         }
+    }
+
+    private func handleIncomingData(_ data: Data, from conn: NWConnection) {
+        guard let message = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return
+        }
+
+        // Handle CB/2 protocol handshake
+        if message.hasPrefix("CB/") {
+            debugPrint("🔌 USBTunnelServer: Received handshake: \(message)")
+
+            // Parse protocol version (CB/2 auth=psk1 name=MacName)
+            let parts = message.dropFirst(3).components(separatedBy: " ")
+            guard let versionPart = parts.first,
+                  let version = Int(versionPart) else {
+                debugPrint("🔌 USBTunnelServer: Failed to parse protocol version")
+                return
+            }
+
+            // Extract computer name if present
+            var computerName = "Bridge"
+            for part in parts.dropFirst() {
+                if part.hasPrefix("name=") {
+                    computerName = String(part.dropFirst(5))
+                }
+            }
+
+            debugPrint("🔌 USBTunnelServer: Handshake from '\(computerName)' using CB/\(version)")
+
+            // Send CB/2 response (OK/2 hmac=)
+            let response = "OK/\(version) hmac=\n"
+            guard let responseData = response.data(using: .utf8) else {
+                debugPrint("🔌 USBTunnelServer: Failed to encode response")
+                return
+            }
+
+            conn.send(content: responseData, completion: .contentProcessed { [weak self] error in
+                if let error = error {
+                    debugPrint("🔌 USBTunnelServer: ❌ Failed to send handshake response: \(error)")
+                    self?.updateStatus(false)
+                } else {
+                    debugPrint("🔌 USBTunnelServer: ✅ Handshake complete - connection established to \(computerName)")
+                    self?.updateStatus(true)
+                }
+            })
+        }
+        // Future: Handle other message types here if needed
     }
 
     private func updateStatus(_ connected: Bool) {
