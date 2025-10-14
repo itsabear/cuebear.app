@@ -30,14 +30,15 @@ class ConnectionManager: ObservableObject {
     // Connection configuration
     private let port: UInt16 = 9360  // USB server port for Bridge app connection
     private let healthCheckInterval: TimeInterval = 2.0
-    private let reconnectInterval: TimeInterval = 1.0
+    private let reconnectInterval: TimeInterval = 0.5  // Faster reconnection attempts
     private let heartbeatCheckInterval: TimeInterval = 1.0  // Check for heartbeat every 1 second
     private let heartbeatTimeout: TimeInterval = 3.0  // Consider disconnected if no heartbeat for 3 seconds
-    private let maxReconnectAttempts = 5
+    private let maxReconnectAttempts = 10  // More attempts before giving up
     
     // Connection state tracking
     private var isListening = false
     private var shouldReconnect = true
+    private var isReconnecting = false  // Prevent concurrent reconnection attempts
     
     // USB device detection
     private var usbDeviceObserver: NSObjectProtocol?
@@ -414,10 +415,17 @@ class ConnectionManager: ObservableObject {
                     connection.stateUpdateHandler = { [weak self] st in
                         self?.logMain("🔗 USB conn state: \(st)")
                         self?.handleConnectionStateChange(st, connection: connection)
-                        
+
                         // Immediate disconnect detection for USB cable removal
                         if case .cancelled = st {
                             self?.logMain("🔗 USB connection cancelled - immediate disconnect detection")
+
+                            // Clean up the dead connection
+                            if let activeConn = self?.activeUSB, connection === activeConn {
+                                self?.logMain("🔗 Clearing dead activeUSB in immediate handler")
+                                self?.activeUSB = nil
+                            }
+
                             DispatchQueue.main.async {
                                 self?.isConnected = false
                                 self?.isConnecting = false
@@ -427,6 +435,8 @@ class ConnectionManager: ObservableObject {
                                 self?.connectionQuality = .disconnected
                                 self?.connectionStateCallback?(false)
                             }
+                            // Trigger reconnection logic when connection is cancelled
+                            self?.handleConnectionFailure()
                         }
                     }
                     connection.start(queue: self.usbQueue)
@@ -464,15 +474,16 @@ class ConnectionManager: ObservableObject {
     
     private func stopListening() {
         debugPrint("🔗 ConnectionManager: Stopping listener")
-        // Don't set isListening = false to keep USB chip visible
-        // isListening = false
-        
+
+        // CRITICAL: Must set isListening = false so startListening() can run
+        isListening = false
+
         closeUSB(activeUSB)
         activeUSB = nil
-        
+
         listener?.cancel()
         listener = nil
-        
+
         DispatchQueue.main.async { [weak self] in
             self?.isConnected = false
             self?.isConnecting = false
@@ -480,10 +491,10 @@ class ConnectionManager: ObservableObject {
             // Don't clear connectedComputerName to keep USB chip visible
             // self?.connectedComputerName = nil
             self?.connectionQuality = .disconnected
-            
+
             // Notify callback of connection state change
             self?.connectionStateCallback?(false)
-            
+
             // Update USB bridge availability to keep chip visible
             self?.checkUSBBridgeAvailability()
         }
@@ -754,6 +765,13 @@ class ConnectionManager: ObservableObject {
         case .cancelled:
             debugPrint("🔗 ConnectionManager: Connection cancelled")
             debugPrint("🔗 ConnectionManager: Connection was cancelled - this usually means we called cancel() or the remote side closed")
+
+            // Clean up the dead connection
+            if let activeConn = activeUSB, connection === activeConn {
+                debugPrint("🔗 ConnectionManager: Clearing dead activeUSB connection")
+                activeUSB = nil
+            }
+
             DispatchQueue.main.async { [weak self] in
                 self?.isConnected = false
                 self?.isConnecting = false
@@ -761,7 +779,7 @@ class ConnectionManager: ObservableObject {
                 // Don't clear connectedComputerName to keep USB chip visible
                 // self?.connectedComputerName = nil
                 self?.connectionQuality = .disconnected
-                
+
                 // Notify callback of connection state change
                 self?.connectionStateCallback?(false)
             }
@@ -1007,7 +1025,8 @@ class ConnectionManager: ObservableObject {
         
         // Start reconnection if needed
         if shouldReconnect && consecutiveFailures <= maxReconnectAttempts {
-            let delay = min(Double(consecutiveFailures) * reconnectInterval, 10.0)
+            // Give iproxy/bridge 2s to fully start on first attempt, then use faster backoff
+            let delay = consecutiveFailures == 1 ? 2.0 : min(Double(consecutiveFailures - 1) * reconnectInterval + 2.0, 6.0)
             debugPrint("🔗 ConnectionManager: Scheduling reconnection in \(delay)s (attempt \(consecutiveFailures))")
             startReconnectTimer()
         } else if consecutiveFailures > maxReconnectAttempts {
@@ -1093,29 +1112,37 @@ class ConnectionManager: ObservableObject {
     
     private func attemptReconnection() {
         guard shouldReconnect else { return }
-        
+
         // Don't reconnect if we already have an active connection
         guard !isConnected else {
             debugPrint("🔗 ConnectionManager: Already connected, skipping reconnection attempt")
             return
         }
-        
+
         // Don't reconnect if we're already listening
         guard !isListening else {
             debugPrint("🔗 ConnectionManager: Already listening, skipping reconnection attempt")
             return
         }
-        
+
+        // Prevent concurrent reconnection attempts
+        guard !isReconnecting else {
+            debugPrint("🔗 ConnectionManager: Reconnection already in progress, skipping")
+            return
+        }
+
         debugPrint("🔗 ConnectionManager: Attempting reconnection...")
         connectionAttempts += 1
-        
+        isReconnecting = true
+
         DispatchQueue.main.async { [weak self] in
             self?.connectionHealth = .connecting
         }
-        
+
         stopListening()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.startListening()
+            self?.isReconnecting = false  // Clear flag after reconnection attempt completes
         }
     }
     
