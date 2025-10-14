@@ -60,10 +60,8 @@ struct CBPerformanceRow: View {
     var onDuplicate: () -> Void
 
     @GestureState private var isPressed = false
-    @State private var firedThisPress = false
     @State private var didDrag = false
     @State private var flashOpacity: Double = 0.0
-    @State private var flashTimer: Timer? = nil
     private let corner: CGFloat = 20
 
     var body: some View {
@@ -71,31 +69,19 @@ struct CBPerformanceRow: View {
             .updating($isPressed) { _, state, _ in if !state { state = true } }
             .onChanged { value in
                 let delta = abs(value.translation.width) + abs(value.translation.height)
-                if delta > 8 { 
+                if delta > 8 {
                     didDrag = true
-                    // Cancel any pending flash if we detect a drag
-                    flashTimer?.invalidate()
-                    flashTimer = nil
-                }
-                // Schedule flash only if we haven't fired yet and it's not a drag
-                if !firedThisPress && !isCued && !isCueMode && !didDrag && flashTimer == nil {
-                    flashTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: false) { _ in
-                        if !didDrag {
-                            firedThisPress = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            flash()
-                        }
-                        flashTimer = nil
-                    }
                 }
             }
             .onEnded { _ in
-                // Cancel any pending flash
-                flashTimer?.invalidate()
-                flashTimer = nil
-                
-                if !didDrag && takenBy == nil { onTap() }
-                firedThisPress = false
+                // Only flash and send MIDI on quick tap (not long-press/context menu)
+                if !didDrag && takenBy == nil {
+                    if !isCued && !isCueMode {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        flash()
+                    }
+                    onTap()
+                }
                 didDrag = false
             }
 
@@ -723,7 +709,7 @@ struct CBConnectionsSheet: View {
                             Text("Cue Bear for iPad")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("v1.0.1 (4ee9f55)")
+                            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.2") (\(gitCommitHash()))")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -740,11 +726,21 @@ struct CBConnectionsSheet: View {
     
     
     private func KeyValueRow(_ key: String, _ value: String) -> some View {
-        HStack { 
+        HStack {
             Text(key)
             Spacer()
-            Text(value).foregroundColor(.secondary) 
+            Text(value).foregroundColor(.secondary)
         }
+    }
+
+    private func gitCommitHash() -> String {
+        // Try to read git commit hash from build-time generated file
+        if let path = Bundle.main.path(forResource: "GitCommit", ofType: "txt"),
+           let hash = try? String(contentsOfFile: path, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines) {
+            return String(hash.prefix(7))
+        }
+        // Fallback to build number if git hash not available
+        return Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 }
 
