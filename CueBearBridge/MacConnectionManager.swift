@@ -230,7 +230,7 @@ final class MacConnectionManager: ObservableObject {
             }
             Logger.shared.log("🔗 MacConnectionManager: Handshake sent — waiting for response…")
             DispatchQueue.main.async { self.connectionStatus = "Looking for Cue Bear" }
-            self.startHandshakeTimeout(seconds: 5.0)
+            self.startHandshakeTimeout(seconds: 10.0)
         })
     }
 
@@ -241,6 +241,13 @@ final class MacConnectionManager: ObservableObject {
         t.setEventHandler { [weak self] in
             guard let self = self else { return }
             Logger.shared.log("🔗 MacConnectionManager: Handshake timed out; reconnecting")
+
+            // Fix: Clean up state properly before reconnecting
+            self.stateLock.lock()
+            self.connecting = false
+            self.didSendHandshake = false
+            self.stateLock.unlock()
+
             self.connection?.cancel()
             self.connection = nil
             self.isReceiving = false
@@ -368,7 +375,7 @@ final class MacConnectionManager: ObservableObject {
 
         guard !isPending else { return }
 
-        let delay = 2.0
+        let delay = 5.0  // Increased from 2.0 to 5.0 for better stability after sleep/wake
         let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
         src.schedule(deadline: .now() + delay)
         src.setEventHandler { [weak self] in
