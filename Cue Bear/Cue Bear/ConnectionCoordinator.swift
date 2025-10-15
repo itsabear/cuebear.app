@@ -97,14 +97,19 @@ class ConnectionCoordinator: ObservableObject {
         } else {
             // USB disconnected - don't auto-connect to WiFi (user choice only)
             debugPrint("🔌 USB disconnected - WiFi available for manual connection")
-            
-            // Don't change activeConnection if WiFi is currently connected
-            if activeConnection != .wifi {
+
+            // CRITICAL FIX: Check ACTUAL WiFi connection state, not just activeConnection
+            // This fixes the bug where WiFi chip turns green when USB disconnects while WiFi is connected
+            if wifiClient.isConnected {
+                // WiFi is actually connected - switch to WiFi as active connection
+                activeConnection = .wifi
+                connectionStatus = "WiFi Connected"
+                debugPrint("🔌 ConnectionCoordinator: WiFi is connected, switching activeConnection to .wifi")
+            } else {
+                // No WiFi connection - set to disconnected state
                 activeConnection = .none
                 connectionStatus = "Disconnected"
-                debugPrint("🔌 ConnectionCoordinator: Updated activeConnection to .none")
-            } else {
-                debugPrint("🔌 ConnectionCoordinator: WiFi is active, keeping activeConnection as .wifi")
+                debugPrint("🔌 ConnectionCoordinator: No WiFi connection, updated activeConnection to .none")
             }
             
             // Add a small delay to allow WiFi connection state to update
