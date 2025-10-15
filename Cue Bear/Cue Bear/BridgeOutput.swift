@@ -599,11 +599,28 @@ final class BridgeOutput: ObservableObject {
     private func receiveLoop() {
         guard let connection = connection else { return }
         connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, isComplete, error in
-            if isComplete || error != nil {
+            // v1.0.4: Handle timeout errors gracefully - retry instead of disconnecting
+            // This prevents WiFi disconnection when USB cable is unplugged
+            if let error = error {
+                let nsError = error as NSError
+                // POSIX error 60 = Operation timed out (happens when no data received for ~30 seconds)
+                if nsError.domain == NSPOSIXErrorDomain && nsError.code == 60 {
+                    debugPrint("BridgeOutput: Receive timeout, retrying connection...")
+                    // Continue the receive loop instead of disconnecting
+                    self?.receiveLoop()
+                    return
+                }
+                // For other errors, disconnect
+                debugPrint("BridgeOutput: Receive error: \(error.localizedDescription), disconnecting")
                 self?.disconnect()
                 return
             }
-            
+
+            if isComplete {
+                self?.disconnect()
+                return
+            }
+
             // Parse responses for automatic pairing
             if let data = data, let self = self {
                 self.parseResponse(data)
