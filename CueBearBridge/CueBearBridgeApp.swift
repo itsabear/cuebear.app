@@ -3,15 +3,41 @@ import Combine
 import Foundation
 import Network
 import CoreMIDI
+import AppKit
+
+// Helper to provide version string without blocking
+struct VersionHelper {
+    static let cachedVersionString: String = {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "v\(version).\(build)"
+    }()
+}
+
+// AppDelegate for handling app lifecycle events
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var bridgeApp: BridgeApp?
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Ensure iproxy is properly stopped when app quits
+        Logger.shared.log("🔧 App: applicationWillTerminate - stopping iproxy")
+        bridgeApp?.iproxy.stop(manual: false)
+    }
+}
 
 @main
 struct CueBearBridgeApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var app = BridgeApp()
-    
+
     var body: some Scene {
         MenuBarExtra("Cue Bear Bridge", image: "BearPawIcon") {
             MenuBarView()
                 .environmentObject(app)
+                .onAppear {
+                    // Connect AppDelegate to BridgeApp for cleanup
+                    appDelegate.bridgeApp = app
+                }
         }
         .menuBarExtraStyle(.window)
         
@@ -35,7 +61,7 @@ struct MenuBarView: View {
                 Text("Cue Bear Bridge")
                     .font(.headline)
                     .fontWeight(.semibold)
-                Text(versionString())
+                Text(VersionHelper.cachedVersionString)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -72,23 +98,6 @@ struct MenuBarView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                     Text(app.wifiStatus.contains("Connected") ? "Connected" : (app.wifiStatus.contains("Listening") ? "Listening" : "Idle"))
-                        .font(.caption)
-                        .fontWeight(.medium)
-                }
-                .padding(.horizontal, 12)
-                
-                // MIDI Activity Indicator (like a preamp input LED)
-                HStack {
-                    Circle()
-                        .fill(app.midiActivity ? .green : .gray)
-                        .frame(width: 8, height: 8)
-                        .scaleEffect(app.midiActivity ? 1.2 : 1.0)
-                        .animation(.easeInOut(duration: 0.1), value: app.midiActivity)
-                    Text("MIDI")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text(app.midiActivity ? "Active" : "Ready")
                         .font(.caption)
                         .fontWeight(.medium)
                 }
@@ -155,44 +164,6 @@ struct MenuBarView: View {
         .background(Color(NSColor.controlBackgroundColor))
     }
 
-    private func versionString() -> String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-
-        // Get git commit hash
-        let commitHash = getGitCommitHash()
-
-        if !commitHash.isEmpty {
-            return "v\(version).\(build) (\(commitHash))"
-        } else {
-            return "v\(version).\(build)"
-        }
-    }
-
-    private func getGitCommitHash() -> String {
-        let task = Process()
-        task.launchPath = "/usr/bin/git"
-        task.arguments = ["rev-parse", "--short", "HEAD"]
-        task.currentDirectoryPath = Bundle.main.bundlePath
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe()
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let hash = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                return hash
-            }
-        } catch {
-            // Git not available or not in repo
-        }
-
-        return ""
-    }
 }
 
 // MARK: - WiFi Server
@@ -809,7 +780,7 @@ final class BridgeApp: ObservableObject {
     @Published var midiActivity: Bool = false
 
     let iproxy = IProxyManager()
-    lazy var conn = MacConnectionManager(iproxyManager: iproxy)
+    private var conn: MacConnectionManager!  // Changed from lazy var to fix bridgeApp weak reference
     let midi = MIDIManager()
     let wifiServer = WifiServer()
     let bonjour = BridgeBonjour()
@@ -817,7 +788,7 @@ final class BridgeApp: ObservableObject {
 
     private var cancellables: Set<AnyCancellable> = []
     private var midiActivityTimer: Timer?
-    
+
     init() {
         // Initialize login item manager
         if #available(macOS 13.0, *) {
@@ -826,8 +797,15 @@ final class BridgeApp: ObservableObject {
             fatalError("macOS 13.0 or later is required")
         }
 
+        // Initialize conn AFTER self is fully initialized (not lazy!)
+        self.conn = MacConnectionManager(iproxyManager: iproxy)
+
         // Set up the reference after initialization
         conn.setBridgeApp(self)
+
+        // CRITICAL: Set up Combine subscriptions BEFORE starting anything
+        // This ensures UI updates are captured from the very first status change
+        setupSubscriptions()
 
         // Start the bridge immediately when created
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -839,16 +817,61 @@ final class BridgeApp: ObservableObject {
         midiActivityTimer?.invalidate()
         print("🔗 BridgeApp: deinit - resources cleaned up")
     }
-    
+
+    private func setupSubscriptions() {
+        // Set up all Combine subscriptions BEFORE any services start
+        // This ensures UI updates are never missed
+        print("🔗 BridgeApp: Setting up Combine subscriptions")
+
+        // Monitor iproxy status
+        iproxy.$status.receive(on: DispatchQueue.main).sink { [weak self] s in
+            print("🔗 BridgeApp: iproxy status update: \(s)")
+            self?.iproxyStatus = "iproxy: " + s
+            self?.isRunning = s.contains("Running")
+        }.store(in: &cancellables)
+
+        // Monitor iproxy bound port and trigger connection attempts
+        iproxy.$boundLocalPort.receive(on: DispatchQueue.main).sink { [weak self] p in
+            print("🔗 BridgeApp: iproxy port update: \(p?.description ?? "nil")")
+            self?.localPort = p
+            // Attempt initial connection when iproxy is ready
+            // Give iPad a moment to initialize, then try to connect
+            if let _ = p, self?.iproxy.isRunning == true {
+                DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    self?.conn.waitAndConnect()
+                }
+            }
+        }.store(in: &cancellables)
+
+        // Monitor USB connection status
+        conn.$connectionStatus.receive(on: DispatchQueue.main).sink { [weak self] s in
+            print("🔗 BridgeApp: USB status update: \(s)")
+            self?.usbStatus = s
+            self?.isConnected = s.contains("Connected")
+        }.store(in: &cancellables)
+
+        // Monitor WiFi status
+        wifiServer.$status.receive(on: DispatchQueue.main).sink { [weak self] s in
+            print("🔗 BridgeApp: WiFi status update: \(s)")
+            self?.wifiStatus = "WiFi: " + s
+        }.store(in: &cancellables)
+
+        print("🔗 BridgeApp: ✅ All subscriptions set up successfully")
+    }
+
     func triggerMIDIActivity() {
         DispatchQueue.main.async {
-            self.midiActivity = true
-            
+            withAnimation(.easeInOut(duration: 0.1)) {
+                self.midiActivity = true
+            }
+
             // Reset activity after 200ms (like a preamp LED)
             self.midiActivityTimer?.invalidate()
-            self.midiActivityTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { _ in
+            self.midiActivityTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { [weak self] _ in
                 DispatchQueue.main.async {
-                    self.midiActivity = false
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        self?.midiActivity = false
+                    }
                 }
             }
         }
@@ -875,25 +898,19 @@ final class BridgeApp: ObservableObject {
 
         do {
             try iproxy.start()
-            iproxy.$status.receive(on: DispatchQueue.main).sink { [weak self] s in
-                self?.iproxyStatus = "iproxy: " + s
-                self?.isRunning = s.contains("Running")
-            }.store(in: &cancellables)
-            iproxy.$boundLocalPort.receive(on: DispatchQueue.main).sink { [weak self] p in
-                self?.localPort = p
-                if let _ = p, self?.iproxy.isRunning == true {
-                    self?.conn.waitAndConnect()
-                }
-            }.store(in: &cancellables)
-            conn.$connectionStatus.receive(on: DispatchQueue.main).sink { [weak self] s in
-                self?.usbStatus = s
-                self?.isConnected = s.contains("Connected")
-            }.store(in: &cancellables)
 
-            // Monitor WiFi status
-            wifiServer.$status.receive(on: DispatchQueue.main).sink { [weak self] s in
-                self?.wifiStatus = "WiFi: " + s
-            }.store(in: &cancellables)
+            // NOTE: Combine subscriptions are now set up in setupSubscriptions()
+            // which is called during init() BEFORE start() runs.
+            // This ensures UI updates are never missed.
+
+            // REMOVED: Don't attempt initial connection automatically
+            // Instead, rely on USB device mount events which trigger instant connection
+            // This ensures iPad app is fully ready before connecting (same as fast reconnect behavior)
+            //
+            // The connection will happen automatically when:
+            // 1. USB device mounts (handled by MacConnectionManager.handleUSBDeviceMounted)
+            // 2. User manually clicks "Connect" in the menu
+            // 3. System wake events (handled by IProxyManager sleep/wake monitoring)
 
             status = "Running"
         } catch {
