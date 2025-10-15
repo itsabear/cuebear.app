@@ -352,9 +352,11 @@ class WifiServer: ObservableObject {
         
         conn.stateUpdateHandler = { [weak self] nwState in
             guard let self = self else { return }
+            // v1.1.8: Log all state changes for debugging
+            self.log("📡 WiFi connection state changed to: \(nwState)")
             switch nwState {
             case .ready:
-                self.log("WiFi connection established")
+                self.log("WiFi connection established - starting receive loop")
                 // Fix Issue #16: Protect state access with lock
                 self.stateLock.lock()
                 self.state = .connected
@@ -378,7 +380,12 @@ class WifiServer: ObservableObject {
                     self.status = "Connection cancelled"
                     self.isConnected = false
                 }
-            default: break
+            case .preparing:
+                self.log("WiFi connection preparing...")
+            case .waiting(let error):
+                self.log("WiFi connection waiting: \(error.localizedDescription)")
+            @unknown default:
+                self.log("WiFi connection unknown state: \(nwState)")
             }
         }
         
@@ -387,10 +394,14 @@ class WifiServer: ObservableObject {
     
     private func startReceiving(_ conn: NWConnection) {
         conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+            // v1.1.8: Enhanced logging for debugging WiFi receive issues
             if let data = data, !data.isEmpty {
+                self?.log("📥 WiFi received \(data.count) bytes")
                 self?.processReceivedData(data)
+            } else if error == nil && !isComplete {
+                self?.log("📥 WiFi receive callback with no data (no error, not complete)")
             }
-            
+
             if isComplete {
                 self?.log("WiFi connection closed")
                 self?.stopHeartbeat()
