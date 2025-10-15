@@ -5889,11 +5889,9 @@ private struct iPadControlTile: View {
                     .onTapGesture { onEdit() }
                 } else {
                     Button(action: {
-                        // Blue flash on tap
+                        // v1.0.3: Blue flash on tap - removed 20ms delay for instant feedback
                         flashOpacity = 1.0
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                            withAnimation(.easeOut(duration: 0.18)) { flashOpacity = 0.0 }
-                        }
+                        withAnimation(.easeOut(duration: 0.18)) { flashOpacity = 0.0 }
                         onTap()
                     }) {
                         ZStack {

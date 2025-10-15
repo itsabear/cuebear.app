@@ -146,9 +146,8 @@ struct CBPerformanceRow: View {
 
     private func flash() {
         flashOpacity = 1.0
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-            withAnimation(.easeOut(duration: 0.18)) { flashOpacity = 0.0 }
-        }
+        // v1.0.3: Removed 20ms delay for instant visual feedback
+        withAnimation(.easeOut(duration: 0.18)) { flashOpacity = 0.0 }
     }
 }
 
