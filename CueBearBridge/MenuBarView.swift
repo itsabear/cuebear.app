@@ -1,8 +1,17 @@
 import SwiftUI
 
+// Helper to provide version string without blocking
+struct VersionHelper {
+    static let cachedVersionString: String = {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "v\(version).\(build)"
+    }()
+}
+
 struct MenuBarView: View {
     @EnvironmentObject var app: BridgeApp
-    
+
     var body: some View {
         VStack(spacing: 8) {
             // Header
@@ -10,7 +19,7 @@ struct MenuBarView: View {
                 Text("Cue Bear Bridge")
                     .font(.headline)
                     .fontWeight(.semibold)
-                Text(versionString())
+                Text(VersionHelper.cachedVersionString)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -36,23 +45,6 @@ struct MenuBarView: View {
                         .fontWeight(.medium)
                 }
                 .padding(.horizontal, 12)
-                
-                // MIDI Activity Indicator (like a preamp input LED)
-                HStack {
-                    Circle()
-                        .fill(app.midiActivity ? .green : .gray)
-                        .frame(width: 8, height: 8)
-                        .scaleEffect(app.midiActivity ? 1.2 : 1.0)
-                        .animation(.easeInOut(duration: 0.1), value: app.midiActivity)
-                    Text("MIDI")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text(app.midiActivity ? "Active" : "Ready")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                }
-                .padding(.horizontal, 12)
             }
             .padding(.vertical, 4)
             
@@ -71,45 +63,6 @@ struct MenuBarView: View {
         }
         .frame(width: 200)
         .background(Color(NSColor.controlBackgroundColor))
-    }
-
-    private func versionString() -> String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-
-        // Get git commit hash
-        let commitHash = getGitCommitHash()
-
-        if !commitHash.isEmpty {
-            return "v\(version).\(build) (\(commitHash))"
-        } else {
-            return "v\(version).\(build)"
-        }
-    }
-
-    private func getGitCommitHash() -> String {
-        let task = Process()
-        task.launchPath = "/usr/bin/git"
-        task.arguments = ["rev-parse", "--short", "HEAD"]
-        task.currentDirectoryPath = Bundle.main.bundlePath
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe()
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let hash = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                return hash
-            }
-        } catch {
-            // Git not available or not in repo
-        }
-
-        return ""
     }
 }
 

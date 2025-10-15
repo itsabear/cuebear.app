@@ -24,6 +24,11 @@ final class MacConnectionManager: ObservableObject {
 
     private var handshakeTimeout: DispatchSourceTimer?
     private var usbDeviceObserver: NSObjectProtocol?
+    private var deviceDisconnectObserver: NSObjectProtocol?
+
+    // Retry limiting for reconnection attempts
+    private var consecutiveReconnectFailures = 0
+    private let maxConsecutiveReconnects = 20  // Increased from 10 for better device ready detection
 
     // Reference to BridgeApp for triggering MIDI activity indicator
     private weak var bridgeApp: BridgeApp?
@@ -31,6 +36,7 @@ final class MacConnectionManager: ObservableObject {
     init(iproxyManager: IProxyManager) {
         self.iproxyManager = iproxyManager
         setupUSBDeviceMonitoring()
+        setupDeviceDisconnectNotification()
     }
     
     func setBridgeApp(_ app: BridgeApp) {
@@ -39,6 +45,7 @@ final class MacConnectionManager: ObservableObject {
     
     deinit {
         stopUSBDeviceMonitoring()
+        stopDeviceDisconnectNotification()
         stopHeartbeatSending()
         reconnectSource?.cancel()
         handshakeTimeout?.cancel()
@@ -83,7 +90,7 @@ final class MacConnectionManager: ObservableObject {
             Logger.shared.log("🔗 MacConnectionManager: iproxy not ready - port: \(iproxyManager.boundLocalPort?.description ?? "nil"), running: \(iproxyManager.isRunning)")
             // Fix Issue #10: Ensure @Published updates on main queue
             DispatchQueue.main.async { [weak self] in
-                self?.connectionStatus = "Waiting for iproxy…"
+                self?.connectionStatus = "USB: Waiting for iproxy…"
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in self?.waitAndConnect() }
             return
@@ -171,7 +178,7 @@ final class MacConnectionManager: ObservableObject {
                 if shouldSendHandshake {
                     self.sendHandshake()
                 }
-                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "Looking for Cue Bear" }
+                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Looking for Cue Bear" }
 
             case .failed(let err):
                 self.stateLock.lock()
@@ -180,7 +187,7 @@ final class MacConnectionManager: ObservableObject {
                 self.cancelHandshakeTimeout()
                 self.disconnect()
                 self.startReconnectTimer()
-                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "Failed: \(err.localizedDescription)" }
+                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Failed: \(err.localizedDescription)" }
 
             case .cancelled:
                 self.stateLock.lock()
@@ -189,7 +196,7 @@ final class MacConnectionManager: ObservableObject {
                 self.cancelHandshakeTimeout()
                 self.disconnect()
                 self.startReconnectTimer()
-                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "Disconnected" }
+                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Disconnected" }
 
             default:
                 break
@@ -197,7 +204,7 @@ final class MacConnectionManager: ObservableObject {
         }
 
         conn.start(queue: .global(qos: .userInitiated))
-        DispatchQueue.main.async { [weak self] in self?.connectionStatus = "Connecting to localhost:\(port)…" }
+        DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Connecting to localhost:\(port)…" }
     }
 
     private func disconnect() {
@@ -229,7 +236,7 @@ final class MacConnectionManager: ObservableObject {
                 return
             }
             Logger.shared.log("🔗 MacConnectionManager: Handshake sent — waiting for response…")
-            DispatchQueue.main.async { self.connectionStatus = "Looking for Cue Bear" }
+            DispatchQueue.main.async { self.connectionStatus = "USB: Looking for Cue Bear" }
             self.startHandshakeTimeout(seconds: 10.0)
         })
     }
@@ -287,7 +294,7 @@ final class MacConnectionManager: ObservableObject {
                 self.cancelHandshakeTimeout()
                 self.isReceiving = false
                 DispatchQueue.main.async { [weak self] in 
-                    self?.connectionStatus = "Disconnected"
+                    self?.connectionStatus = "USB: Disconnected"
                     self?.connection = nil  // Clear the connection object
                 }
                 self.startReconnectTimer()
@@ -299,7 +306,7 @@ final class MacConnectionManager: ObservableObject {
                 self.cancelHandshakeTimeout()
                 self.isReceiving = false
                 DispatchQueue.main.async { [weak self] in 
-                    self?.connectionStatus = "Disconnected"
+                    self?.connectionStatus = "USB: Disconnected"
                     self?.connection = nil  // Clear the connection object
                 }
                 self.startReconnectTimer()
@@ -316,9 +323,10 @@ final class MacConnectionManager: ObservableObject {
         if let messageString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
             if messageString.hasPrefix("OK/") {
                 cancelHandshakeTimeout()
-                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "Connected" }
+                consecutiveReconnectFailures = 0  // Reset failure counter on successful connection
+                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Connected" }
                 Logger.shared.log("🔗 MacConnectionManager: Received CB/2 handshake response — connected")
-                
+
                 // Start sending heartbeats to detect disconnection
                 startHeartbeatSending()
                 return
@@ -365,6 +373,17 @@ final class MacConnectionManager: ObservableObject {
     }
 
     private func startReconnectTimer() {
+        // Check if we've hit the reconnection attempt limit
+        if consecutiveReconnectFailures >= maxConsecutiveReconnects {
+            Logger.shared.log("🔗 MacConnectionManager: ❌ Max reconnection attempts (\(maxConsecutiveReconnects)) reached - stopping auto-reconnect")
+            Logger.shared.log("🔗 MacConnectionManager: ℹ️ Will retry when USB device is mounted or manually triggered")
+            consecutiveReconnectFailures = 0
+            DispatchQueue.main.async { [weak self] in
+                self?.connectionStatus = "USB: Disconnected (no device)"
+            }
+            return
+        }
+
         // Fix Issue #12: Protect reconnectPending with lock
         stateLock.lock()
         let isPending = reconnectPending
@@ -375,7 +394,24 @@ final class MacConnectionManager: ObservableObject {
 
         guard !isPending else { return }
 
-        let delay = 5.0  // Increased from 2.0 to 5.0 for better stability after sleep/wake
+        consecutiveReconnectFailures += 1
+
+        // Smart backoff: Fast retries for first 5 attempts, then progressively slower
+        // Attempts 1-5: 1s delay (5 seconds total) - iPad usually ready quickly
+        // Attempts 6-15: 3s delay (30 seconds more = 35s total) - Give more time after sleep/wake
+        // Attempts 16-20: 5s delay (25 seconds more = 60s total) - Final attempts before giving up
+        let delay: TimeInterval = {
+            if consecutiveReconnectFailures <= 5 {
+                return 1.0  // Fast retry for first 5 attempts
+            } else if consecutiveReconnectFailures <= 15 {
+                return 3.0  // Medium retry for next 10 attempts
+            } else {
+                return 5.0  // Slow retry for final attempts
+            }
+        }()
+
+        Logger.shared.log("🔗 MacConnectionManager: 🔄 Scheduling reconnect attempt \(consecutiveReconnectFailures)/\(maxConsecutiveReconnects) in \(Int(delay))s")
+
         let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
         src.schedule(deadline: .now() + delay)
         src.setEventHandler { [weak self] in
@@ -421,7 +457,56 @@ final class MacConnectionManager: ObservableObject {
         }
         Logger.shared.log("🔗 MacConnectionManager: USB device monitoring stopped")
     }
-    
+
+    private func setupDeviceDisconnectNotification() {
+        Logger.shared.log("🔗 MacConnectionManager: Setting up device disconnect notification listener")
+
+        deviceDisconnectObserver = NotificationCenter.default.addObserver(
+            forName: .iosDeviceDisconnected,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleDeviceDisconnected()
+        }
+
+        Logger.shared.log("🔗 MacConnectionManager: ✅ Device disconnect notification listener active")
+    }
+
+    private func stopDeviceDisconnectNotification() {
+        if let observer = deviceDisconnectObserver {
+            NotificationCenter.default.removeObserver(observer)
+            deviceDisconnectObserver = nil
+        }
+        Logger.shared.log("🔗 MacConnectionManager: Device disconnect notification listener stopped")
+    }
+
+    private func handleDeviceDisconnected() {
+        Logger.shared.log("🔗 MacConnectionManager: 📱 iOS device disconnected! Updating UI and stopping connection...")
+
+        // Immediately update UI
+        DispatchQueue.main.async { [weak self] in
+            self?.connectionStatus = "USB: Disconnected"
+        }
+
+        // Cancel existing connection
+        connection?.cancel()
+        connection = nil
+        isReceiving = false
+
+        // Stop reconnect attempts
+        stopReconnectTimer()
+        stopHeartbeatSending()
+        cancelHandshakeTimeout()
+
+        // Reset state
+        stateLock.lock()
+        connecting = false
+        didSendHandshake = false
+        reconnectPending = false
+        consecutiveReconnectFailures = 0
+        stateLock.unlock()
+    }
+
     private func handleUSBDeviceMounted(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let devicePath = userInfo[NSWorkspace.volumeURLUserInfoKey] as? URL else {
@@ -433,8 +518,9 @@ final class MacConnectionManager: ObservableObject {
         // Check if this is an iOS device
         if isiOSDevicePath(devicePath.path) {
             Logger.shared.log("🔗 MacConnectionManager: 🎯 iOS device detected! Triggering immediate reconnection...")
-            
+
             // Cancel any pending reconnection timer and connect immediately
+            consecutiveReconnectFailures = 0  // Reset failure counter when device mounted
             stopReconnectTimer()
             
             // Wait a moment for iproxy to start, then connect immediately
@@ -502,9 +588,9 @@ final class MacConnectionManager: ObservableObject {
         }
         
         Logger.shared.log("🔗 MacConnectionManager: Processing batch of \(messages.count) messages")
-        
-        // Trigger MIDI activity indicator
-        bridgeApp?.triggerMIDIActivity()
+
+        // MIDI activity indicator is triggered by each individual message in handleMIDIMessage()
+        // This ensures the indicator flashes for every MIDI message, not just once per batch
         
         for messageString in messages {
             guard let messageData = messageString.data(using: .utf8),
@@ -518,7 +604,7 @@ final class MacConnectionManager: ObservableObject {
     
     private func handleMIDIMessage(_ obj: [String: Any]) {
         guard let type = obj["type"] as? String else { return }
-        
+
         switch type {
         case "midi_cc":
             if let channel = obj["channel"] as? Int,
@@ -528,7 +614,7 @@ final class MacConnectionManager: ObservableObject {
                 // Forward to WiFi server for MIDI processing
                 forwardMIDIToWiFiServer(obj)
             }
-            
+
         case "midi_note":
             if let channel = obj["channel"] as? Int,
                let note = obj["note"] as? Int,
@@ -537,7 +623,7 @@ final class MacConnectionManager: ObservableObject {
                 // Forward to WiFi server for MIDI processing
                 forwardMIDIToWiFiServer(obj)
             }
-            
+
         default:
             Logger.shared.log("🔗 MacConnectionManager: Unknown MIDI message type: \(type)")
         }

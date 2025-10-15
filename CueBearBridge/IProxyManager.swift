@@ -16,9 +16,12 @@ final class IProxyManager: ObservableObject {
     private var process: Process?
     private let devicePort: UInt16 = 9360
     private var usbDeviceObserver: NSObjectProtocol?
+    private var usbUnmountObserver: NSObjectProtocol?
     private var isMonitoringUSB = false
     private var sleepObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
+    private var consecutiveRestartFailures = 0
+    private let maxConsecutiveRestarts = 3
 
     init() {
         setupUSBDeviceMonitoring()
@@ -26,6 +29,7 @@ final class IProxyManager: ObservableObject {
     }
 
     deinit {
+        stop(manual: false)
         stopUSBDeviceMonitoring()
         stopSleepWakeMonitoring()
     }
@@ -56,32 +60,39 @@ final class IProxyManager: ObservableObject {
         
         proc.terminationHandler = { [weak self] p in
             DispatchQueue.main.async {
-                self?.isRunning = false
+                guard let self = self else { return }
+                self.isRunning = false
                 let exitCode = p.terminationStatus
-                self?.status = "Stopped (code: \(exitCode))"
+                self.status = "Stopped (code: \(exitCode))"
                 Logger.shared.log("🔧 IProxyManager: iproxy stopped with code \(exitCode)")
 
                 // Auto-restart iproxy if it crashed unexpectedly (non-zero exit code)
-                // Don't restart if it was manually stopped (exit code 15 = SIGTERM)
-                if exitCode != 0 && exitCode != 15 {
-                    Logger.shared.log("🔧 IProxyManager: ⚠️ iproxy crashed unexpectedly - auto-restarting in 2s...")
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                // Don't restart if:
+                // - Manually stopped (exit code 15 = SIGTERM)
+                // - No device connected (exit code 9 = SIGKILL from immediate failure)
+                // - Already hit max consecutive restart attempts
+                if exitCode != 0 && exitCode != 15 && exitCode != 9 {
+                    if self.consecutiveRestartFailures >= self.maxConsecutiveRestarts {
+                        Logger.shared.log("🔧 IProxyManager: ❌ Max restart attempts (\(self.maxConsecutiveRestarts)) reached - stopping auto-restart")
+                        self.consecutiveRestartFailures = 0
+                        return
+                    }
+
+                    self.consecutiveRestartFailures += 1
+                    let delay: TimeInterval = Double(self.consecutiveRestartFailures) * 2.0 // Exponential backoff: 2s, 4s, 6s
+                    Logger.shared.log("🔧 IProxyManager: ⚠️ iproxy crashed unexpectedly - auto-restarting in \(Int(delay))s (attempt \(self.consecutiveRestartFailures)/\(self.maxConsecutiveRestarts))...")
+
+                    DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
                         do {
                             try self?.start()
                             Logger.shared.log("🔧 IProxyManager: ✅ iproxy auto-restarted successfully after crash")
                         } catch {
                             Logger.shared.log("🔧 IProxyManager: ❌ Failed to auto-restart iproxy: \(error)")
-                            // Retry once more after a longer delay
-                            DispatchQueue.global().asyncAfter(deadline: .now() + 5.0) { [weak self] in
-                                do {
-                                    try self?.start()
-                                    Logger.shared.log("🔧 IProxyManager: ✅ iproxy auto-restarted on retry")
-                                } catch {
-                                    Logger.shared.log("🔧 IProxyManager: ❌ Failed to auto-restart iproxy on retry: \(error)")
-                                }
-                            }
                         }
                     }
+                } else if exitCode == 9 {
+                    Logger.shared.log("🔧 IProxyManager: ℹ️ iproxy stopped (exit code 9) - likely no device connected. Not auto-restarting.")
+                    self.consecutiveRestartFailures = 0
                 }
             }
         }
@@ -95,6 +106,7 @@ final class IProxyManager: ObservableObject {
             isRunning = true
             status = "Running"
             boundLocalPort = 8077
+            consecutiveRestartFailures = 0 // Reset failure counter on successful start
             Logger.shared.log("🔧 IProxyManager: ✅ iproxy started successfully")
 
             // Add simple port binding check (non-aggressive)
@@ -186,8 +198,8 @@ final class IProxyManager: ObservableObject {
     
     private func setupUSBDeviceMonitoring() {
         Logger.shared.log("🔧 IProxyManager: Setting up event-driven USB device monitoring")
-        
-        // Listen for USB device mount/unmount events
+
+        // Listen for USB device mount events
         usbDeviceObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didMountNotification,
             object: nil,
@@ -195,15 +207,28 @@ final class IProxyManager: ObservableObject {
         ) { [weak self] notification in
             self?.handleUSBDeviceMounted(notification)
         }
-        
+
+        // Listen for USB device unmount events
+        usbUnmountObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didUnmountNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleUSBDeviceUnmounted(notification)
+        }
+
         isMonitoringUSB = true
-        Logger.shared.log("🔧 IProxyManager: ✅ USB device monitoring active")
+        Logger.shared.log("🔧 IProxyManager: ✅ USB device monitoring active (mount + unmount)")
     }
     
     private func stopUSBDeviceMonitoring() {
         if let observer = usbDeviceObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
             usbDeviceObserver = nil
+        }
+        if let observer = usbUnmountObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            usbUnmountObserver = nil
         }
         isMonitoringUSB = false
         Logger.shared.log("🔧 IProxyManager: USB device monitoring stopped")
@@ -232,6 +257,26 @@ final class IProxyManager: ObservableObject {
         }
     }
     
+    private func handleUSBDeviceUnmounted(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let devicePath = userInfo[NSWorkspace.volumeURLUserInfoKey] as? URL else {
+            return
+        }
+
+        Logger.shared.log("🔧 IProxyManager: USB device unmounted at: \(devicePath.path)")
+
+        // Check if this is an iOS device
+        if isiOSDevicePath(devicePath.path) {
+            Logger.shared.log("🔧 IProxyManager: 📱 iOS device disconnected! Stopping iproxy...")
+
+            // Stop iproxy when iOS device is disconnected
+            stop(manual: false)
+
+            // Notify connection manager about disconnect
+            NotificationCenter.default.post(name: .iosDeviceDisconnected, object: nil)
+        }
+    }
+
     private func isiOSDevicePath(_ path: String) -> Bool {
         // Check for common iOS device mount points
         let iosDevicePatterns = [
@@ -312,4 +357,9 @@ final class IProxyManager: ObservableObject {
             }
         }
     }
+}
+
+// MARK: - Notification Names
+extension Notification.Name {
+    static let iosDeviceDisconnected = Notification.Name("iosDeviceDisconnected")
 }
