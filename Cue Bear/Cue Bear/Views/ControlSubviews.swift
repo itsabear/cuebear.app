@@ -688,8 +688,11 @@ struct CBConnectionsSheet: View {
                         ForEach(wifiClient.discovered, id: \.id) { item in
                             BridgeDeviceCard(
                                 computerName: item.name,
-                                isConnected: wifiClient.isConnected && wifiClient.current?.id == item.id,
-                                isConnecting: wifiClient.isConnecting && wifiClient.current?.id == item.id,
+                                // v1.0.4: Fix WiFi chip showing disconnected when USB unplugs
+                                // Use connectionCoordinator.activeConnection as source of truth instead of item.id comparison
+                                // because discovered array rebuilds with new IDs after USB disconnect
+                                isConnected: connectionCoordinator.activeConnection == .wifi && wifiClient.current?.name == item.name,
+                                isConnecting: wifiClient.isConnecting && wifiClient.current?.name == item.name,
                                 connectionType: .wifi,
                                 isClickable: true,
                                 onTap: {
