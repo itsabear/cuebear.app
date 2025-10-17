@@ -178,6 +178,11 @@ class WifiServer: ObservableObject {
     private var usbConnectionManager: MacConnectionManager?
     private var heartbeatTimer: Timer?
     private var midiObserver: NSObjectProtocol?
+    private var pathRecoveryTimer: Timer?
+
+    // RESILIENCE FIX: Connection health monitoring
+    private var connectionHealthTimer: Timer?
+    private var lastHeartbeatReceived: Date = Date.distantPast
 
     private var port: UInt16 = 8078
 
@@ -194,6 +199,7 @@ class WifiServer: ObservableObject {
             NotificationCenter.default.removeObserver(observer)
         }
         heartbeatTimer?.invalidate()
+        connectionHealthTimer?.invalidate()
         stop()
         log("WiFi server deinit - all resources cleaned up")
     }
@@ -252,6 +258,7 @@ class WifiServer: ObservableObject {
     func stop() {
         log("Stopping WiFi server")
         stopHeartbeat()
+        stopConnectionHealthMonitor() // RESILIENCE FIX
         connection?.cancel()
         connection = nil
         listener?.cancel()
@@ -347,16 +354,22 @@ class WifiServer: ObservableObject {
             return
         }
 
-        connection?.cancel()
+        // RESILIENCE FIX: Properly cleanup old connection before replacing
+        // This prevents memory leaks during many reconnections over long sessions
+        if let oldConn = connection {
+            log("📡 WiFi: Cleaning up old connection before accepting new one")
+            oldConn.cancel()
+            oldConn.stateUpdateHandler = nil
+            oldConn.pathUpdateHandler = nil
+        }
         connection = conn
-        
+
         conn.stateUpdateHandler = { [weak self] nwState in
             guard let self = self else { return }
-            // v1.1.8: Log all state changes for debugging
-            self.log("📡 WiFi connection state changed to: \(nwState)")
+            self.log("📡 WiFi state: \(nwState)")
             switch nwState {
             case .ready:
-                self.log("WiFi connection established - starting receive loop")
+                self.log("WiFi ready - starting receive loop")
                 // Fix Issue #16: Protect state access with lock
                 self.stateLock.lock()
                 self.state = .connected
@@ -367,50 +380,71 @@ class WifiServer: ObservableObject {
                 }
                 self.startReceiving(conn)
                 self.startHeartbeat()
+                self.startConnectionHealthMonitor() // RESILIENCE FIX
             case .failed(let error):
-                self.log("WiFi connection failed: \(error.localizedDescription)")
+                self.log("WiFi failed: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     self.status = "Connection failed"
                     self.isConnected = false
                 }
             case .cancelled:
-                self.log("WiFi connection cancelled")
+                self.log("WiFi cancelled")
                 self.stopHeartbeat()
+                self.stopConnectionHealthMonitor() // RESILIENCE FIX
                 DispatchQueue.main.async {
                     self.status = "Connection cancelled"
                     self.isConnected = false
                 }
             case .preparing:
-                self.log("WiFi connection preparing...")
+                break // No action needed
             case .waiting(let error):
-                self.log("WiFi connection waiting: \(error.localizedDescription)")
+                self.log("WiFi waiting: \(error.localizedDescription)")
+            case .setup:
+                break // No action needed
             @unknown default:
-                self.log("WiFi connection unknown state: \(nwState)")
+                self.log("WiFi unknown state: \(nwState)")
             }
         }
-        
+
+        // Handle network path changes (e.g., when USB unplugs and routing changes)
+        conn.pathUpdateHandler = { [weak self] path in
+            guard let self = self else { return }
+            self.log("📡 WiFi path changed: \(path.status)")
+
+            if path.status == .unsatisfied && conn.state == .ready {
+                // Path became unsatisfied - connection is zombie (can't send/receive)
+                // Cancel immediately so iPad can reconnect with a working connection
+                self.log("📡 WiFi path unsatisfied - canceling connection for immediate reconnect")
+                self.stopHeartbeat()
+                DispatchQueue.main.async {
+                    self.isConnected = false
+                    self.status = "Disconnected"
+                }
+                conn.cancel()
+            } else if path.status == .satisfied {
+                self.log("📡 WiFi path satisfied")
+            }
+        }
+
         conn.start(queue: queue)
     }
     
     private func startReceiving(_ conn: NWConnection) {
         conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
-            // v1.1.8: Enhanced logging for debugging WiFi receive issues
             if let data = data, !data.isEmpty {
-                self?.log("📥 WiFi received \(data.count) bytes")
+                self?.log("📥 WiFi RX \(data.count)B")
                 self?.processReceivedData(data)
-            } else if error == nil && !isComplete {
-                self?.log("📥 WiFi receive callback with no data (no error, not complete)")
             }
 
             if isComplete {
-                self?.log("WiFi connection closed")
+                self?.log("WiFi closed")
                 self?.stopHeartbeat()
                 DispatchQueue.main.async {
                     self?.isConnected = false
                     self?.status = "Disconnected"
                 }
             } else if let error = error {
-                self?.log("WiFi receive error: \(error.localizedDescription)")
+                self?.log("WiFi RX error: \(error.localizedDescription)")
             } else {
                 self?.startReceiving(conn)
             }
@@ -500,6 +534,12 @@ class WifiServer: ObservableObject {
         guard let type = midiObj["type"] as? String else { return }
 
         switch type {
+        case "heartbeat":
+            // RESILIENCE FIX: Mark heartbeat received for health monitoring
+            markHeartbeatReceived()
+            log("💓 Received heartbeat from iPad")
+            return
+
         case "midi_cc":
             if let channel = midiObj["channel"] as? Int,
                let cc = midiObj["cc"] as? Int,
@@ -845,10 +885,10 @@ final class BridgeApp: ObservableObject {
         iproxy.$boundLocalPort.receive(on: DispatchQueue.main).sink { [weak self] p in
             print("🔗 BridgeApp: iproxy port update: \(p?.description ?? "nil")")
             self?.localPort = p
-            // Attempt initial connection when iproxy is ready
-            // Give iPad a moment to initialize, then try to connect
+            // SPEED FIX: Reduced delay from 2.0s to 0.1s for faster startup connection
+            // The retry logic handles cases where iPad isn't ready yet
             if let _ = p, self?.iproxy.isRunning == true {
-                DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     self?.conn.waitAndConnect()
                 }
             }
@@ -976,20 +1016,70 @@ extension WifiServer {
     
     private func sendHeartbeat() {
         guard let connection = connection else { return }
-        
+
         let heartbeat: [String: Any] = [
             "type": "heartbeat",
             "source": "wifi_bridge",
             "timestamp": Int(Date().timeIntervalSince1970)
         ]
-        
+
         guard let data = try? JSONSerialization.data(withJSONObject: heartbeat) else { return }
         let framed = data + Data([0x0A])
-        
+
         connection.send(content: framed, completion: .contentProcessed { error in
             if let error = error {
                 print("📡 WiFi Server: Heartbeat send error: \(error)")
             }
         })
+    }
+
+    // MARK: - Connection Health Monitoring (RESILIENCE FIX)
+
+    private func startConnectionHealthMonitor() {
+        log("Starting WiFi connection health monitor")
+        lastHeartbeatReceived = Date() // Initialize to current time
+
+        connectionHealthTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            self?.checkConnectionHealth()
+        }
+    }
+
+    private func stopConnectionHealthMonitor() {
+        connectionHealthTimer?.invalidate()
+        connectionHealthTimer = nil
+        log("Stopped WiFi connection health monitor")
+    }
+
+    private func checkConnectionHealth() {
+        guard isConnected else { return }
+
+        let timeSinceLastHeartbeat = Date().timeIntervalSince(lastHeartbeatReceived)
+
+        // If no heartbeat received from iPad in 60 seconds, assume connection is dead
+        if timeSinceLastHeartbeat > 60.0 {
+            log("⚠️ WiFi: No heartbeat from iPad for \(Int(timeSinceLastHeartbeat))s - disconnecting zombie connection")
+
+            // Clean up zombie connection
+            stopHeartbeat()
+            stopConnectionHealthMonitor()
+
+            if let conn = connection {
+                conn.cancel()
+                conn.stateUpdateHandler = nil
+                conn.pathUpdateHandler = nil
+            }
+            connection = nil
+
+            DispatchQueue.main.async {
+                self.isConnected = false
+                self.status = "Listening on \(self.port)"
+            }
+
+            log("📡 WiFi: Zombie connection cleaned up, ready for new iPad connection")
+        }
+    }
+
+    func markHeartbeatReceived() {
+        lastHeartbeatReceived = Date()
     }
 }
