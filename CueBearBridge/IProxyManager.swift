@@ -15,22 +15,20 @@ final class IProxyManager: ObservableObject {
     private let processLock = NSLock()
     private var process: Process?
     private let devicePort: UInt16 = 9360
-    private var usbDeviceObserver: NSObjectProtocol?
-    private var usbUnmountObserver: NSObjectProtocol?
-    private var isMonitoringUSB = false
+    private var usbMuxdMonitor: USBMuxdMonitor?
     private var sleepObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
     private var consecutiveRestartFailures = 0
     private let maxConsecutiveRestarts = 3
 
     init() {
-        setupUSBDeviceMonitoring()
+        setupUSBMuxdMonitoring()
         setupSleepWakeMonitoring()
     }
 
     deinit {
         stop(manual: false)
-        stopUSBDeviceMonitoring()
+        stopUSBMuxdMonitoring()
         stopSleepWakeMonitoring()
     }
 
@@ -194,58 +192,17 @@ final class IProxyManager: ObservableObject {
         }
     }
     
-    // MARK: - Event-Driven USB Device Detection
-    
-    private func setupUSBDeviceMonitoring() {
-        Logger.shared.log("🔧 IProxyManager: Setting up event-driven USB device monitoring")
+    // MARK: - USB Device Detection via libusbmuxd
 
-        // Listen for USB device mount events
-        usbDeviceObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didMountNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.handleUSBDeviceMounted(notification)
-        }
+    private func setupUSBMuxdMonitoring() {
+        Logger.shared.log("🔧 IProxyManager: Setting up libusbmuxd device monitoring")
 
-        // Listen for USB device unmount events
-        usbUnmountObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didUnmountNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.handleUSBDeviceUnmounted(notification)
-        }
+        let monitor = USBMuxdMonitor()
 
-        isMonitoringUSB = true
-        Logger.shared.log("🔧 IProxyManager: ✅ USB device monitoring active (mount + unmount)")
-    }
-    
-    private func stopUSBDeviceMonitoring() {
-        if let observer = usbDeviceObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
-            usbDeviceObserver = nil
-        }
-        if let observer = usbUnmountObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
-            usbUnmountObserver = nil
-        }
-        isMonitoringUSB = false
-        Logger.shared.log("🔧 IProxyManager: USB device monitoring stopped")
-    }
-    
-    private func handleUSBDeviceMounted(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let devicePath = userInfo[NSWorkspace.volumeURLUserInfoKey] as? URL else {
-            return
-        }
-        
-        Logger.shared.log("🔧 IProxyManager: USB device mounted at: \(devicePath.path)")
-        
-        // Check if this is an iOS device by looking for common iOS device paths
-        if isiOSDevicePath(devicePath.path) {
-            Logger.shared.log("🔧 IProxyManager: 🎯 iOS device detected! Starting automatic connection...")
-            
+        // Handle device attached
+        monitor.onDeviceAttached = { [weak self] in
+            Logger.shared.log("🔧 IProxyManager: 🎯 iOS device attached! Starting automatic connection...")
+
             // Automatically start iproxy when iOS device is detected
             DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 do {
@@ -255,41 +212,28 @@ final class IProxyManager: ObservableObject {
                 }
             }
         }
-    }
-    
-    private func handleUSBDeviceUnmounted(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let devicePath = userInfo[NSWorkspace.volumeURLUserInfoKey] as? URL else {
-            return
-        }
 
-        Logger.shared.log("🔧 IProxyManager: USB device unmounted at: \(devicePath.path)")
-
-        // Check if this is an iOS device
-        if isiOSDevicePath(devicePath.path) {
-            Logger.shared.log("🔧 IProxyManager: 📱 iOS device disconnected! Stopping iproxy...")
+        // Handle device detached
+        monitor.onDeviceDetached = { [weak self] in
+            Logger.shared.log("🔧 IProxyManager: 📱 iOS device detached! Stopping iproxy...")
 
             // Stop iproxy when iOS device is disconnected
-            stop(manual: false)
+            self?.stop(manual: false)
 
             // Notify connection manager about disconnect
             NotificationCenter.default.post(name: .iosDeviceDisconnected, object: nil)
         }
+
+        self.usbMuxdMonitor = monitor
+        monitor.start()
+
+        Logger.shared.log("🔧 IProxyManager: ✅ libusbmuxd device monitoring active")
     }
 
-    private func isiOSDevicePath(_ path: String) -> Bool {
-        // Check for common iOS device mount points
-        let iosDevicePatterns = [
-            "/Volumes/iPhone",
-            "/Volumes/iPad",
-            "/Volumes/iPod",
-            "/Volumes/Apple iPhone",
-            "/Volumes/Apple iPad"
-        ]
-
-        return iosDevicePatterns.contains { pattern in
-            path.hasPrefix(pattern)
-        }
+    private func stopUSBMuxdMonitoring() {
+        usbMuxdMonitor?.stop()
+        usbMuxdMonitor = nil
+        Logger.shared.log("🔧 IProxyManager: libusbmuxd monitoring stopped")
     }
 
     // MARK: - Sleep/Wake Monitoring for Auto-Restart
@@ -343,6 +287,10 @@ final class IProxyManager: ObservableObject {
             do {
                 try self?.start()
                 Logger.shared.log("🔧 IProxyManager: ✅ iproxy restarted successfully after wake")
+
+                // SLEEP/WAKE FIX: Notify MacConnectionManager to reset failure counter
+                // This gives Bridge fresh reconnection attempts after Mac wakes
+                NotificationCenter.default.post(name: .iproxyDidRestartAfterWake, object: nil)
             } catch {
                 Logger.shared.log("🔧 IProxyManager: ❌ Failed to restart iproxy after wake: \(error)")
                 // Retry after a longer delay if first attempt fails
@@ -350,6 +298,9 @@ final class IProxyManager: ObservableObject {
                     do {
                         try self?.start()
                         Logger.shared.log("🔧 IProxyManager: ✅ iproxy restarted on retry after wake")
+
+                        // Notify on successful retry as well
+                        NotificationCenter.default.post(name: .iproxyDidRestartAfterWake, object: nil)
                     } catch {
                         Logger.shared.log("🔧 IProxyManager: ❌ Failed to restart iproxy on retry: \(error)")
                     }
@@ -362,4 +313,5 @@ final class IProxyManager: ObservableObject {
 // MARK: - Notification Names
 extension Notification.Name {
     static let iosDeviceDisconnected = Notification.Name("iosDeviceDisconnected")
+    static let iproxyDidRestartAfterWake = Notification.Name("iproxyDidRestartAfterWake")
 }

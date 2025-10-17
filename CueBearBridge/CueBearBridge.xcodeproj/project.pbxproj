@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E301FBB867444293AC772372 /* USBMuxdMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489894C27C7C45A7B6F68045 /* USBMuxdMonitor.swift */; };
 		AA1111000000000000000001 /* CueBearBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000001 /* CueBearBridgeApp.swift */; };
 		AA1111000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000002 /* ContentView.swift */; };
 		AA1111000000000000000003 /* IProxyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000003 /* IProxyManager.swift */; };
@@ -19,6 +20,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		489894C27C7C45A7B6F68045 /* USBMuxdMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBMuxdMonitor.swift; sourceTree = "<group>"; };
+		A313445E766241B89A2BB542 /* CueBearBridge-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "CueBearBridge-Bridging-Header.h"; sourceTree = "<group>"; };
 		AA1112000000000000000000 /* CueBearBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CueBearBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA1112000000000000000001 /* CueBearBridgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueBearBridgeApp.swift; sourceTree = "<group>"; };
 		AA1112000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -48,6 +51,8 @@
 				AA1112000000000000000001 /* CueBearBridgeApp.swift */,
 				AA1112000000000000000002 /* ContentView.swift */,
 				AA1112000000000000000003 /* IProxyManager.swift */,
+				489894C27C7C45A7B6F68045 /* USBMuxdMonitor.swift */,
+				A313445E766241B89A2BB542 /* CueBearBridge-Bridging-Header.h */,
 				AA1112000000000000000004 /* MacConnectionManager.swift */,
 				AA1112000000000000000005 /* MIDIManager.swift */,
 				AA1112000000000000000008 /* Logger.swift */,
@@ -162,6 +167,8 @@
 				AA1111000000000000000008 /* Logger.swift in Sources */,
 				AA1111000000000000000009 /* ConnectionSecurity.swift in Sources */,
 				AA111100000000000000000A /* LoginItemManager.swift in Sources */,
+			
+				E301FBB867444293AC772372 /* USBMuxdMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -173,19 +180,31 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ARCHS = arm64;
 				CODE_SIGN_ENTITLEMENTS = CueBearBridge.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					/opt/homebrew/include,
+				);
+				INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LIBRARY_SEARCH_PATHS = (
+					/opt/homebrew/lib,
+				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				OTHER_LDFLAGS = (
+					"-lusbmuxd-2.0",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cuebear.bridge.clean;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				
+				SWIFT_OBJC_BRIDGING_HEADER = "CueBearBridge-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USE_HEADERMAP = YES;
@@ -197,18 +216,30 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ARCHS = arm64;
 				CODE_SIGN_ENTITLEMENTS = CueBearBridge.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					/opt/homebrew/include,
+				);
+				INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LIBRARY_SEARCH_PATHS = (
+					/opt/homebrew/lib,
+				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				OTHER_LDFLAGS = (
+					"-lusbmuxd-2.0",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cuebear.bridge.clean;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				
+				SWIFT_OBJC_BRIDGING_HEADER = "CueBearBridge-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USE_HEADERMAP = YES;
