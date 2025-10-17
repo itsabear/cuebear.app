@@ -13,8 +13,14 @@ class LoginItemManager: ObservableObject {
         // Initialize state from current system status
         updateStatus()
 
-        // Also restore user preference if available
-        if UserDefaults.standard.object(forKey: userDefaultsKey) != nil {
+        // Check if this is the first launch (no saved preference)
+        if UserDefaults.standard.object(forKey: userDefaultsKey) == nil {
+            // First launch: default to OFF
+            print("Open at Login: First launch, defaulting to OFF")
+            _ = disable()
+            UserDefaults.standard.set(false, forKey: userDefaultsKey)
+        } else {
+            // Restore user preference if available
             let savedPreference = UserDefaults.standard.bool(forKey: userDefaultsKey)
             if savedPreference != isEnabled {
                 // User preference doesn't match system state, sync it

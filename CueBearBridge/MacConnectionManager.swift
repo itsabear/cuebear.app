@@ -25,6 +25,7 @@ final class MacConnectionManager: ObservableObject {
     private var handshakeTimeout: DispatchSourceTimer?
     private var usbDeviceObserver: NSObjectProtocol?
     private var deviceDisconnectObserver: NSObjectProtocol?
+    private var wakeNotificationObserver: NSObjectProtocol?
 
     // Retry limiting for reconnection attempts
     private var consecutiveReconnectFailures = 0
@@ -37,6 +38,7 @@ final class MacConnectionManager: ObservableObject {
         self.iproxyManager = iproxyManager
         setupUSBDeviceMonitoring()
         setupDeviceDisconnectNotification()
+        setupWakeNotificationObserver()
     }
     
     func setBridgeApp(_ app: BridgeApp) {
@@ -46,6 +48,7 @@ final class MacConnectionManager: ObservableObject {
     deinit {
         stopUSBDeviceMonitoring()
         stopDeviceDisconnectNotification()
+        stopWakeNotificationObserver()
         stopHeartbeatSending()
         reconnectSource?.cancel()
         handshakeTimeout?.cancel()
@@ -96,13 +99,10 @@ final class MacConnectionManager: ObservableObject {
             return
         }
         
-        Logger.shared.log("🔗 MacConnectionManager: iproxy ready on port \(port), waiting 0.5s for iPad to be ready")
-
-        // Wait a brief moment for the iPad's USB server to be ready (retry logic handles longer waits)
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            Logger.shared.log("🔗 MacConnectionManager: Attempting connection after delay")
-            self?.connect(to: port)
-        }
+        // SPEED FIX: Removed 0.5s wait - connect immediately
+        // Retry logic handles cases where iPad isn't ready yet
+        Logger.shared.log("🔗 MacConnectionManager: iproxy ready on port \(port), attempting connection immediately")
+        self.connect(to: port)
     }
 
     private func connect(to port: UInt16) {
@@ -180,6 +180,23 @@ final class MacConnectionManager: ObservableObject {
                 }
                 DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Looking for Cue Bear" }
 
+                // SPEED FIX: Fast zombie detection - check if handshake response arrives within 1s
+                // If connection is ready but no response, fail fast and retry
+                DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { [weak self, weak conn] in
+                    guard let self = self, let conn = conn else { return }
+
+                    // Check if we're still waiting for handshake response (not yet connected)
+                    let currentStatus = self.connectionStatus
+                    let isStillWaiting = currentStatus.contains("Looking for") || currentStatus.contains("Waiting")
+
+                    if isStillWaiting && conn.state == .ready {
+                        Logger.shared.log("🔗 MacConnectionManager: ⚠️ Connection ready but no handshake response after 1s - fast retry")
+                        self.cancelHandshakeTimeout()
+                        conn.cancel()
+                        self.startReconnectTimer()
+                    }
+                }
+
             case .failed(let err):
                 self.stateLock.lock()
                 self.connecting = false
@@ -237,7 +254,8 @@ final class MacConnectionManager: ObservableObject {
             }
             Logger.shared.log("🔗 MacConnectionManager: Handshake sent — waiting for response…")
             DispatchQueue.main.async { self.connectionStatus = "USB: Looking for Cue Bear" }
-            self.startHandshakeTimeout(seconds: 10.0)
+            // SPEED FIX: Reduced timeout from 10s to 3s for faster failure detection
+            self.startHandshakeTimeout(seconds: 3.0)
         })
     }
 
@@ -373,15 +391,13 @@ final class MacConnectionManager: ObservableObject {
     }
 
     private func startReconnectTimer() {
-        // Check if we've hit the reconnection attempt limit
+        // SLEEP/WAKE FIX: Removed reconnection attempt limit to ensure Bridge keeps trying
+        // This prevents "giving up" after Mac wake when iPad might take longer to be ready
+        // The backoff strategy prevents infinite fast loops while still allowing unlimited retries
+
+        // Log warning after many attempts, but don't stop trying
         if consecutiveReconnectFailures >= maxConsecutiveReconnects {
-            Logger.shared.log("🔗 MacConnectionManager: ❌ Max reconnection attempts (\(maxConsecutiveReconnects)) reached - stopping auto-reconnect")
-            Logger.shared.log("🔗 MacConnectionManager: ℹ️ Will retry when USB device is mounted or manually triggered")
-            consecutiveReconnectFailures = 0
-            DispatchQueue.main.async { [weak self] in
-                self?.connectionStatus = "USB: Disconnected (no device)"
-            }
-            return
+            Logger.shared.log("🔗 MacConnectionManager: ⚠️ High reconnection attempts (\(consecutiveReconnectFailures)) - continuing to retry with backoff")
         }
 
         // Fix Issue #12: Protect reconnectPending with lock
@@ -396,21 +412,21 @@ final class MacConnectionManager: ObservableObject {
 
         consecutiveReconnectFailures += 1
 
-        // Smart backoff: Fast retries for first 5 attempts, then progressively slower
+        // Smart backoff: Fast retries for first 5 attempts, then progressively slower, max 10s
         // Attempts 1-5: 1s delay (5 seconds total) - iPad usually ready quickly
         // Attempts 6-15: 3s delay (30 seconds more = 35s total) - Give more time after sleep/wake
-        // Attempts 16-20: 5s delay (25 seconds more = 60s total) - Final attempts before giving up
+        // Attempts 16+: 10s delay (unlimited attempts with reasonable backoff)
         let delay: TimeInterval = {
             if consecutiveReconnectFailures <= 5 {
                 return 1.0  // Fast retry for first 5 attempts
             } else if consecutiveReconnectFailures <= 15 {
                 return 3.0  // Medium retry for next 10 attempts
             } else {
-                return 5.0  // Slow retry for final attempts
+                return 10.0  // Slower retry for extended attempts (was 5.0, now 10.0 for less aggressive polling)
             }
         }()
 
-        Logger.shared.log("🔗 MacConnectionManager: 🔄 Scheduling reconnect attempt \(consecutiveReconnectFailures)/\(maxConsecutiveReconnects) in \(Int(delay))s")
+        Logger.shared.log("🔗 MacConnectionManager: 🔄 Scheduling reconnect attempt #\(consecutiveReconnectFailures) in \(Int(delay))s")
 
         let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
         src.schedule(deadline: .now() + delay)
@@ -505,6 +521,54 @@ final class MacConnectionManager: ObservableObject {
         reconnectPending = false
         consecutiveReconnectFailures = 0
         stateLock.unlock()
+    }
+
+    // MARK: - Wake Notification Observer (SLEEP/WAKE FIX)
+
+    private func setupWakeNotificationObserver() {
+        Logger.shared.log("🔗 MacConnectionManager: Setting up iproxy wake notification observer")
+
+        wakeNotificationObserver = NotificationCenter.default.addObserver(
+            forName: .iproxyDidRestartAfterWake,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleIProxyRestartAfterWake()
+        }
+
+        Logger.shared.log("🔗 MacConnectionManager: ✅ iproxy wake notification observer active")
+    }
+
+    private func stopWakeNotificationObserver() {
+        if let observer = wakeNotificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+            wakeNotificationObserver = nil
+        }
+        Logger.shared.log("🔗 MacConnectionManager: iproxy wake notification observer stopped")
+    }
+
+    private func handleIProxyRestartAfterWake() {
+        Logger.shared.log("🔗 MacConnectionManager: ⏰ iproxy restarted after wake - resetting failure counter for fresh attempts")
+
+        // Reset failure counter to give Bridge fresh reconnection attempts after Mac wake
+        stateLock.lock()
+        let previousFailures = consecutiveReconnectFailures
+        consecutiveReconnectFailures = 0
+        stateLock.unlock()
+
+        Logger.shared.log("🔗 MacConnectionManager: ✅ Failure counter reset from \(previousFailures) to 0 - Bridge will retry connection")
+
+        // If we're not currently connected and not currently connecting, try to connect
+        stateLock.lock()
+        let shouldAttemptConnection = !connecting && connection == nil
+        stateLock.unlock()
+
+        if shouldAttemptConnection {
+            Logger.shared.log("🔗 MacConnectionManager: 🔄 Attempting connection after wake...")
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.waitAndConnect()
+            }
+        }
     }
 
     private func handleUSBDeviceMounted(_ notification: Notification) {

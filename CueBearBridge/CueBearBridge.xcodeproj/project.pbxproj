@@ -6,9 +6,7 @@
 	objectVersion = 60;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		E301FBB867444293AC772372 /* USBMuxdMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489894C27C7C45A7B6F68045 /* USBMuxdMonitor.swift */; };
-		AA1111000000000000000001 /* CueBearBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000001 /* CueBearBridgeApp.swift */; };
+/* Begin PBXBuildFile section */		AA1111000000000000000001 /* CueBearBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000001 /* CueBearBridgeApp.swift */; };
 		AA1111000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000002 /* ContentView.swift */; };
 		AA1111000000000000000003 /* IProxyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000003 /* IProxyManager.swift */; };
 		AA1111000000000000000004 /* MacConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000004 /* MacConnectionManager.swift */; };
@@ -17,11 +15,10 @@
 		AA1111000000000000000008 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000008 /* Logger.swift */; };
 		AA1111000000000000000009 /* ConnectionSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000009 /* ConnectionSecurity.swift */; };
 		AA111100000000000000000A /* LoginItemManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA111200000000000000000A /* LoginItemManager.swift */; };
+		AA111100000000000000000B /* USBMuxdMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA111200000000000000000B /* USBMuxdMonitor.swift */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXFileReference section */
-		489894C27C7C45A7B6F68045 /* USBMuxdMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBMuxdMonitor.swift; sourceTree = "<group>"; };
-		A313445E766241B89A2BB542 /* CueBearBridge-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "CueBearBridge-Bridging-Header.h"; sourceTree = "<group>"; };
+/* Begin PBXFileReference section */		A313445E766241B89A2BB542 /* CueBearBridge-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "CueBearBridge-Bridging-Header.h"; sourceTree = "<group>"; };
 		AA1112000000000000000000 /* CueBearBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CueBearBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA1112000000000000000001 /* CueBearBridgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueBearBridgeApp.swift; sourceTree = "<group>"; };
 		AA1112000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -33,7 +30,8 @@
 		AA1112000000000000000008 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		AA1112000000000000000009 /* ConnectionSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionSecurity.swift; sourceTree = "<group>"; };
 		AA111200000000000000000A /* LoginItemManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginItemManager.swift; sourceTree = "<group>"; };
-		AA111200000000000000000B /* CueBearBridge.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CueBearBridge.entitlements; sourceTree = "<group>"; };
+		AA111200000000000000000B /* USBMuxdMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBMuxdMonitor.swift; sourceTree = "<group>"; };
+		AA111200000000000000000C /* CueBearBridge.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CueBearBridge.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -58,9 +56,10 @@
 				AA1112000000000000000008 /* Logger.swift */,
 				AA1112000000000000000009 /* ConnectionSecurity.swift */,
 				AA111200000000000000000A /* LoginItemManager.swift */,
+				AA111200000000000000000B /* USBMuxdMonitor.swift */,
 				AA1112000000000000000006 /* Assets.xcassets */,
 				AA1112000000000000000007 /* Info.plist */,
-				AA111200000000000000000B /* CueBearBridge.entitlements */,
+				AA111200000000000000000C /* CueBearBridge.entitlements */,
 			);
 			name = CueBearBridge;
 			sourceTree = "<group>";
@@ -167,8 +166,7 @@
 				AA1111000000000000000008 /* Logger.swift in Sources */,
 				AA1111000000000000000009 /* ConnectionSecurity.swift in Sources */,
 				AA111100000000000000000A /* LoginItemManager.swift in Sources */,
-			
-				E301FBB867444293AC772372 /* USBMuxdMonitor.swift in Sources */,
+				AA111100000000000000000B /* USBMuxdMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -179,8 +177,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ARCHS = arm64;
+				ARCHS = "$(ARCHS_STANDARD)";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				CODE_SIGN_ENTITLEMENTS = CueBearBridge.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
@@ -192,11 +193,14 @@
 				INFOPLIST_FILE = Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LIBRARY_SEARCH_PATHS = (
-					/opt/homebrew/lib,
+					"$(PROJECT_DIR)/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = (
-					"-lusbmuxd-2.0",
+					"$(PROJECT_DIR)/Frameworks/libusbmuxd-2.0.dylib",
+					"$(PROJECT_DIR)/Frameworks/libplist-2.0.dylib",
+					"$(PROJECT_DIR)/Frameworks/libimobiledevice-glue-1.0.dylib",
+					"-Wl,-rpath,@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cuebear.bridge.clean;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -215,8 +219,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ARCHS = arm64;
+				ARCHS = "$(ARCHS_STANDARD)";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				CODE_SIGN_ENTITLEMENTS = CueBearBridge.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -227,11 +234,14 @@
 				INFOPLIST_FILE = Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LIBRARY_SEARCH_PATHS = (
-					/opt/homebrew/lib,
+					"$(PROJECT_DIR)/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = (
-					"-lusbmuxd-2.0",
+					"$(PROJECT_DIR)/Frameworks/libusbmuxd-2.0.dylib",
+					"$(PROJECT_DIR)/Frameworks/libplist-2.0.dylib",
+					"$(PROJECT_DIR)/Frameworks/libimobiledevice-glue-1.0.dylib",
+					"-Wl,-rpath,@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cuebear.bridge.clean;
 				PRODUCT_NAME = "$(TARGET_NAME)";
