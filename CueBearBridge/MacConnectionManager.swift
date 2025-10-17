@@ -201,19 +201,21 @@ final class MacConnectionManager: ObservableObject {
                 self.stateLock.lock()
                 self.connecting = false
                 self.stateLock.unlock()
+                Logger.shared.log("🔗 MacConnectionManager: Connection failed: \(err.localizedDescription)")
                 self.cancelHandshakeTimeout()
                 self.disconnect()
                 self.startReconnectTimer()
-                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Failed: \(err.localizedDescription)" }
+                // Don't update UI - keep showing "Looking for iPad"
 
             case .cancelled:
                 self.stateLock.lock()
                 self.connecting = false
                 self.stateLock.unlock()
+                Logger.shared.log("🔗 MacConnectionManager: Connection cancelled")
                 self.cancelHandshakeTimeout()
                 self.disconnect()
                 self.startReconnectTimer()
-                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Disconnected" }
+                // Don't update UI - keep showing "Looking for iPad"
 
             default:
                 break
@@ -221,7 +223,8 @@ final class MacConnectionManager: ObservableObject {
         }
 
         conn.start(queue: .global(qos: .userInitiated))
-        DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Connecting to localhost:\(port)…" }
+        Logger.shared.log("🔗 MacConnectionManager: Connecting to localhost:\(port)")
+        DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Looking for iPad" }
     }
 
     private func disconnect() {
@@ -499,9 +502,9 @@ final class MacConnectionManager: ObservableObject {
     private func handleDeviceDisconnected() {
         Logger.shared.log("🔗 MacConnectionManager: 📱 iOS device disconnected! Updating UI and stopping connection...")
 
-        // Immediately update UI
+        // Immediately update UI to show looking for iPad (will stay here until device reconnects)
         DispatchQueue.main.async { [weak self] in
-            self?.connectionStatus = "USB: Disconnected"
+            self?.connectionStatus = "USB: Looking for iPad"
         }
 
         // Cancel existing connection
