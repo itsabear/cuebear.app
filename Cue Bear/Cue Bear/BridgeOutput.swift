@@ -46,7 +46,8 @@ final class BridgeOutput: ObservableObject {
     @Published var connectionQuality: ConnectionQuality = .disconnected
 
     private var browser: NWBrowser?
-    private var connection: NWConnection?
+    // v1.0.8: Made internal (not private) so ConnectionCoordinator can check if connection is suspended
+    internal var connection: NWConnection?
     private let queue = DispatchQueue(label: "CueBear.BridgeOutput")
     private var pairToken: String = UserDefaults.standard.string(forKey: "BridgePairToken") ?? ""
     private var isPairing: Bool = false
@@ -161,11 +162,57 @@ final class BridgeOutput: ObservableObject {
         reconnectionTimer = nil
         connectionHealthTimer?.invalidate()
         connectionHealthTimer = nil
-        
+
         // Clear message batch
         batchTimer?.invalidate()
         batchTimer = nil
         messageBatch.removeAll()
+    }
+
+    // v1.0.8: Suspend WiFi connection temporarily (for USB priority) without destroying it
+    // This preserves the connection object so it can resume sending data when USB disconnects
+    func suspend() {
+        debugPrint("📡 BridgeOutput: Suspending WiFi connection (USB taking priority)")
+        // DON'T cancel the connection - keep it alive
+        // DON'T set connection = nil - preserve the connection object
+        // DON'T clear current - remember which bridge we're connected to
+
+        // Just update UI state to show we're not actively using WiFi
+        DispatchQueue.main.async {
+            self.isConnected = false  // UI shows disconnected
+            self.isConnecting = false
+        }
+
+        // Keep all timers running to maintain the connection
+        // Keep message batch alive
+
+        debugPrint("📡 BridgeOutput: WiFi connection suspended - connection object preserved for resume")
+    }
+
+    // v1.0.8: Resume WiFi connection after USB disconnects
+    // This reactivates the WiFi connection that was suspended
+    func resume() {
+        debugPrint("📡 BridgeOutput: Resuming WiFi connection after USB disconnect")
+
+        // Verify we still have a valid connection object
+        guard connection != nil, current != nil else {
+            debugPrint("📡 BridgeOutput: ⚠️ Cannot resume - connection object was destroyed, need full reconnect")
+            return
+        }
+
+        // Restore UI state to show WiFi is active
+        DispatchQueue.main.async {
+            self.isConnected = true
+            self.connectionQuality = .excellent
+        }
+
+        // Restart connection health monitoring
+        self.startConnectionHealthMonitoring()
+
+        // Reset last successful message timestamp to prevent immediate stale detection
+        self.lastSuccessfulMessage = Date()
+
+        debugPrint("📡 BridgeOutput: ✅ WiFi connection resumed - MIDI data can flow again")
     }
     
     // MARK: - Background Task Support

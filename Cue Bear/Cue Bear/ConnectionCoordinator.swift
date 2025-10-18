@@ -90,9 +90,9 @@ class ConnectionCoordinator: ObservableObject {
         debugPrint("🔌 ConnectionCoordinator: DEBUG - This callback was triggered")
 
         if isConnected {
-            // USB connected - disable WiFi and set USB as active
-            debugPrint("🔌 USB connected - disabling WiFi connection")
-            wifiClient.disconnect()
+            // USB connected - suspend WiFi (don't destroy it) and set USB as active
+            debugPrint("🔌 USB connected - suspending WiFi connection (preserving for later resume)")
+            wifiClient.suspend()  // v1.0.8: Suspend instead of disconnect to preserve connection object
             activeConnection = .usb
             connectionStatus = "USB Connected"
             debugPrint("🔌 ConnectionCoordinator: Updated activeConnection to .usb")
@@ -107,8 +107,16 @@ class ConnectionCoordinator: ObservableObject {
             // Reset manual USB flag since connection is lost
             isManualUSBConnection = false
 
-            // v1.0.4: Check actual WiFi connection state when USB disconnects
-            if wifiClient.isConnected {
+            // v1.0.8: Resume WiFi connection if it was suspended (not fully disconnected)
+            // Check if WiFi has a valid connection object that was just suspended
+            if wifiClient.connection != nil && wifiClient.current != nil {
+                debugPrint("🔌 ConnectionCoordinator: WiFi connection was suspended - resuming it now")
+                wifiClient.resume()  // v1.0.8: Resume the suspended WiFi connection
+                activeConnection = .wifi
+                connectionStatus = "WiFi Connected"
+                debugPrint("🔌 ConnectionCoordinator: ✅ WiFi resumed and activeConnection switched to .wifi")
+            } else if wifiClient.isConnected {
+                // Fallback: WiFi shows as connected but no suspended connection to resume
                 activeConnection = .wifi
                 connectionStatus = "WiFi Connected"
                 debugPrint("🔌 ConnectionCoordinator: WiFi is connected, switching activeConnection to .wifi")
