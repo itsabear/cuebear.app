@@ -49,9 +49,8 @@ struct OnboardingView: View {
                             isLastPage: index == pages.count - 1,
                             dontShowAgain: $dontShowAgain,
                             onGetStarted: {
-                                if dontShowAgain {
-                                    UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
-                                }
+                                // Always mark onboarding as seen - user has completed the flow
+                                UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
                                 dismiss()
                             }
                         )
