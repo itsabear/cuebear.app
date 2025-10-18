@@ -729,7 +729,12 @@ class ConnectionManager: ObservableObject {
                 self?.consecutiveFailures = 0
                 // Don't set connectedComputerName here - it will be set by handshake parsing
                 self?.connectionQuality = .excellent
-                
+
+                // Set USB cable connected as fallback to Darwin notifications
+                // If USB connection is established, cable must be connected
+                self?.isUSBCableConnected = true
+                debugPrint("🔗 ConnectionManager: USB connection established - setting isUSBCableConnected = true")
+
                 // Notify callback of connection state change
                 self?.connectionStateCallback?(true)
             }
@@ -754,6 +759,11 @@ class ConnectionManager: ObservableObject {
                 // Don't clear connectedComputerName to keep USB chip visible
                 // self?.connectedComputerName = nil
                 self?.connectionQuality = .disconnected
+
+                // Clear USB cable connection status when connection fails
+                self?.isUSBCableConnected = false
+                debugPrint("🔗 ConnectionManager: USB connection failed - setting isUSBCableConnected = false")
+
                 self?.connectionStateCallback?(false)
             }
             handleConnectionFailure()
@@ -775,6 +785,10 @@ class ConnectionManager: ObservableObject {
                 // Don't clear connectedComputerName to keep USB chip visible
                 // self?.connectedComputerName = nil
                 self?.connectionQuality = .disconnected
+
+                // Clear USB cable connection status when connection is cancelled
+                self?.isUSBCableConnected = false
+                debugPrint("🔗 ConnectionManager: USB connection cancelled - setting isUSBCableConnected = false")
 
                 // Notify callback of connection state change
                 self?.connectionStateCallback?(false)
@@ -1401,10 +1415,17 @@ class ConnectionManager: ObservableObject {
             self.isUSBCableConnected = true
             debugPrint("🔗 ConnectionManager: ✅ USB cable connected - chip will appear")
 
-            // USB cable connected - ensure we're listening for connections
-            if !self.isListening {
-                debugPrint("🔗 ConnectionManager: Starting USB server for new connection")
-                self.start()
+            // STORY 6 FIX: Don't auto-connect USB if WiFi is connected
+            // User can manually switch by tapping USB chip
+            if self.isWiFiConnected {
+                debugPrint("🔗 ConnectionManager: WiFi is connected - NOT auto-starting USB (cable plug ignored)")
+                debugPrint("🔗 ConnectionManager: User can manually tap USB chip to switch")
+            } else {
+                // USB cable connected and WiFi not active - ensure we're listening for connections
+                if !self.isListening {
+                    debugPrint("🔗 ConnectionManager: Starting USB server for new connection")
+                    self.start()
+                }
             }
 
             // Update USB bridge availability
@@ -1424,7 +1445,11 @@ class ConnectionManager: ObservableObject {
             self.isUSBCableConnected = false
             debugPrint("🔗 ConnectionManager: ❌ USB cable disconnected - chip will disappear")
 
-            // USB cable disconnected - immediately update connection state
+            // STORY 3 FIX: Only disconnect USB, preserve WiFi connection if active
+            // Don't call connectionStateCallback(false) if WiFi is still connected
+            let shouldNotifyDisconnect = !self.isWiFiConnected
+
+            // USB cable disconnected - immediately update USB connection state
             self.isConnected = false
             self.isConnecting = false
             self.connectionHealth = .disconnected
@@ -1439,9 +1464,13 @@ class ConnectionManager: ObservableObject {
             self.closeUSB(self.activeUSB)
             self.activeUSB = nil
 
-            // Notify callback of disconnection
-            debugPrint("🔗 ConnectionManager: 🔌 Calling connectionStateCallback(false)")
-            self.connectionStateCallback?(false)
+            // Notify callback of disconnection ONLY if WiFi is not connected
+            if shouldNotifyDisconnect {
+                debugPrint("🔗 ConnectionManager: 🔌 Calling connectionStateCallback(false) - no WiFi active")
+                self.connectionStateCallback?(false)
+            } else {
+                debugPrint("🔗 ConnectionManager: 🔌 WiFi still connected - NOT calling connectionStateCallback(false)")
+            }
 
             // Update USB bridge availability to hide chip
             self.checkUSBBridgeAvailability()
