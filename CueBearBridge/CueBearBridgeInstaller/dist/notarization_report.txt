@@ -2,14 +2,14 @@
 CueBear Bridge Notarization Report
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Notarization Date: Tue Oct  7 23:38:23 IDT 2025
+Notarization Date: Sat Oct 18 23:11:18 CEST 2025
 Operator: omribehr
-Machine: Omris-MacBook-Pro.local
+Machine: 172-11-1-169.lightspeed.jcvlfl.sbcglobal.net
 
 Package Information:
-  Original: dist/CueBearBridge-Installer.pkg
-  Notarized: dist/CueBearBridge-Installer-notarized.pkg
-  Submission ID: 1182415f-84b3-4782-ad34-6d6dc614c036
+  Original: /Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/dist/CueBearBridge-Installer.pkg
+  Notarized: /Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/dist/CueBearBridge-Installer-notarized.pkg
+  Submission ID: 0daafa31-fbf5-4f66-99f6-a4186d190257
 
 Status: ✅ APPROVED
 
@@ -17,7 +17,7 @@ Verification:
 Package "CueBearBridge-Installer-notarized.pkg":
    Status: signed by a developer certificate issued by Apple for distribution
    Notarization: trusted by the Apple notary service
-   Signed with a trusted timestamp on: 2025-10-07 20:37:23 +0000
+   Signed with a trusted timestamp on: 2025-10-18 21:07:10 +0000
    Certificate Chain:
     1. Developer ID Installer: Omri Behr (2U78NYVLQN)
        Expires: 2030-10-05 17:25:43 +0000
@@ -42,7 +42,7 @@ Processing: /Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear
 The validate action worked!
 
 Gatekeeper Check:
-dist/CueBearBridge-Installer.pkg: accepted
+/Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller/dist/CueBearBridge-Installer.pkg: accepted
 source=Notarized Developer ID
 origin=Developer ID Installer: Omri Behr (2U78NYVLQN)
 

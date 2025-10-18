@@ -34,10 +34,10 @@ hdiutil create -volname "${VOLUME_NAME}" \
     -srcfolder "$DMG_TEMP" \
     -ov -format UDRW \
     -fs HFS+ \
-    "$DMG_TEMP/temp.dmg"
+    "/tmp/temp_$$.dmg"
 
 echo "Mounting temporary DMG..."
-MOUNT_DIR=$(hdiutil attach "$DMG_TEMP/temp.dmg" | grep Volumes | awk '{print $3}')
+MOUNT_DIR=$(hdiutil attach "/tmp/temp_$$.dmg" | grep Volumes | sed 's/.*\/Volumes/\/Volumes/' | awk '{$1=$1};1')
 
 echo "Setting DMG window properties..."
 # Set window properties using AppleScript
@@ -66,13 +66,14 @@ echo "Unmounting temporary DMG..."
 hdiutil detach "$MOUNT_DIR"
 
 echo "Compressing final DMG..."
-hdiutil convert "$DMG_TEMP/temp.dmg" \
+hdiutil convert "/tmp/temp_$$.dmg" \
     -format UDZO \
     -imagekey zlib-level=9 \
     -o "$DIST_DIR/${DMG_NAME}.dmg"
 
 echo "Cleaning up..."
 rm -rf "$DMG_TEMP"
+rm -f "/tmp/temp_$$.dmg"
 
 echo -e "${GREEN}✅ DMG created: $DIST_DIR/${DMG_NAME}.dmg${NC}"
 echo -e "${GREEN}✅ Users can drag ${APP_NAME}.app to Applications folder to install${NC}"

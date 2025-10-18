@@ -1,1 +1,57 @@
-15e5d00ed7557835ecd261295ac03f4531ac77d0
+iPad v1.0.8: Add draft persistence for all editor sheets
+
+FEATURE: Draft Persistence
+- When tapping outside a sheet: Draft is preserved, sheet closes, nothing added to lists
+- When clicking Cancel: Draft is cleared, sheet closes
+- When clicking Save/Add: Changes applied to lists, sheet closes
+- Applies to cue editor, button editor, and fader editor
+
+IMPLEMENTATION:
+1. Created CueEditorDraft ObservableObject class
+   - Preserves: name, subtitle, kind, number, channel, velocity, autoAssign
+   - Methods: clear(), loadFrom(song)
+
+2. Created ControlEditorDraft ObservableObject class
+   - Preserves: title, symbol, kind, number, channel, velocity, autoAssign, isToggle, isSmall, isFader, faderOrientation, faderDirection
+   - Methods: clear(), loadFrom(control)
+
+3. Updated CBAddEditCueSheet to use CueEditorDraft
+   - All form fields bound to draft properties
+   - Cancel button calls draft.clear()
+   - preset() compares draft with original to detect modifications (preserves user edits)
+   - Only loads from original if draft matches or is empty
+   - save() reads from draft properties
+
+4. Updated CBControlEditorSheet to use ControlEditorDraft
+   - All form fields bound to draft properties
+   - Cancel button calls draft.clear()
+   - preset() compares draft with original to detect modifications (preserves user edits)
+   - Only loads from original if draft matches or is empty
+   - saveControl() reads from draft properties
+   - Save & Add Another properly resets draft
+
+5. Removed old auto-save pattern with userDismissedExplicitly flags
+
+FIXES:
+- Fixed non-optional velocity warnings (removed unnecessary ?? 127)
+- Auto-assigned MIDI CC numbers now find first FREE number (not defaulting to 1)
+- Fixed "Assign MIDI automatically" toggle defaulting to OFF in add mode
+  - Now correctly defaults to ON when adding new buttons/faders
+  - Remains OFF when editing existing controls (to preserve manual assignments)
+- Fixed "Save & Add Another" not preserving MIDI type (CC vs Note)
+  - When adding Note controls, next control now auto-assigns next available Note
+  - When adding CC controls, next control now auto-assigns next available CC
+  - Applies to both cue editor and button/fader editor
+- Fixed draft persistence for EDIT mode
+  - Draft now correctly preserves modifications when editing existing items
+  - Compares draft with original to detect user changes
+  - Only overwrites draft if it matches original (first open) or is empty
+
+KNOWN ISSUE (needs testing):
+- Control area collapse handle may be exiting edit mode when clicked
+  - Handle should toggle collapse/expand WITHOUT ending edit mode
+  - Need to verify if there's a parent tap gesture catching the event
+
+FILES MODIFIED:
+- ContentView.swift: Draft classes, StateObject instances, all sheet conversions
+- ControlSubviews.swift: CBAddEditCueSheet fully converted to draft pattern

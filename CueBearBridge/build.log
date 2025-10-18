@@ -1,0 +1,1510 @@
+🔨 Building Universal libusbmuxd Libraries
+==========================================
+
+📦 Step 1: Download source archives...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100 12962    0 12962    0     0  34462      0 --:--:-- --:--:-- --:--:-- 34462100  220k    0  220k    0     0   505k      0 --:--:-- --:--:-- --:--:-- 3520k
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100 60487    0 60487    0     0   204k      0 --:--:-- --:--:-- --:--:--  204k
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100 46931    0 46931    0     0   151k      0 --:--:-- --:--:-- --:--:--  151k
+
+📂 Step 2: Extract archives...
+
+========================================
+Building libplist...
+========================================
+
+========================================
+Building libplist for x86_64...
+========================================
+glibtoolize: putting auxiliary files in '.'.
+glibtoolize: linking file './ltmain.sh'
+glibtoolize: putting macros in AC_CONFIG_MACRO_DIRS, 'm4'.
+glibtoolize: linking file 'm4/libtool.m4'
+glibtoolize: linking file 'm4/ltoptions.m4'
+glibtoolize: linking file 'm4/ltsugar.m4'
+glibtoolize: linking file 'm4/ltversion.m4'
+glibtoolize: linking file 'm4/lt~obsolete.m4'
+configure.ac:28: installing './compile'
+configure.ac:41: installing './config.guess'
+configure.ac:41: installing './config.sub'
+configure.ac:6: installing './install-sh'
+configure.ac:6: installing './missing'
+cython/Makefile.am: installing './depcomp'
+parallel-tests: installing './test-driver'
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether sleep supports fractional seconds... yes
+checking filesystem timestamp resolution... 2
+checking whether build environment is sane... yes
+checking for x86_64-apple-darwin-strip... no
+checking for strip... strip
+checking for a race-free mkdir -p... mkdir -p
+checking for gawk... no
+checking for mawk... no
+checking for nawk... no
+checking for awk... awk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking xargs -n works... yes
+checking whether UID '501' is supported by ustar format... yes
+checking whether GID '20' is supported by ustar format... yes
+checking how to create a ustar tar archive... gnutar
+checking for x86_64-apple-darwin-gcc... clang -arch x86_64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether clang -arch x86_64 accepts -g... yes
+checking for clang -arch x86_64 option to enable C11 features... none needed
+checking whether clang -arch x86_64 understands -c and -o together... yes
+checking whether make supports the include directive... yes (GNU style)
+checking dependency style of clang -arch x86_64... none
+checking whether the compiler supports GNU C++... yes
+checking whether clang++ -arch x86_64 accepts -g... yes
+checking for clang++ -arch x86_64 option to enable C++11 features... -std=gnu++11
+checking dependency style of clang++ -arch x86_64 -std=gnu++11... none
+checking whether clang++ -arch x86_64 -std=gnu++11 is available and compiles a program... yes
+checking build system type... aarch64-apple-darwin24.3.0
+checking host system type... x86_64-apple-darwin
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by clang -arch x86_64... /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+checking if the linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) is GNU ld... no
+checking for BSD- or MS-compatible name lister (nm)... no
+checking for x86_64-apple-darwin-dumpbin... no
+checking for x86_64-apple-darwin-link... no
+checking for dumpbin... no
+checking for link... link -dump
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 786432
+checking how to convert aarch64-apple-darwin24.3.0 file names to x86_64-apple-darwin format... func_convert_file_noop
+checking how to convert aarch64-apple-darwin24.3.0 file names to toolchain format... func_convert_file_noop
+checking for /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld option to reload object files... -r
+checking for file... file
+checking for x86_64-apple-darwin-objdump... no
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for x86_64-apple-darwin-dlltool... no
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for x86_64-apple-darwin-ranlib... no
+checking for ranlib... ranlib
+checking for x86_64-apple-darwin-ar... no
+checking for ar... ar
+checking for archiver @FILE support... no
+checking for x86_64-apple-darwin-strip... strip
+checking command to parse nm output from clang -arch x86_64 object... ok
+checking for sysroot... no
+checking for a working dd... /bin/dd
+checking how to truncate binary pipes... /bin/dd bs=4096 count=1
+checking for x86_64-apple-darwin-mt... no
+checking for mt... no
+checking if : is a manifest tool... no
+checking for x86_64-apple-darwin-dsymutil... no
+checking for dsymutil... dsymutil
+checking for x86_64-apple-darwin-nmedit... no
+checking for nmedit... nmedit
+checking for x86_64-apple-darwin-lipo... no
+checking for lipo... lipo
+checking for x86_64-apple-darwin-otool... no
+checking for otool... otool
+checking for x86_64-apple-darwin-otool64... no
+checking for otool64... no
+checking for -single_module linker flag... ld: warning: -single_module is obsolete
+no
+checking for -no_fixup_chains linker flag... yes
+checking for -exported_symbols_list linker flag... yes
+checking for -force_load linker flag... yes
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if clang -arch x86_64 supports -fno-rtti -fno-exceptions... yes
+checking for clang -arch x86_64 option to produce PIC... -fno-common -DPIC
+checking if clang -arch x86_64 PIC flag -fno-common -DPIC works... yes
+checking if clang -arch x86_64 static flag -static works... no
+checking if clang -arch x86_64 supports -c -o file.o... yes
+checking if clang -arch x86_64 supports -c -o file.o... (cached) yes
+checking whether the clang -arch x86_64 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking dynamic linker characteristics... darwin dyld
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... yes
+checking whether to build static libraries... yes
+checking how to run the C++ preprocessor... clang++ -arch x86_64 -std=gnu++11 -E
+checking for ld used by clang++ -arch x86_64 -std=gnu++11... /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+checking if the linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) is GNU ld... no
+checking whether the clang++ -arch x86_64 -std=gnu++11 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking for clang++ -arch x86_64 -std=gnu++11 option to produce PIC... -fno-common -DPIC
+checking if clang++ -arch x86_64 -std=gnu++11 PIC flag -fno-common -DPIC works... yes
+checking if clang++ -arch x86_64 -std=gnu++11 static flag -static works... no
+checking if clang++ -arch x86_64 -std=gnu++11 supports -c -o file.o... yes
+checking if clang++ -arch x86_64 -std=gnu++11 supports -c -o file.o... (cached) yes
+checking whether the clang++ -arch x86_64 -std=gnu++11 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking dynamic linker characteristics... darwin dyld
+checking how to hardcode library paths into programs... immediate
+checking for stdint.h... (cached) yes
+checking for stdlib.h... (cached) yes
+checking for string.h... (cached) yes
+checking for an ANSI C-conforming const... yes
+checking for size_t... yes
+checking for ssize_t... yes
+checking for uint16_t... yes
+checking for uint32_t... yes
+checking for uint8_t... yes
+checking for strdup... yes
+checking for strndup... yes
+checking for strerror... yes
+checking for gmtime_r... yes
+checking for localtime_r... yes
+checking for timegm... yes
+checking for strptime... yes
+checking for memmem... yes
+checking whether byte ordering is bigendian... no
+checking for platform-specific build settings... darwin
+checking for library containing fmin... none required
+checking for tm_gmtoff in struct tm... yes
+checking for tm_zone in struct tm... yes
+checking for supported compiler flags...  -Wall -Wextra -Wredundant-decls -Wshadow -Wpointer-arith -Wwrite-strings -Wswitch-default -Wno-unused-parameter -Wno-strict-aliasing
+checking to see if compiler understands -fvisibility=hidden... yes
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating libcnary/Makefile
+config.status: creating src/Makefile
+config.status: creating src/libplist-2.0.pc
+config.status: creating src/libplist++-2.0.pc
+config.status: creating include/Makefile
+config.status: creating tools/Makefile
+config.status: creating docs/Makefile
+config.status: creating cython/Makefile
+config.status: creating test/Makefile
+config.status: creating fuzz/Makefile
+config.status: creating doxygen.cfg
+config.status: creating config.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+
+Configuration for libplist 2.7.0:
+-------------------------------------------
+
+  Install prefix ..........: /tmp/cuebear_universal_build/install-x86_64
+  Debug code ..............: no
+  Python bindings .........: no
+  Build tools .............: yes
+  Build test suite ........: yes
+
+  Now type 'make' to build libplist 2.7.0,
+  and then 'make install' for installation.
+
+if test -z 'strip'; then \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	      install; \
+	else \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	    "INSTALL_PROGRAM_ENV=STRIPPROG='strip'" install; \
+	fi
+Making install in libcnary
+  CC       node.lo
+  CC       node_list.lo
+  CCLD     libcnary.la
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+Making install in src
+  CC       base64.lo
+  CC       bytearray.lo
+  CC       hashtable.lo
+  CC       xplist.lo
+  CC       time64.lo
+  CC       bplist.lo
+  CC       ptrarray.lo
+  CC       jplist.lo
+  CC       jsmn.lo
+  CC       oplist.lo
+  CC       out-default.lo
+  CC       out-limd.lo
+  CC       plist.lo
+  CC       out-plutil.lo
+  CXX      Node.lo
+  CXX      Structure.lo
+  CXX      Array.lo
+  CXX      Boolean.lo
+  CXX      Data.lo
+  CXX      Date.lo
+  CXX      Dictionary.lo
+  CXX      Integer.lo
+  CXX      Key.lo
+  CXX      Real.lo
+  CXX      String.lo
+  CXX      Uid.lo
+  CCLD     libplist-2.0.la
+  CXXLD    libplist++-2.0.la
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/lib'
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/lib/pkgconfig'
+ /bin/sh ../libtool   --mode=install /usr/bin/install -c -s  libplist-2.0.la libplist++-2.0.la '/tmp/cuebear_universal_build/install-x86_64/lib'
+ /usr/bin/install -c -m 644 libplist-2.0.pc libplist++-2.0.pc '/tmp/cuebear_universal_build/install-x86_64/lib/pkgconfig'
+libtool: install: /usr/bin/install -c .libs/libplist-2.0.4.dylib /tmp/cuebear_universal_build/install-x86_64/lib/libplist-2.0.4.dylib
+libtool: install: strip -x /tmp/cuebear_universal_build/install-x86_64/lib/libplist-2.0.4.dylib
+libtool: install: (cd /tmp/cuebear_universal_build/install-x86_64/lib && { ln -s -f libplist-2.0.4.dylib libplist-2.0.dylib || { rm -f libplist-2.0.dylib && ln -s libplist-2.0.4.dylib libplist-2.0.dylib; }; })
+libtool: install: /usr/bin/install -c .libs/libplist-2.0.lai /tmp/cuebear_universal_build/install-x86_64/lib/libplist-2.0.la
+libtool: install: /usr/bin/install -c .libs/libplist++-2.0.4.dylib /tmp/cuebear_universal_build/install-x86_64/lib/libplist++-2.0.4.dylib
+libtool: install: strip -x /tmp/cuebear_universal_build/install-x86_64/lib/libplist++-2.0.4.dylib
+libtool: install: (cd /tmp/cuebear_universal_build/install-x86_64/lib && { ln -s -f libplist++-2.0.4.dylib libplist++-2.0.dylib || { rm -f libplist++-2.0.dylib && ln -s libplist++-2.0.4.dylib libplist++-2.0.dylib; }; })
+libtool: install: /usr/bin/install -c .libs/libplist++-2.0.lai /tmp/cuebear_universal_build/install-x86_64/lib/libplist++-2.0.la
+libtool: install: /usr/bin/install -c .libs/libplist-2.0.a /tmp/cuebear_universal_build/install-x86_64/lib/libplist-2.0.a
+libtool: install: strip -S /tmp/cuebear_universal_build/install-x86_64/lib/libplist-2.0.a
+libtool: install: chmod 644 /tmp/cuebear_universal_build/install-x86_64/lib/libplist-2.0.a
+libtool: install: ranlib /tmp/cuebear_universal_build/install-x86_64/lib/libplist-2.0.a
+libtool: install: /usr/bin/install -c .libs/libplist++-2.0.a /tmp/cuebear_universal_build/install-x86_64/lib/libplist++-2.0.a
+libtool: install: strip -S /tmp/cuebear_universal_build/install-x86_64/lib/libplist++-2.0.a
+libtool: install: chmod 644 /tmp/cuebear_universal_build/install-x86_64/lib/libplist++-2.0.a
+libtool: install: ranlib /tmp/cuebear_universal_build/install-x86_64/lib/libplist++-2.0.a
+Making install in include
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/include'
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/include/plist'
+ /usr/bin/install -c -m 644  ../../include/plist/plist.h ../../include/plist/plist++.h ../../include/plist/Array.h ../../include/plist/Boolean.h ../../include/plist/Data.h ../../include/plist/Date.h ../../include/plist/Dictionary.h ../../include/plist/Integer.h ../../include/plist/Key.h ../../include/plist/Node.h ../../include/plist/Real.h ../../include/plist/String.h ../../include/plist/Structure.h ../../include/plist/Uid.h '/tmp/cuebear_universal_build/install-x86_64/include/plist'
+Making install in tools
+  CC       plistutil.o
+  CCLD     plistutil
+make[3]: Nothing to be done for `install-data-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/bin'
+ STRIPPROG='strip' /bin/sh ../libtool   --mode=install /bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s plistutil '/tmp/cuebear_universal_build/install-x86_64/bin'
+libtool: install: /bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s .libs/plistutil /tmp/cuebear_universal_build/install-x86_64/bin/plistutil
+Making install in docs
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/share/man/man1'
+ /usr/bin/install -c -m 644 ../../docs/plistutil.1 '/tmp/cuebear_universal_build/install-x86_64/share/man/man1'
+Making install in test
+  CC       plist_cmp.o
+  CC       plist_test.o
+  CXX      plist_test++.o
+  CC       integer_set.o
+  CC       plist_btest.o
+  CC       plist_jtest.o
+  CC       plist_otest.o
+  CCLD     integer_set_test
+  CCLD     plist_test
+  CCLD     plist_btest
+  CCLD     plist_jtest
+  CCLD     plist_otest
+  CCLD     plist_cmp
+  CXXLD    plist_test++
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+
+========================================
+Building libplist for arm64...
+========================================
+glibtoolize: putting auxiliary files in '.'.
+glibtoolize: linking file './ltmain.sh'
+glibtoolize: putting macros in AC_CONFIG_MACRO_DIRS, 'm4'.
+glibtoolize: linking file 'm4/libtool.m4'
+glibtoolize: linking file 'm4/ltoptions.m4'
+glibtoolize: linking file 'm4/ltsugar.m4'
+glibtoolize: linking file 'm4/ltversion.m4'
+glibtoolize: linking file 'm4/lt~obsolete.m4'
+configure.ac:28: installing './compile'
+configure.ac:6: installing './missing'
+cython/Makefile.am: installing './depcomp'
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether sleep supports fractional seconds... yes
+checking filesystem timestamp resolution... 2
+checking whether build environment is sane... yes
+checking for arm-apple-darwin-strip... no
+checking for strip... strip
+checking for a race-free mkdir -p... mkdir -p
+checking for gawk... no
+checking for mawk... no
+checking for nawk... no
+checking for awk... awk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking xargs -n works... yes
+checking whether UID '501' is supported by ustar format... yes
+checking whether GID '20' is supported by ustar format... yes
+checking how to create a ustar tar archive... gnutar
+checking for arm-apple-darwin-gcc... clang -arch arm64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether clang -arch arm64 accepts -g... yes
+checking for clang -arch arm64 option to enable C11 features... none needed
+checking whether clang -arch arm64 understands -c and -o together... yes
+checking whether make supports the include directive... yes (GNU style)
+checking dependency style of clang -arch arm64... none
+checking whether the compiler supports GNU C++... yes
+checking whether clang++ -arch arm64 accepts -g... yes
+checking for clang++ -arch arm64 option to enable C++11 features... -std=gnu++11
+checking dependency style of clang++ -arch arm64 -std=gnu++11... none
+checking whether clang++ -arch arm64 -std=gnu++11 is available and compiles a program... yes
+checking build system type... aarch64-apple-darwin24.3.0
+checking host system type... arm-apple-darwin
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by clang -arch arm64... /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+checking if the linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) is GNU ld... no
+checking for BSD- or MS-compatible name lister (nm)... no
+checking for arm-apple-darwin-dumpbin... no
+checking for arm-apple-darwin-link... no
+checking for dumpbin... no
+checking for link... link -dump
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 786432
+checking how to convert aarch64-apple-darwin24.3.0 file names to arm-apple-darwin format... func_convert_file_noop
+checking how to convert aarch64-apple-darwin24.3.0 file names to toolchain format... func_convert_file_noop
+checking for /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld option to reload object files... -r
+checking for file... file
+checking for arm-apple-darwin-objdump... no
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for arm-apple-darwin-dlltool... no
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for arm-apple-darwin-ranlib... no
+checking for ranlib... ranlib
+checking for arm-apple-darwin-ar... no
+checking for ar... ar
+checking for archiver @FILE support... no
+checking for arm-apple-darwin-strip... strip
+checking command to parse nm output from clang -arch arm64 object... ok
+checking for sysroot... no
+checking for a working dd... /bin/dd
+checking how to truncate binary pipes... /bin/dd bs=4096 count=1
+checking for arm-apple-darwin-mt... no
+checking for mt... no
+checking if : is a manifest tool... no
+checking for arm-apple-darwin-dsymutil... no
+checking for dsymutil... dsymutil
+checking for arm-apple-darwin-nmedit... no
+checking for nmedit... nmedit
+checking for arm-apple-darwin-lipo... no
+checking for lipo... lipo
+checking for arm-apple-darwin-otool... no
+checking for otool... otool
+checking for arm-apple-darwin-otool64... no
+checking for otool64... no
+checking for -single_module linker flag... ld: warning: -single_module is obsolete
+no
+checking for -no_fixup_chains linker flag... yes
+checking for -exported_symbols_list linker flag... yes
+checking for -force_load linker flag... yes
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if clang -arch arm64 supports -fno-rtti -fno-exceptions... yes
+checking for clang -arch arm64 option to produce PIC... -fno-common -DPIC
+checking if clang -arch arm64 PIC flag -fno-common -DPIC works... yes
+checking if clang -arch arm64 static flag -static works... no
+checking if clang -arch arm64 supports -c -o file.o... yes
+checking if clang -arch arm64 supports -c -o file.o... (cached) yes
+checking whether the clang -arch arm64 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking dynamic linker characteristics... darwin dyld
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... yes
+checking whether to build static libraries... yes
+checking how to run the C++ preprocessor... clang++ -arch arm64 -std=gnu++11 -E
+checking for ld used by clang++ -arch arm64 -std=gnu++11... /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+checking if the linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) is GNU ld... no
+checking whether the clang++ -arch arm64 -std=gnu++11 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking for clang++ -arch arm64 -std=gnu++11 option to produce PIC... -fno-common -DPIC
+checking if clang++ -arch arm64 -std=gnu++11 PIC flag -fno-common -DPIC works... yes
+checking if clang++ -arch arm64 -std=gnu++11 static flag -static works... no
+checking if clang++ -arch arm64 -std=gnu++11 supports -c -o file.o... yes
+checking if clang++ -arch arm64 -std=gnu++11 supports -c -o file.o... (cached) yes
+checking whether the clang++ -arch arm64 -std=gnu++11 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking dynamic linker characteristics... darwin dyld
+checking how to hardcode library paths into programs... immediate
+checking for stdint.h... (cached) yes
+checking for stdlib.h... (cached) yes
+checking for string.h... (cached) yes
+checking for an ANSI C-conforming const... yes
+checking for size_t... yes
+checking for ssize_t... yes
+checking for uint16_t... yes
+checking for uint32_t... yes
+checking for uint8_t... yes
+checking for strdup... yes
+checking for strndup... yes
+checking for strerror... yes
+checking for gmtime_r... yes
+checking for localtime_r... yes
+checking for timegm... yes
+checking for strptime... yes
+checking for memmem... yes
+checking whether byte ordering is bigendian... no
+checking for platform-specific build settings... darwin
+checking for library containing fmin... none required
+checking for tm_gmtoff in struct tm... yes
+checking for tm_zone in struct tm... yes
+checking for supported compiler flags...  -Wall -Wextra -Wredundant-decls -Wshadow -Wpointer-arith -Wwrite-strings -Wswitch-default -Wno-unused-parameter -Wno-strict-aliasing
+checking to see if compiler understands -fvisibility=hidden... yes
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating libcnary/Makefile
+config.status: creating src/Makefile
+config.status: creating src/libplist-2.0.pc
+config.status: creating src/libplist++-2.0.pc
+config.status: creating include/Makefile
+config.status: creating tools/Makefile
+config.status: creating docs/Makefile
+config.status: creating cython/Makefile
+config.status: creating test/Makefile
+config.status: creating fuzz/Makefile
+config.status: creating doxygen.cfg
+config.status: creating config.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+
+Configuration for libplist 2.7.0:
+-------------------------------------------
+
+  Install prefix ..........: /tmp/cuebear_universal_build/install-arm64
+  Debug code ..............: no
+  Python bindings .........: no
+  Build tools .............: yes
+  Build test suite ........: yes
+
+  Now type 'make' to build libplist 2.7.0,
+  and then 'make install' for installation.
+
+if test -z 'strip'; then \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	      install; \
+	else \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	    "INSTALL_PROGRAM_ENV=STRIPPROG='strip'" install; \
+	fi
+Making install in libcnary
+  CC       node_list.lo
+  CC       node.lo
+  CCLD     libcnary.la
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+Making install in src
+  CC       base64.lo
+  CC       bytearray.lo
+  CC       time64.lo
+  CC       ptrarray.lo
+  CC       bplist.lo
+  CC       hashtable.lo
+  CC       jsmn.lo
+  CC       jplist.lo
+  CC       xplist.lo
+  CC       oplist.lo
+  CC       out-default.lo
+  CC       out-plutil.lo
+  CC       out-limd.lo
+  CC       plist.lo
+  CXX      Node.lo
+  CXX      Structure.lo
+  CXX      Array.lo
+  CXX      Boolean.lo
+  CXX      Data.lo
+  CXX      Date.lo
+  CXX      Dictionary.lo
+  CXX      Integer.lo
+  CXX      Key.lo
+  CXX      Real.lo
+  CXX      String.lo
+  CXX      Uid.lo
+  CCLD     libplist-2.0.la
+  CXXLD    libplist++-2.0.la
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/lib/pkgconfig'
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/lib'
+ /bin/sh ../libtool   --mode=install /usr/bin/install -c -s  libplist-2.0.la libplist++-2.0.la '/tmp/cuebear_universal_build/install-arm64/lib'
+ /usr/bin/install -c -m 644 libplist-2.0.pc libplist++-2.0.pc '/tmp/cuebear_universal_build/install-arm64/lib/pkgconfig'
+libtool: install: /usr/bin/install -c .libs/libplist-2.0.4.dylib /tmp/cuebear_universal_build/install-arm64/lib/libplist-2.0.4.dylib
+libtool: install: strip -x /tmp/cuebear_universal_build/install-arm64/lib/libplist-2.0.4.dylib
+libtool: install: (cd /tmp/cuebear_universal_build/install-arm64/lib && { ln -s -f libplist-2.0.4.dylib libplist-2.0.dylib || { rm -f libplist-2.0.dylib && ln -s libplist-2.0.4.dylib libplist-2.0.dylib; }; })
+libtool: install: /usr/bin/install -c .libs/libplist-2.0.lai /tmp/cuebear_universal_build/install-arm64/lib/libplist-2.0.la
+libtool: install: /usr/bin/install -c .libs/libplist++-2.0.4.dylib /tmp/cuebear_universal_build/install-arm64/lib/libplist++-2.0.4.dylib
+libtool: install: strip -x /tmp/cuebear_universal_build/install-arm64/lib/libplist++-2.0.4.dylib
+libtool: install: (cd /tmp/cuebear_universal_build/install-arm64/lib && { ln -s -f libplist++-2.0.4.dylib libplist++-2.0.dylib || { rm -f libplist++-2.0.dylib && ln -s libplist++-2.0.4.dylib libplist++-2.0.dylib; }; })
+libtool: install: /usr/bin/install -c .libs/libplist++-2.0.lai /tmp/cuebear_universal_build/install-arm64/lib/libplist++-2.0.la
+libtool: install: /usr/bin/install -c .libs/libplist-2.0.a /tmp/cuebear_universal_build/install-arm64/lib/libplist-2.0.a
+libtool: install: strip -S /tmp/cuebear_universal_build/install-arm64/lib/libplist-2.0.a
+libtool: install: chmod 644 /tmp/cuebear_universal_build/install-arm64/lib/libplist-2.0.a
+libtool: install: ranlib /tmp/cuebear_universal_build/install-arm64/lib/libplist-2.0.a
+libtool: install: /usr/bin/install -c .libs/libplist++-2.0.a /tmp/cuebear_universal_build/install-arm64/lib/libplist++-2.0.a
+libtool: install: strip -S /tmp/cuebear_universal_build/install-arm64/lib/libplist++-2.0.a
+libtool: install: chmod 644 /tmp/cuebear_universal_build/install-arm64/lib/libplist++-2.0.a
+libtool: install: ranlib /tmp/cuebear_universal_build/install-arm64/lib/libplist++-2.0.a
+Making install in include
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/include'
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/include/plist'
+ /usr/bin/install -c -m 644  ../../include/plist/plist.h ../../include/plist/plist++.h ../../include/plist/Array.h ../../include/plist/Boolean.h ../../include/plist/Data.h ../../include/plist/Date.h ../../include/plist/Dictionary.h ../../include/plist/Integer.h ../../include/plist/Key.h ../../include/plist/Node.h ../../include/plist/Real.h ../../include/plist/String.h ../../include/plist/Structure.h ../../include/plist/Uid.h '/tmp/cuebear_universal_build/install-arm64/include/plist'
+Making install in tools
+  CC       plistutil.o
+  CCLD     plistutil
+make[3]: Nothing to be done for `install-data-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/bin'
+ STRIPPROG='strip' /bin/sh ../libtool   --mode=install /bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s plistutil '/tmp/cuebear_universal_build/install-arm64/bin'
+libtool: install: /bin/sh /tmp/cuebear_universal_build/libplist-2.7.0/install-sh -c -s .libs/plistutil /tmp/cuebear_universal_build/install-arm64/bin/plistutil
+Making install in docs
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/share/man/man1'
+ /usr/bin/install -c -m 644 ../../docs/plistutil.1 '/tmp/cuebear_universal_build/install-arm64/share/man/man1'
+Making install in test
+  CC       plist_cmp.o
+  CC       plist_test.o
+  CXX      plist_test++.o
+  CC       integer_set.o
+  CC       plist_btest.o
+  CC       plist_jtest.o
+  CC       plist_otest.o
+  CCLD     integer_set_test
+  CCLD     plist_jtest
+  CCLD     plist_test
+  CCLD     plist_cmp
+  CCLD     plist_btest
+  CCLD     plist_otest
+  CXXLD    plist_test++
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+
+========================================
+Building libimobiledevice-glue...
+========================================
+
+========================================
+Building libimobiledevice-glue for x86_64...
+========================================
+glibtoolize: putting auxiliary files in '.'.
+glibtoolize: linking file './ltmain.sh'
+glibtoolize: putting macros in AC_CONFIG_MACRO_DIRS, 'm4'.
+glibtoolize: linking file 'm4/libtool.m4'
+glibtoolize: linking file 'm4/ltoptions.m4'
+glibtoolize: linking file 'm4/ltsugar.m4'
+glibtoolize: linking file 'm4/ltversion.m4'
+glibtoolize: linking file 'm4/lt~obsolete.m4'
+configure.ac:32: installing './compile'
+configure.ac:35: installing './config.guess'
+configure.ac:35: installing './config.sub'
+configure.ac:6: installing './install-sh'
+configure.ac:6: installing './missing'
+src/Makefile.am: installing './depcomp'
+configure: WARNING: unrecognized options: --without-cython
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether sleep supports fractional seconds... yes
+checking filesystem timestamp resolution... 2
+checking whether build environment is sane... yes
+checking for x86_64-apple-darwin-strip... no
+checking for strip... strip
+checking for a race-free mkdir -p... mkdir -p
+checking for gawk... no
+checking for mawk... no
+checking for nawk... no
+checking for awk... awk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking xargs -n works... yes
+checking whether UID '501' is supported by ustar format... yes
+checking whether GID '20' is supported by ustar format... yes
+checking how to create a ustar tar archive... gnutar
+checking for x86_64-apple-darwin-gcc... clang -arch x86_64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether clang -arch x86_64 accepts -g... yes
+checking for clang -arch x86_64 option to enable C11 features... none needed
+checking whether clang -arch x86_64 understands -c and -o together... yes
+checking whether make supports the include directive... yes (GNU style)
+checking dependency style of clang -arch x86_64... none
+checking build system type... aarch64-apple-darwin24.3.0
+checking host system type... x86_64-apple-darwin
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by clang -arch x86_64... /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+checking if the linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) is GNU ld... no
+checking for BSD- or MS-compatible name lister (nm)... no
+checking for x86_64-apple-darwin-dumpbin... no
+checking for x86_64-apple-darwin-link... no
+checking for dumpbin... no
+checking for link... link -dump
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 786432
+checking how to convert aarch64-apple-darwin24.3.0 file names to x86_64-apple-darwin format... func_convert_file_noop
+checking how to convert aarch64-apple-darwin24.3.0 file names to toolchain format... func_convert_file_noop
+checking for /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld option to reload object files... -r
+checking for file... file
+checking for x86_64-apple-darwin-objdump... no
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for x86_64-apple-darwin-dlltool... no
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for x86_64-apple-darwin-ranlib... no
+checking for ranlib... ranlib
+checking for x86_64-apple-darwin-ar... no
+checking for ar... ar
+checking for archiver @FILE support... no
+checking for x86_64-apple-darwin-strip... strip
+checking command to parse nm output from clang -arch x86_64 object... ok
+checking for sysroot... no
+checking for a working dd... /bin/dd
+checking how to truncate binary pipes... /bin/dd bs=4096 count=1
+checking for x86_64-apple-darwin-mt... no
+checking for mt... no
+checking if : is a manifest tool... no
+checking for x86_64-apple-darwin-dsymutil... no
+checking for dsymutil... dsymutil
+checking for x86_64-apple-darwin-nmedit... no
+checking for nmedit... nmedit
+checking for x86_64-apple-darwin-lipo... no
+checking for lipo... lipo
+checking for x86_64-apple-darwin-otool... no
+checking for otool... otool
+checking for x86_64-apple-darwin-otool64... no
+checking for otool64... no
+checking for -single_module linker flag... ld: warning: -single_module is obsolete
+no
+checking for -no_fixup_chains linker flag... yes
+checking for -exported_symbols_list linker flag... yes
+checking for -force_load linker flag... yes
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if clang -arch x86_64 supports -fno-rtti -fno-exceptions... yes
+checking for clang -arch x86_64 option to produce PIC... -fno-common -DPIC
+checking if clang -arch x86_64 PIC flag -fno-common -DPIC works... yes
+checking if clang -arch x86_64 static flag -static works... no
+checking if clang -arch x86_64 supports -c -o file.o... yes
+checking if clang -arch x86_64 supports -c -o file.o... (cached) yes
+checking whether the clang -arch x86_64 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking dynamic linker characteristics... darwin dyld
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... yes
+checking whether to build static libraries... yes
+checking for x86_64-apple-darwin-pkg-config... no
+checking for pkg-config... /opt/homebrew/bin/pkg-config
+checking pkg-config is at least version 0.9.0... yes
+checking for libplist-2.0 >= 2.3.0... yes
+checking for stdint.h... (cached) yes
+checking for stdlib.h... (cached) yes
+checking for string.h... (cached) yes
+checking for an ANSI C-conforming const... yes
+checking for size_t... yes
+checking for ssize_t... yes
+checking for uint16_t... yes
+checking for uint32_t... yes
+checking for uint8_t... yes
+checking for asprintf... yes
+checking for strcasecmp... yes
+checking for strdup... yes
+checking for strerror... yes
+checking for strndup... yes
+checking for stpcpy... yes
+checking for vasprintf... yes
+checking for getifaddrs... yes
+checking for poll... yes
+checking for library containing socket... none required
+checking for endian.h... no
+checking whether byte ordering is bigendian... no
+checking for platform-specific build settings... darwin
+checking how to run the C preprocessor... clang -arch x86_64 -E
+checking for egrep -e... (cached) /usr/bin/grep -E
+checking whether clang -arch x86_64 is Clang... yes
+checking whether pthreads work with "-pthread" and "-lpthread"... yes
+checking whether Clang needs flag to prevent "argument unused" warning when linking with -pthread... no
+checking for joinable pthread attribute... PTHREAD_CREATE_JOINABLE
+checking whether more special flags are required for pthreads... no
+checking for PTHREAD_PRIO_INHERIT... yes
+checking for pthread_once... yes
+checking for pthread_cancel... yes
+checking for struct dirent.d_type... yes
+checking for plist_new_unix_date... yes
+checking for supported compiler flags...  -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith -Wwrite-strings -Wswitch-default -Wno-unused-parameter -fsigned-char -fvisibility=hidden
+checking for clang -arch x86_64 option to enable large file support... none needed
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating src/Makefile
+config.status: creating src/libimobiledevice-glue-1.0.pc
+config.status: creating include/Makefile
+config.status: creating config.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+configure: WARNING: unrecognized options: --without-cython
+
+Configuration for libimobiledevice-glue 1.3.2:
+-------------------------------------------
+
+  Install prefix: .........: /tmp/cuebear_universal_build/install-x86_64
+
+  Now type 'make' to build libimobiledevice-glue 1.3.2,
+  and then 'make install' for installation.
+
+if test -z 'strip'; then \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libimobiledevice-glue-1.3.2/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libimobiledevice-glue-1.3.2/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	      install; \
+	else \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libimobiledevice-glue-1.3.2/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libimobiledevice-glue-1.3.2/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	    "INSTALL_PROGRAM_ENV=STRIPPROG='strip'" install; \
+	fi
+Making install in src
+  CC       glue.lo
+  CC       thread.lo
+  CC       socket.lo
+  CC       nskeyedarchive.lo
+  CC       collection.lo
+  CC       termcolors.lo
+  CC       utils.lo
+  CC       opack.lo
+  CC       tlv.lo
+  CC       cbuf.lo
+  CC       sha1.lo
+  CC       sha256.lo
+  CC       sha512.lo
+  CCLD     libimobiledevice-glue-1.0.la
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/lib/pkgconfig'
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/lib'
+ /bin/sh ../libtool   --mode=install /usr/bin/install -c -s  libimobiledevice-glue-1.0.la '/tmp/cuebear_universal_build/install-x86_64/lib'
+ /usr/bin/install -c -m 644 libimobiledevice-glue-1.0.pc '/tmp/cuebear_universal_build/install-x86_64/lib/pkgconfig'
+libtool: install: /usr/bin/install -c .libs/libimobiledevice-glue-1.0.0.dylib /tmp/cuebear_universal_build/install-x86_64/lib/libimobiledevice-glue-1.0.0.dylib
+libtool: install: strip -x /tmp/cuebear_universal_build/install-x86_64/lib/libimobiledevice-glue-1.0.0.dylib
+libtool: install: (cd /tmp/cuebear_universal_build/install-x86_64/lib && { ln -s -f libimobiledevice-glue-1.0.0.dylib libimobiledevice-glue-1.0.dylib || { rm -f libimobiledevice-glue-1.0.dylib && ln -s libimobiledevice-glue-1.0.0.dylib libimobiledevice-glue-1.0.dylib; }; })
+libtool: install: /usr/bin/install -c .libs/libimobiledevice-glue-1.0.lai /tmp/cuebear_universal_build/install-x86_64/lib/libimobiledevice-glue-1.0.la
+libtool: install: /usr/bin/install -c .libs/libimobiledevice-glue-1.0.a /tmp/cuebear_universal_build/install-x86_64/lib/libimobiledevice-glue-1.0.a
+libtool: install: strip -S /tmp/cuebear_universal_build/install-x86_64/lib/libimobiledevice-glue-1.0.a
+libtool: install: chmod 644 /tmp/cuebear_universal_build/install-x86_64/lib/libimobiledevice-glue-1.0.a
+libtool: install: ranlib /tmp/cuebear_universal_build/install-x86_64/lib/libimobiledevice-glue-1.0.a
+Making install in include
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/include'
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/include/libimobiledevice-glue'
+ /usr/bin/install -c -m 644  ../../include/libimobiledevice-glue/glue.h ../../include/libimobiledevice-glue/socket.h ../../include/libimobiledevice-glue/thread.h ../../include/libimobiledevice-glue/utils.h ../../include/libimobiledevice-glue/nskeyedarchive.h ../../include/libimobiledevice-glue/collection.h ../../include/libimobiledevice-glue/termcolors.h ../../include/libimobiledevice-glue/cbuf.h ../../include/libimobiledevice-glue/opack.h ../../include/libimobiledevice-glue/tlv.h ../../include/libimobiledevice-glue/sha.h '/tmp/cuebear_universal_build/install-x86_64/include/libimobiledevice-glue'
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+
+========================================
+Building libimobiledevice-glue for arm64...
+========================================
+glibtoolize: putting auxiliary files in '.'.
+glibtoolize: linking file './ltmain.sh'
+glibtoolize: putting macros in AC_CONFIG_MACRO_DIRS, 'm4'.
+glibtoolize: linking file 'm4/libtool.m4'
+glibtoolize: linking file 'm4/ltoptions.m4'
+glibtoolize: linking file 'm4/ltsugar.m4'
+glibtoolize: linking file 'm4/ltversion.m4'
+glibtoolize: linking file 'm4/lt~obsolete.m4'
+configure.ac:32: installing './compile'
+configure.ac:6: installing './missing'
+src/Makefile.am: installing './depcomp'
+configure: WARNING: unrecognized options: --without-cython
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether sleep supports fractional seconds... yes
+checking filesystem timestamp resolution... 2
+checking whether build environment is sane... yes
+checking for arm-apple-darwin-strip... no
+checking for strip... strip
+checking for a race-free mkdir -p... mkdir -p
+checking for gawk... no
+checking for mawk... no
+checking for nawk... no
+checking for awk... awk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking xargs -n works... yes
+checking whether UID '501' is supported by ustar format... yes
+checking whether GID '20' is supported by ustar format... yes
+checking how to create a ustar tar archive... gnutar
+checking for arm-apple-darwin-gcc... clang -arch arm64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether clang -arch arm64 accepts -g... yes
+checking for clang -arch arm64 option to enable C11 features... none needed
+checking whether clang -arch arm64 understands -c and -o together... yes
+checking whether make supports the include directive... yes (GNU style)
+checking dependency style of clang -arch arm64... none
+checking build system type... aarch64-apple-darwin24.3.0
+checking host system type... arm-apple-darwin
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by clang -arch arm64... /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+checking if the linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) is GNU ld... no
+checking for BSD- or MS-compatible name lister (nm)... no
+checking for arm-apple-darwin-dumpbin... no
+checking for arm-apple-darwin-link... no
+checking for dumpbin... no
+checking for link... link -dump
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 786432
+checking how to convert aarch64-apple-darwin24.3.0 file names to arm-apple-darwin format... func_convert_file_noop
+checking how to convert aarch64-apple-darwin24.3.0 file names to toolchain format... func_convert_file_noop
+checking for /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld option to reload object files... -r
+checking for file... file
+checking for arm-apple-darwin-objdump... no
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for arm-apple-darwin-dlltool... no
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for arm-apple-darwin-ranlib... no
+checking for ranlib... ranlib
+checking for arm-apple-darwin-ar... no
+checking for ar... ar
+checking for archiver @FILE support... no
+checking for arm-apple-darwin-strip... strip
+checking command to parse nm output from clang -arch arm64 object... ok
+checking for sysroot... no
+checking for a working dd... /bin/dd
+checking how to truncate binary pipes... /bin/dd bs=4096 count=1
+checking for arm-apple-darwin-mt... no
+checking for mt... no
+checking if : is a manifest tool... no
+checking for arm-apple-darwin-dsymutil... no
+checking for dsymutil... dsymutil
+checking for arm-apple-darwin-nmedit... no
+checking for nmedit... nmedit
+checking for arm-apple-darwin-lipo... no
+checking for lipo... lipo
+checking for arm-apple-darwin-otool... no
+checking for otool... otool
+checking for arm-apple-darwin-otool64... no
+checking for otool64... no
+checking for -single_module linker flag... ld: warning: -single_module is obsolete
+no
+checking for -no_fixup_chains linker flag... yes
+checking for -exported_symbols_list linker flag... yes
+checking for -force_load linker flag... yes
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if clang -arch arm64 supports -fno-rtti -fno-exceptions... yes
+checking for clang -arch arm64 option to produce PIC... -fno-common -DPIC
+checking if clang -arch arm64 PIC flag -fno-common -DPIC works... yes
+checking if clang -arch arm64 static flag -static works... no
+checking if clang -arch arm64 supports -c -o file.o... yes
+checking if clang -arch arm64 supports -c -o file.o... (cached) yes
+checking whether the clang -arch arm64 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking dynamic linker characteristics... darwin dyld
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... yes
+checking whether to build static libraries... yes
+checking for arm-apple-darwin-pkg-config... no
+checking for pkg-config... /opt/homebrew/bin/pkg-config
+checking pkg-config is at least version 0.9.0... yes
+checking for libplist-2.0 >= 2.3.0... yes
+checking for stdint.h... (cached) yes
+checking for stdlib.h... (cached) yes
+checking for string.h... (cached) yes
+checking for an ANSI C-conforming const... yes
+checking for size_t... yes
+checking for ssize_t... yes
+checking for uint16_t... yes
+checking for uint32_t... yes
+checking for uint8_t... yes
+checking for asprintf... yes
+checking for strcasecmp... yes
+checking for strdup... yes
+checking for strerror... yes
+checking for strndup... yes
+checking for stpcpy... yes
+checking for vasprintf... yes
+checking for getifaddrs... yes
+checking for poll... yes
+checking for library containing socket... none required
+checking for endian.h... no
+checking whether byte ordering is bigendian... no
+checking for platform-specific build settings... darwin
+checking how to run the C preprocessor... clang -arch arm64 -E
+checking for egrep -e... (cached) /usr/bin/grep -E
+checking whether clang -arch arm64 is Clang... yes
+checking whether pthreads work with "-pthread" and "-lpthread"... yes
+checking whether Clang needs flag to prevent "argument unused" warning when linking with -pthread... no
+checking for joinable pthread attribute... PTHREAD_CREATE_JOINABLE
+checking whether more special flags are required for pthreads... no
+checking for PTHREAD_PRIO_INHERIT... yes
+checking for pthread_once... yes
+checking for pthread_cancel... yes
+checking for struct dirent.d_type... yes
+checking for plist_new_unix_date... yes
+checking for supported compiler flags...  -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith -Wwrite-strings -Wswitch-default -Wno-unused-parameter -fsigned-char -fvisibility=hidden
+checking for clang -arch arm64 option to enable large file support... none needed
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating src/Makefile
+config.status: creating src/libimobiledevice-glue-1.0.pc
+config.status: creating include/Makefile
+config.status: creating config.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+configure: WARNING: unrecognized options: --without-cython
+
+Configuration for libimobiledevice-glue 1.3.2:
+-------------------------------------------
+
+  Install prefix: .........: /tmp/cuebear_universal_build/install-arm64
+
+  Now type 'make' to build libimobiledevice-glue 1.3.2,
+  and then 'make install' for installation.
+
+if test -z 'strip'; then \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libimobiledevice-glue-1.3.2/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libimobiledevice-glue-1.3.2/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	      install; \
+	else \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libimobiledevice-glue-1.3.2/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libimobiledevice-glue-1.3.2/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	    "INSTALL_PROGRAM_ENV=STRIPPROG='strip'" install; \
+	fi
+Making install in src
+  CC       socket.lo
+  CC       glue.lo
+  CC       utils.lo
+  CC       thread.lo
+  CC       nskeyedarchive.lo
+  CC       opack.lo
+  CC       collection.lo
+  CC       termcolors.lo
+  CC       cbuf.lo
+  CC       tlv.lo
+  CC       sha1.lo
+  CC       sha256.lo
+  CC       sha512.lo
+  CCLD     libimobiledevice-glue-1.0.la
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/lib/pkgconfig'
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/lib'
+ /bin/sh ../libtool   --mode=install /usr/bin/install -c -s  libimobiledevice-glue-1.0.la '/tmp/cuebear_universal_build/install-arm64/lib'
+ /usr/bin/install -c -m 644 libimobiledevice-glue-1.0.pc '/tmp/cuebear_universal_build/install-arm64/lib/pkgconfig'
+libtool: install: /usr/bin/install -c .libs/libimobiledevice-glue-1.0.0.dylib /tmp/cuebear_universal_build/install-arm64/lib/libimobiledevice-glue-1.0.0.dylib
+libtool: install: strip -x /tmp/cuebear_universal_build/install-arm64/lib/libimobiledevice-glue-1.0.0.dylib
+libtool: install: (cd /tmp/cuebear_universal_build/install-arm64/lib && { ln -s -f libimobiledevice-glue-1.0.0.dylib libimobiledevice-glue-1.0.dylib || { rm -f libimobiledevice-glue-1.0.dylib && ln -s libimobiledevice-glue-1.0.0.dylib libimobiledevice-glue-1.0.dylib; }; })
+libtool: install: /usr/bin/install -c .libs/libimobiledevice-glue-1.0.lai /tmp/cuebear_universal_build/install-arm64/lib/libimobiledevice-glue-1.0.la
+libtool: install: /usr/bin/install -c .libs/libimobiledevice-glue-1.0.a /tmp/cuebear_universal_build/install-arm64/lib/libimobiledevice-glue-1.0.a
+libtool: install: strip -S /tmp/cuebear_universal_build/install-arm64/lib/libimobiledevice-glue-1.0.a
+libtool: install: chmod 644 /tmp/cuebear_universal_build/install-arm64/lib/libimobiledevice-glue-1.0.a
+libtool: install: ranlib /tmp/cuebear_universal_build/install-arm64/lib/libimobiledevice-glue-1.0.a
+Making install in include
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/include'
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/include/libimobiledevice-glue'
+ /usr/bin/install -c -m 644  ../../include/libimobiledevice-glue/glue.h ../../include/libimobiledevice-glue/socket.h ../../include/libimobiledevice-glue/thread.h ../../include/libimobiledevice-glue/utils.h ../../include/libimobiledevice-glue/nskeyedarchive.h ../../include/libimobiledevice-glue/collection.h ../../include/libimobiledevice-glue/termcolors.h ../../include/libimobiledevice-glue/cbuf.h ../../include/libimobiledevice-glue/opack.h ../../include/libimobiledevice-glue/tlv.h ../../include/libimobiledevice-glue/sha.h '/tmp/cuebear_universal_build/install-arm64/include/libimobiledevice-glue'
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+
+========================================
+Building libusbmuxd...
+========================================
+
+========================================
+Building libusbmuxd for x86_64...
+========================================
+glibtoolize: putting auxiliary files in '.'.
+glibtoolize: linking file './ltmain.sh'
+glibtoolize: putting macros in AC_CONFIG_MACRO_DIRS, 'm4'.
+glibtoolize: linking file 'm4/libtool.m4'
+glibtoolize: linking file 'm4/ltoptions.m4'
+glibtoolize: linking file 'm4/ltsugar.m4'
+glibtoolize: linking file 'm4/ltversion.m4'
+glibtoolize: linking file 'm4/lt~obsolete.m4'
+configure.ac:35: installing './compile'
+configure.ac:38: installing './config.guess'
+configure.ac:38: installing './config.sub'
+configure.ac:6: installing './install-sh'
+configure.ac:6: installing './missing'
+src/Makefile.am: installing './depcomp'
+configure: WARNING: unrecognized options: --without-cython
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether sleep supports fractional seconds... yes
+checking filesystem timestamp resolution... 2
+checking whether build environment is sane... yes
+checking for x86_64-apple-darwin-strip... no
+checking for strip... strip
+checking for a race-free mkdir -p... mkdir -p
+checking for gawk... no
+checking for mawk... no
+checking for nawk... no
+checking for awk... awk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking xargs -n works... yes
+checking whether UID '501' is supported by ustar format... yes
+checking whether GID '20' is supported by ustar format... yes
+checking how to create a ustar tar archive... gnutar
+checking for x86_64-apple-darwin-gcc... clang -arch x86_64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether clang -arch x86_64 accepts -g... yes
+checking for clang -arch x86_64 option to enable C11 features... none needed
+checking whether clang -arch x86_64 understands -c and -o together... yes
+checking whether make supports the include directive... yes (GNU style)
+checking dependency style of clang -arch x86_64... none
+checking build system type... aarch64-apple-darwin24.3.0
+checking host system type... x86_64-apple-darwin
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by clang -arch x86_64... /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+checking if the linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) is GNU ld... no
+checking for BSD- or MS-compatible name lister (nm)... no
+checking for x86_64-apple-darwin-dumpbin... no
+checking for x86_64-apple-darwin-link... no
+checking for dumpbin... no
+checking for link... link -dump
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 786432
+checking how to convert aarch64-apple-darwin24.3.0 file names to x86_64-apple-darwin format... func_convert_file_noop
+checking how to convert aarch64-apple-darwin24.3.0 file names to toolchain format... func_convert_file_noop
+checking for /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld option to reload object files... -r
+checking for file... file
+checking for x86_64-apple-darwin-objdump... no
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for x86_64-apple-darwin-dlltool... no
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for x86_64-apple-darwin-ranlib... no
+checking for ranlib... ranlib
+checking for x86_64-apple-darwin-ar... no
+checking for ar... ar
+checking for archiver @FILE support... no
+checking for x86_64-apple-darwin-strip... strip
+checking command to parse nm output from clang -arch x86_64 object... ok
+checking for sysroot... no
+checking for a working dd... /bin/dd
+checking how to truncate binary pipes... /bin/dd bs=4096 count=1
+checking for x86_64-apple-darwin-mt... no
+checking for mt... no
+checking if : is a manifest tool... no
+checking for x86_64-apple-darwin-dsymutil... no
+checking for dsymutil... dsymutil
+checking for x86_64-apple-darwin-nmedit... no
+checking for nmedit... nmedit
+checking for x86_64-apple-darwin-lipo... no
+checking for lipo... lipo
+checking for x86_64-apple-darwin-otool... no
+checking for otool... otool
+checking for x86_64-apple-darwin-otool64... no
+checking for otool64... no
+checking for -single_module linker flag... ld: warning: -single_module is obsolete
+no
+checking for -no_fixup_chains linker flag... yes
+checking for -exported_symbols_list linker flag... yes
+checking for -force_load linker flag... yes
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if clang -arch x86_64 supports -fno-rtti -fno-exceptions... yes
+checking for clang -arch x86_64 option to produce PIC... -fno-common -DPIC
+checking if clang -arch x86_64 PIC flag -fno-common -DPIC works... yes
+checking if clang -arch x86_64 static flag -static works... no
+checking if clang -arch x86_64 supports -c -o file.o... yes
+checking if clang -arch x86_64 supports -c -o file.o... (cached) yes
+checking whether the clang -arch x86_64 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking dynamic linker characteristics... darwin dyld
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... yes
+checking whether to build static libraries... yes
+checking for x86_64-apple-darwin-pkg-config... no
+checking for pkg-config... /opt/homebrew/bin/pkg-config
+checking pkg-config is at least version 0.9.0... yes
+checking for libplist-2.0 >= 2.2.0... yes
+checking for libimobiledevice-glue-1.0 >= 1.2.0... yes
+checking for sys/inotify.h... no
+checking for stdint.h... (cached) yes
+checking for stdlib.h... (cached) yes
+checking for string.h... (cached) yes
+checking for an ANSI C-conforming const... yes
+checking for size_t... yes
+checking for ssize_t... yes
+checking for uint16_t... yes
+checking for uint32_t... yes
+checking for uint8_t... yes
+checking for strcasecmp... yes
+checking for strdup... yes
+checking for strerror... yes
+checking for stpncpy... yes
+checking for malloc... yes
+checking for realloc... yes
+checking for getifaddrs... yes
+checking for platform-specific build settings... darwin
+checking for supported compiler flags...  -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith -Wwrite-strings -Wswitch-default -Wno-unused-parameter -fvisibility=hidden
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating src/Makefile
+config.status: creating include/Makefile
+config.status: creating tools/Makefile
+config.status: creating docs/Makefile
+config.status: creating src/libusbmuxd-2.0.pc
+config.status: creating config.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+configure: WARNING: unrecognized options: --without-cython
+
+Configuration for libusbmuxd 2.1.1:
+-------------------------------------------
+
+  Install prefix: .........: /tmp/cuebear_universal_build/install-x86_64
+  inotify support (Linux) .: no
+
+  Now type 'make' to build libusbmuxd 2.1.1,
+  and then 'make install' for installation.
+
+if test -z 'strip'; then \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	      install; \
+	else \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	    "INSTALL_PROGRAM_ENV=STRIPPROG='strip'" install; \
+	fi
+Making install in src
+  CC       libusbmuxd.lo
+  CCLD     libusbmuxd-2.0.la
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/lib'
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/lib/pkgconfig'
+ /bin/sh ../libtool   --mode=install /usr/bin/install -c -s  libusbmuxd-2.0.la '/tmp/cuebear_universal_build/install-x86_64/lib'
+ /usr/bin/install -c -m 644 libusbmuxd-2.0.pc '/tmp/cuebear_universal_build/install-x86_64/lib/pkgconfig'
+libtool: install: /usr/bin/install -c .libs/libusbmuxd-2.0.7.dylib /tmp/cuebear_universal_build/install-x86_64/lib/libusbmuxd-2.0.7.dylib
+libtool: install: strip -x /tmp/cuebear_universal_build/install-x86_64/lib/libusbmuxd-2.0.7.dylib
+libtool: install: (cd /tmp/cuebear_universal_build/install-x86_64/lib && { ln -s -f libusbmuxd-2.0.7.dylib libusbmuxd-2.0.dylib || { rm -f libusbmuxd-2.0.dylib && ln -s libusbmuxd-2.0.7.dylib libusbmuxd-2.0.dylib; }; })
+libtool: install: /usr/bin/install -c .libs/libusbmuxd-2.0.lai /tmp/cuebear_universal_build/install-x86_64/lib/libusbmuxd-2.0.la
+libtool: install: /usr/bin/install -c .libs/libusbmuxd-2.0.a /tmp/cuebear_universal_build/install-x86_64/lib/libusbmuxd-2.0.a
+libtool: install: strip -S /tmp/cuebear_universal_build/install-x86_64/lib/libusbmuxd-2.0.a
+libtool: install: chmod 644 /tmp/cuebear_universal_build/install-x86_64/lib/libusbmuxd-2.0.a
+libtool: install: ranlib /tmp/cuebear_universal_build/install-x86_64/lib/libusbmuxd-2.0.a
+Making install in include
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/include'
+ /usr/bin/install -c -m 644  ../../include/usbmuxd.h ../../include/usbmuxd-proto.h '/tmp/cuebear_universal_build/install-x86_64/include/.'
+Making install in tools
+  CC       inetcat-inetcat.o
+  CC       iproxy-iproxy.o
+  CCLD     inetcat
+  CCLD     iproxy
+make[3]: Nothing to be done for `install-data-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/bin'
+ STRIPPROG='strip' /bin/sh ../libtool   --mode=install /bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s iproxy inetcat '/tmp/cuebear_universal_build/install-x86_64/bin'
+libtool: install: /bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s .libs/iproxy /tmp/cuebear_universal_build/install-x86_64/bin/iproxy
+libtool: install: /bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s .libs/inetcat /tmp/cuebear_universal_build/install-x86_64/bin/inetcat
+Making install in docs
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-x86_64/share/man/man1'
+ /usr/bin/install -c -m 644 ../../docs/iproxy.1 ../../docs/inetcat.1 '/tmp/cuebear_universal_build/install-x86_64/share/man/man1'
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+
+========================================
+Building libusbmuxd for arm64...
+========================================
+glibtoolize: putting auxiliary files in '.'.
+glibtoolize: linking file './ltmain.sh'
+glibtoolize: putting macros in AC_CONFIG_MACRO_DIRS, 'm4'.
+glibtoolize: linking file 'm4/libtool.m4'
+glibtoolize: linking file 'm4/ltoptions.m4'
+glibtoolize: linking file 'm4/ltsugar.m4'
+glibtoolize: linking file 'm4/ltversion.m4'
+glibtoolize: linking file 'm4/lt~obsolete.m4'
+configure.ac:35: installing './compile'
+configure.ac:6: installing './missing'
+src/Makefile.am: installing './depcomp'
+configure: WARNING: unrecognized options: --without-cython
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether sleep supports fractional seconds... yes
+checking filesystem timestamp resolution... 2
+checking whether build environment is sane... yes
+checking for arm-apple-darwin-strip... no
+checking for strip... strip
+checking for a race-free mkdir -p... mkdir -p
+checking for gawk... no
+checking for mawk... no
+checking for nawk... no
+checking for awk... awk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking xargs -n works... yes
+checking whether UID '501' is supported by ustar format... yes
+checking whether GID '20' is supported by ustar format... yes
+checking how to create a ustar tar archive... gnutar
+checking for arm-apple-darwin-gcc... clang -arch arm64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether clang -arch arm64 accepts -g... yes
+checking for clang -arch arm64 option to enable C11 features... none needed
+checking whether clang -arch arm64 understands -c and -o together... yes
+checking whether make supports the include directive... yes (GNU style)
+checking dependency style of clang -arch arm64... none
+checking build system type... aarch64-apple-darwin24.3.0
+checking host system type... arm-apple-darwin
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by clang -arch arm64... /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+checking if the linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) is GNU ld... no
+checking for BSD- or MS-compatible name lister (nm)... no
+checking for arm-apple-darwin-dumpbin... no
+checking for arm-apple-darwin-link... no
+checking for dumpbin... no
+checking for link... link -dump
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 786432
+checking how to convert aarch64-apple-darwin24.3.0 file names to arm-apple-darwin format... func_convert_file_noop
+checking how to convert aarch64-apple-darwin24.3.0 file names to toolchain format... func_convert_file_noop
+checking for /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld option to reload object files... -r
+checking for file... file
+checking for arm-apple-darwin-objdump... no
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for arm-apple-darwin-dlltool... no
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for arm-apple-darwin-ranlib... no
+checking for ranlib... ranlib
+checking for arm-apple-darwin-ar... no
+checking for ar... ar
+checking for archiver @FILE support... no
+checking for arm-apple-darwin-strip... strip
+checking command to parse nm output from clang -arch arm64 object... ok
+checking for sysroot... no
+checking for a working dd... /bin/dd
+checking how to truncate binary pipes... /bin/dd bs=4096 count=1
+checking for arm-apple-darwin-mt... no
+checking for mt... no
+checking if : is a manifest tool... no
+checking for arm-apple-darwin-dsymutil... no
+checking for dsymutil... dsymutil
+checking for arm-apple-darwin-nmedit... no
+checking for nmedit... nmedit
+checking for arm-apple-darwin-lipo... no
+checking for lipo... lipo
+checking for arm-apple-darwin-otool... no
+checking for otool... otool
+checking for arm-apple-darwin-otool64... no
+checking for otool64... no
+checking for -single_module linker flag... ld: warning: -single_module is obsolete
+no
+checking for -no_fixup_chains linker flag... yes
+checking for -exported_symbols_list linker flag... yes
+checking for -force_load linker flag... yes
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if clang -arch arm64 supports -fno-rtti -fno-exceptions... yes
+checking for clang -arch arm64 option to produce PIC... -fno-common -DPIC
+checking if clang -arch arm64 PIC flag -fno-common -DPIC works... yes
+checking if clang -arch arm64 static flag -static works... no
+checking if clang -arch arm64 supports -c -o file.o... yes
+checking if clang -arch arm64 supports -c -o file.o... (cached) yes
+checking whether the clang -arch arm64 linker (/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld) supports shared libraries... yes
+checking dynamic linker characteristics... darwin dyld
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... yes
+checking whether to build static libraries... yes
+checking for arm-apple-darwin-pkg-config... no
+checking for pkg-config... /opt/homebrew/bin/pkg-config
+checking pkg-config is at least version 0.9.0... yes
+checking for libplist-2.0 >= 2.2.0... yes
+checking for libimobiledevice-glue-1.0 >= 1.2.0... yes
+checking for sys/inotify.h... no
+checking for stdint.h... (cached) yes
+checking for stdlib.h... (cached) yes
+checking for string.h... (cached) yes
+checking for an ANSI C-conforming const... yes
+checking for size_t... yes
+checking for ssize_t... yes
+checking for uint16_t... yes
+checking for uint32_t... yes
+checking for uint8_t... yes
+checking for strcasecmp... yes
+checking for strdup... yes
+checking for strerror... yes
+checking for stpncpy... yes
+checking for malloc... yes
+checking for realloc... yes
+checking for getifaddrs... yes
+checking for platform-specific build settings... darwin
+checking for supported compiler flags...  -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith -Wwrite-strings -Wswitch-default -Wno-unused-parameter -fvisibility=hidden
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating src/Makefile
+config.status: creating include/Makefile
+config.status: creating tools/Makefile
+config.status: creating docs/Makefile
+config.status: creating src/libusbmuxd-2.0.pc
+config.status: creating config.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+configure: WARNING: unrecognized options: --without-cython
+
+Configuration for libusbmuxd 2.1.1:
+-------------------------------------------
+
+  Install prefix: .........: /tmp/cuebear_universal_build/install-arm64
+  inotify support (Linux) .: no
+
+  Now type 'make' to build libusbmuxd 2.1.1,
+  and then 'make install' for installation.
+
+if test -z 'strip'; then \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	      install; \
+	else \
+	  /Applications/Xcode.app/Contents/Developer/usr/bin/make  INSTALL_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s" \
+	    install_sh_PROGRAM="/bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s" INSTALL_STRIP_FLAG=-s \
+	    "INSTALL_PROGRAM_ENV=STRIPPROG='strip'" install; \
+	fi
+Making install in src
+  CC       libusbmuxd.lo
+  CCLD     libusbmuxd-2.0.la
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/lib'
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/lib/pkgconfig'
+ /bin/sh ../libtool   --mode=install /usr/bin/install -c -s  libusbmuxd-2.0.la '/tmp/cuebear_universal_build/install-arm64/lib'
+ /usr/bin/install -c -m 644 libusbmuxd-2.0.pc '/tmp/cuebear_universal_build/install-arm64/lib/pkgconfig'
+libtool: install: /usr/bin/install -c .libs/libusbmuxd-2.0.7.dylib /tmp/cuebear_universal_build/install-arm64/lib/libusbmuxd-2.0.7.dylib
+libtool: install: strip -x /tmp/cuebear_universal_build/install-arm64/lib/libusbmuxd-2.0.7.dylib
+libtool: install: (cd /tmp/cuebear_universal_build/install-arm64/lib && { ln -s -f libusbmuxd-2.0.7.dylib libusbmuxd-2.0.dylib || { rm -f libusbmuxd-2.0.dylib && ln -s libusbmuxd-2.0.7.dylib libusbmuxd-2.0.dylib; }; })
+libtool: install: /usr/bin/install -c .libs/libusbmuxd-2.0.lai /tmp/cuebear_universal_build/install-arm64/lib/libusbmuxd-2.0.la
+libtool: install: /usr/bin/install -c .libs/libusbmuxd-2.0.a /tmp/cuebear_universal_build/install-arm64/lib/libusbmuxd-2.0.a
+libtool: install: strip -S /tmp/cuebear_universal_build/install-arm64/lib/libusbmuxd-2.0.a
+libtool: install: chmod 644 /tmp/cuebear_universal_build/install-arm64/lib/libusbmuxd-2.0.a
+libtool: install: ranlib /tmp/cuebear_universal_build/install-arm64/lib/libusbmuxd-2.0.a
+Making install in include
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/include'
+ /usr/bin/install -c -m 644  ../../include/usbmuxd.h ../../include/usbmuxd-proto.h '/tmp/cuebear_universal_build/install-arm64/include/.'
+Making install in tools
+  CC       inetcat-inetcat.o
+  CC       iproxy-iproxy.o
+  CCLD     inetcat
+  CCLD     iproxy
+make[3]: Nothing to be done for `install-data-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/bin'
+ STRIPPROG='strip' /bin/sh ../libtool   --mode=install /bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s iproxy inetcat '/tmp/cuebear_universal_build/install-arm64/bin'
+libtool: install: /bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s .libs/iproxy /tmp/cuebear_universal_build/install-arm64/bin/iproxy
+libtool: install: /bin/sh /tmp/cuebear_universal_build/libusbmuxd-2.1.1/install-sh -c -s .libs/inetcat /tmp/cuebear_universal_build/install-arm64/bin/inetcat
+Making install in docs
+make[3]: Nothing to be done for `install-exec-am'.
+ mkdir -p '/tmp/cuebear_universal_build/install-arm64/share/man/man1'
+ /usr/bin/install -c -m 644 ../../docs/iproxy.1 ../../docs/inetcat.1 '/tmp/cuebear_universal_build/install-arm64/share/man/man1'
+make[3]: Nothing to be done for `install-exec-am'.
+make[3]: Nothing to be done for `install-data-am'.
+
+🔗 Step 3: Creating universal fat binaries...
+  Creating universal libplist-2.0.dylib...
+fatal error: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo: can't create temporary output file: ./Frameworks/libplist-2.0.dylib.lipo (No such file or directory)

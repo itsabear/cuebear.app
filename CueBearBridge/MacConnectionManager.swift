@@ -178,7 +178,7 @@ final class MacConnectionManager: ObservableObject {
                 if shouldSendHandshake {
                     self.sendHandshake()
                 }
-                DispatchQueue.main.async { [weak self] in self?.connectionStatus = "USB: Looking for Cue Bear" }
+                // Status already set to "Looking for iPad" - no need to update
 
                 // SPEED FIX: Fast zombie detection - check if handshake response arrives within 1s
                 // If connection is ready but no response, fail fast and retry
@@ -256,7 +256,7 @@ final class MacConnectionManager: ObservableObject {
                 return
             }
             Logger.shared.log("🔗 MacConnectionManager: Handshake sent — waiting for response…")
-            DispatchQueue.main.async { self.connectionStatus = "USB: Looking for Cue Bear" }
+            // Status already set to "Looking for iPad" - keep it consistent to avoid blinking
             // SPEED FIX: Reduced timeout from 10s to 3s for faster failure detection
             self.startHandshakeTimeout(seconds: 3.0)
         })

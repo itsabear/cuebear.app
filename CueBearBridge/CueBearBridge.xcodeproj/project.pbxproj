@@ -149,7 +149,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"🔧 Bundling iproxy with fixed library paths...\"\nAPP_BUNDLE=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nBUNDLE_SCRIPT=\"${SRCROOT}/CueBearBridgeInstaller/scripts/bundle_iproxy.sh\"\n\nif [ -f \"$BUNDLE_SCRIPT\" ]; then\n  echo \"Running bundle_iproxy.sh for Xcode build...\"\n  \"$BUNDLE_SCRIPT\" \"$APP_BUNDLE\" || true\n  echo \"✅ iproxy bundling complete\"\nelse\n  echo \"⚠️  bundle_iproxy.sh not found at $BUNDLE_SCRIPT\"\n  echo \"⚠️  App will require system iproxy from Homebrew\"\nfi\nexit 0\n";
+			shellScript = "echo \"🔧 Bundling libraries and iproxy...\"\nAPP_BUNDLE=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nFRAMEWORKS_DIR=\"${APP_BUNDLE}/Contents/Frameworks\"\n\n# Copy universal libraries\necho \"📦 Copying universal libraries...\"\nmkdir -p \"$FRAMEWORKS_DIR\"\ncp \"${SRCROOT}/Frameworks/\"*.dylib \"$FRAMEWORKS_DIR/\" || echo \"⚠️  Failed to copy libraries\"\necho \"✅ Libraries copied\"\n\n# Bundle iproxy\nBUNDLE_SCRIPT=\"${SRCROOT}/CueBearBridgeInstaller/scripts/bundle_iproxy.sh\"\n\nif [ -f \"$BUNDLE_SCRIPT\" ]; then\n  echo \"Running bundle_iproxy.sh for Xcode build...\"\n  \"$BUNDLE_SCRIPT\" \"$APP_BUNDLE\" || true\n  echo \"✅ iproxy bundling complete\"\nelse\n  echo \"⚠️  bundle_iproxy.sh not found at $BUNDLE_SCRIPT\"\n  echo \"⚠️  App will require system iproxy from Homebrew\"\nfi\n\n# Re-sign libraries and app bundle after copying\necho \"🔏 Code signing libraries and app bundle...\"\n\n# Sign each library individually first\nfor lib in \"$FRAMEWORKS_DIR\"/*.dylib; do\n  if [ -f \"$lib\" ]; then\n    echo \"  Signing $(basename \"$lib\")...\"\n    codesign --force --sign - \"$lib\" || echo \"⚠️  Failed to sign $(basename \"$lib\")\"\n  fi\ndone\n\n# Then sign the app bundle\nif [ \"${CONFIGURATION}\" = \"Debug\" ]; then\n  # For Debug builds, use ad-hoc signing\n  codesign --force --deep --sign - \"$APP_BUNDLE\" || echo \"⚠️  Code signing failed\"\n  echo \"✅ App bundle signed (ad-hoc)\"\nelse\n  # For Release builds, also use ad-hoc signing (will be properly signed later for distribution)\n  codesign --force --deep --sign - \"$APP_BUNDLE\" || echo \"⚠️  Code signing failed\"\n  echo \"✅ App bundle signed (ad-hoc for local testing)\"\nfi\n\nexit 0\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -177,7 +177,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_STANDARD)";
+				ARCHS = "arm64 x86_64";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -185,6 +185,7 @@
 				CODE_SIGN_ENTITLEMENTS = CueBearBridge.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
+				ENABLE_HARDENED_RUNTIME = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				HEADER_SEARCH_PATHS = (
 					/opt/homebrew/include,
@@ -219,7 +220,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_STANDARD)";
+				ARCHS = "arm64 x86_64";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
