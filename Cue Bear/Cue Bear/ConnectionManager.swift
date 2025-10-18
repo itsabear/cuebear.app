@@ -1445,10 +1445,6 @@ class ConnectionManager: ObservableObject {
             self.isUSBCableConnected = false
             debugPrint("🔗 ConnectionManager: ❌ USB cable disconnected - chip will disappear")
 
-            // STORY 3 FIX: Only disconnect USB, preserve WiFi connection if active
-            // Don't call connectionStateCallback(false) if WiFi is still connected
-            let shouldNotifyDisconnect = !self.isWiFiConnected
-
             // USB cable disconnected - immediately update USB connection state
             self.isConnected = false
             self.isConnecting = false
@@ -1464,13 +1460,10 @@ class ConnectionManager: ObservableObject {
             self.closeUSB(self.activeUSB)
             self.activeUSB = nil
 
-            // Notify callback of disconnection ONLY if WiFi is not connected
-            if shouldNotifyDisconnect {
-                debugPrint("🔗 ConnectionManager: 🔌 Calling connectionStateCallback(false) - no WiFi active")
-                self.connectionStateCallback?(false)
-            } else {
-                debugPrint("🔗 ConnectionManager: 🔌 WiFi still connected - NOT calling connectionStateCallback(false)")
-            }
+            // ALWAYS notify callback of USB disconnection
+            // Let ConnectionCoordinator decide whether to switch to WiFi or show disconnected
+            debugPrint("🔗 ConnectionManager: 🔌 Calling connectionStateCallback(false) - USB cable unplugged")
+            self.connectionStateCallback?(false)
 
             // Update USB bridge availability to hide chip
             self.checkUSBBridgeAvailability()
