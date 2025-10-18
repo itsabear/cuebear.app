@@ -48,6 +48,8 @@ final class BridgeOutput: ObservableObject {
     private var browser: NWBrowser?
     // v1.0.8: Made internal (not private) so ConnectionCoordinator can check if connection is suspended
     internal var connection: NWConnection?
+    // v1.0.8: Track if WiFi was actually suspended (for proper resume detection)
+    internal var isSuspended: Bool = false
     private let queue = DispatchQueue(label: "CueBear.BridgeOutput")
     private var pairToken: String = UserDefaults.standard.string(forKey: "BridgePairToken") ?? ""
     private var isPairing: Bool = false
@@ -152,6 +154,7 @@ final class BridgeOutput: ObservableObject {
 
     func disconnect() {
         connection?.cancel(); connection = nil
+        isSuspended = false  // Clear suspended flag on disconnect
         DispatchQueue.main.async {
             self.isConnected = false
             self.isConnecting = false
@@ -177,6 +180,9 @@ final class BridgeOutput: ObservableObject {
         // DON'T set connection = nil - preserve the connection object
         // DON'T clear current - remember which bridge we're connected to
 
+        // Mark as suspended so we know this was an intentional suspension
+        isSuspended = true
+
         // Just update UI state to show we're not actively using WiFi
         DispatchQueue.main.async {
             self.isConnected = false  // UI shows disconnected
@@ -194,11 +200,21 @@ final class BridgeOutput: ObservableObject {
     func resume() {
         debugPrint("📡 BridgeOutput: Resuming WiFi connection after USB disconnect")
 
+        // CRITICAL FIX: Only resume if WiFi was actually suspended
+        guard isSuspended else {
+            debugPrint("📡 BridgeOutput: ⚠️ WiFi was NOT suspended - already active, no need to resume")
+            return
+        }
+
         // Verify we still have a valid connection object
         guard connection != nil, current != nil else {
             debugPrint("📡 BridgeOutput: ⚠️ Cannot resume - connection object was destroyed, need full reconnect")
+            isSuspended = false  // Clear flag since we can't resume
             return
         }
+
+        // Clear suspended flag
+        isSuspended = false
 
         // Restore UI state to show WiFi is active
         DispatchQueue.main.async {
@@ -206,8 +222,13 @@ final class BridgeOutput: ObservableObject {
             self.connectionQuality = .excellent
         }
 
-        // Restart connection health monitoring
-        self.startConnectionHealthMonitoring()
+        // Only restart health monitoring if it's not already running
+        // This prevents duplicate timers
+        if connectionHealthTimer == nil {
+            self.startConnectionHealthMonitoring()
+        } else {
+            debugPrint("📡 BridgeOutput: Health monitoring already running - not restarting")
+        }
 
         // Reset last successful message timestamp to prevent immediate stale detection
         self.lastSuccessfulMessage = Date()
@@ -415,23 +436,27 @@ final class BridgeOutput: ObservableObject {
             switch state {
             case .ready:
                 debugPrint("BridgeOutput: Connected successfully to \(item.name)")
-                DispatchQueue.main.async { 
+                DispatchQueue.main.async {
                     self.isConnected = true
                     self.isConnecting = false
                     self.current = item
                     self.connectionQuality = .excellent
                 }
+
+                // Clear suspended flag when establishing new connection
+                self.isSuspended = false
+
                 self.receiveLoop()
-                
+
                 // Stop reconnection timer when connected
                 self.stopReconnectionTimer()
-                
+
                 // Start connection health monitoring
                 self.startConnectionHealthMonitoring()
-                
+
                 // Reset last successful message timestamp
                 self.lastSuccessfulMessage = Date()
-                
+
                 // Automatic pairing for security
                 if self.pairToken.isEmpty {
                     self.initiatePairing()

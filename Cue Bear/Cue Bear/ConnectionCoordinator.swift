@@ -107,19 +107,20 @@ class ConnectionCoordinator: ObservableObject {
             // Reset manual USB flag since connection is lost
             isManualUSBConnection = false
 
-            // v1.0.8: Resume WiFi connection if it was suspended (not fully disconnected)
-            // Check if WiFi has a valid connection object that was just suspended
-            if wifiClient.connection != nil && wifiClient.current != nil {
+            // v1.0.8: Resume WiFi connection ONLY if it was actually suspended by USB
+            // CRITICAL FIX: Check isSuspended flag instead of connection != nil
+            // This prevents incorrectly "resuming" WiFi that was never suspended
+            if wifiClient.isSuspended {
                 debugPrint("🔌 ConnectionCoordinator: WiFi connection was suspended - resuming it now")
                 wifiClient.resume()  // v1.0.8: Resume the suspended WiFi connection
                 activeConnection = .wifi
                 connectionStatus = "WiFi Connected"
                 debugPrint("🔌 ConnectionCoordinator: ✅ WiFi resumed and activeConnection switched to .wifi")
             } else if wifiClient.isConnected {
-                // Fallback: WiFi shows as connected but no suspended connection to resume
+                // WiFi is already active (Story 6: USB cable was plugged but didn't connect)
                 activeConnection = .wifi
                 connectionStatus = "WiFi Connected"
-                debugPrint("🔌 ConnectionCoordinator: WiFi is connected, switching activeConnection to .wifi")
+                debugPrint("🔌 ConnectionCoordinator: WiFi is already active, switching activeConnection to .wifi")
             } else {
                 activeConnection = .none
                 connectionStatus = "Disconnected"
