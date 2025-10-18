@@ -65,51 +65,49 @@ struct CueBearApp: App {
 
     private func installDemoProjectsIfNeeded() {
         let hasInstalledDemos = UserDefaults.standard.bool(forKey: "hasInstalledDemoProjects")
-        guard !hasInstalledDemos else {
-            debugPrint("📦 Demo projects already installed, skipping")
+
+        // ALWAYS check if the demo project actually exists, even if flag is set
+        let demoName = "Beethoven Live"
+        let projectExists = (try? ProjectIO.load(name: demoName)) != nil
+
+        guard !hasInstalledDemos || !projectExists else {
+            debugPrint("📦 Demo project already installed, skipping")
             return
         }
 
-        debugPrint("📦 Installing demo projects for first launch...")
-
-        let demoNames = [
-            "DJ Set - Electronic Night",
-            "Live Band - Rock Concert",
-            "Studio Session - Hip Hop Production",
-            "Theater Production - Hamilton",
-            "Worship Service - Sunday Morning"
-        ]
-
-        var installedCount = 0
-
-        for name in demoNames {
-            guard let url = Bundle.main.url(forResource: name, withExtension: "cuebearproj") else {
-                debugPrint("⚠️ Demo project not found in bundle: \(name)")
-                continue
-            }
-
-            do {
-                let data = try Data(contentsOf: url)
-                let payload = try JSONDecoder().decode(ProjectPayload.self, from: data)
-
-                // Save using ProjectIO (saves as .cuebear format in Documents)
-                try ProjectIO.save(
-                    name: payload.name,
-                    setlist: payload.setlist,
-                    library: payload.library,
-                    controls: payload.controls,
-                    isGlobalChannel: payload.isGlobalChannel,
-                    globalChannel: payload.globalChannel
-                )
-
-                installedCount += 1
-                debugPrint("✅ Installed demo project: \(name)")
-            } catch {
-                debugPrint("❌ Failed to install demo project \(name): \(error)")
-            }
+        if hasInstalledDemos && !projectExists {
+            debugPrint("⚠️ hasInstalledDemoProjects flag was set but project doesn't exist - reinstalling")
         }
 
-        UserDefaults.standard.set(true, forKey: "hasInstalledDemoProjects")
-        debugPrint("📦 Installed \(installedCount) of \(demoNames.count) demo projects")
+        debugPrint("📦 Installing demo project for first launch...")
+
+        guard let url = Bundle.main.url(forResource: demoName, withExtension: "cuebearproj") else {
+            debugPrint("❌ Demo project not found in bundle: \(demoName)")
+            debugPrint("❌ Make sure '\(demoName).cuebearproj' is added to Copy Bundle Resources in Xcode")
+            return
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let payload = try JSONDecoder().decode(ProjectPayload.self, from: data)
+
+            // Save using ProjectIO (saves as .cuebear format in Documents)
+            try ProjectIO.save(
+                name: payload.name,
+                setlist: payload.setlist,
+                library: payload.library,
+                controls: payload.controls,
+                isGlobalChannel: payload.isGlobalChannel,
+                globalChannel: payload.globalChannel
+            )
+
+            debugPrint("✅ Installed demo project: \(demoName)")
+            debugPrint("📊 Demo content: \(payload.setlist.count) cues, \(payload.library.count) library songs, \(payload.controls.count) controls")
+
+            // Only set flag if installation succeeded
+            UserDefaults.standard.set(true, forKey: "hasInstalledDemoProjects")
+        } catch {
+            debugPrint("❌ Failed to install demo project \(demoName): \(error)")
+        }
     }
 }
