@@ -7,6 +7,89 @@ import UIKit
 import UniformTypeIdentifiers
 import Combine
 
+// MARK: - Draft State Persistence
+// v1.0.8: Preserve draft edits across sheet dismissals (when tapping outside)
+// Only clear drafts when Cancel is clicked, not when tapping outside
+
+class CueEditorDraft: ObservableObject {
+    @Published var name: String = ""
+    @Published var subtitle: String = ""
+    @Published var kind: MIDIKind = .cc
+    @Published var number: Int = 1
+    @Published var channel: Int = 1
+    @Published var velocity: Int = 127
+    @Published var autoAssign: Bool = true
+
+    func clear() {
+        name = ""
+        subtitle = ""
+        kind = .cc
+        number = 1
+        channel = 1
+        velocity = 127
+        autoAssign = true
+    }
+
+    func loadFrom(song: Song) {
+        name = song.name
+        subtitle = song.subtitle ?? ""
+        kind = song.kind
+        channel = song.channel
+        velocity = song.velocity
+        if kind == .note {
+            number = song.note ?? 0
+        } else {
+            number = song.cc
+        }
+        autoAssign = false
+    }
+}
+
+class ControlEditorDraft: ObservableObject {
+    @Published var title: String = ""
+    @Published var symbol: String = "square.grid.2x2.fill"
+    @Published var kind: MIDIKind = .cc
+    @Published var number: Int = 0
+    @Published var channel: Int = 1
+    @Published var velocity: Int = 127
+    @Published var autoAssign: Bool = true
+    @Published var isToggle: Bool = false
+    @Published var isSmall: Bool = false
+    @Published var isFader: Bool = false
+    @Published var faderOrientation: String = "vertical"
+    @Published var faderDirection: String = "up"
+
+    func clear() {
+        title = ""
+        symbol = "square.grid.2x2.fill"
+        kind = .cc
+        number = 0
+        channel = 1
+        velocity = 127
+        autoAssign = true
+        isToggle = false
+        isSmall = false
+        isFader = false
+        faderOrientation = "vertical"
+        faderDirection = "up"
+    }
+
+    func loadFrom(control: ControlButton) {
+        title = control.title
+        symbol = control.symbol
+        kind = control.kind
+        number = control.number
+        channel = control.channel
+        velocity = control.velocity
+        autoAssign = false
+        isToggle = control.isToggle ?? false
+        isSmall = control.isSmall ?? false
+        isFader = control.isFader == true
+        faderOrientation = control.faderOrientation ?? "vertical"
+        faderDirection = control.faderDirection ?? "up"
+    }
+}
+
 // MARK: - Shared Wobble Animator (Time-Based Continuous Animation)
 // Uses continuous sine-wave calculations instead of discrete state updates for smooth 60fps performance
 @MainActor
@@ -311,26 +394,16 @@ struct CBControlEditorSheet: View {
     let icons: [String]
     var isEditMode: Bool = false  // Explicit flag: true for editing existing control, false for adding new
 
-    @State private var title: String = ""
-    @State private var symbol: String = "square.grid.2x2.fill"
-    @State private var kind: MIDIKind = .cc
-    @State private var number: Int = 0
-    @State private var channel: Int = 1
-    @State private var velocity: Int = 127
-    @State private var autoAssign: Bool = true
-    @State private var isToggle: Bool = false
+    // v1.0.8: Use ObservedObject draft to preserve edits across sheet dismissals
+    @ObservedObject var draft: ControlEditorDraft
+
     @State private var showDeleteAlert: Bool = false
     private enum ControlType: String, CaseIterable, Identifiable { case button, fader; var id: String { rawValue } }
-    @State private var controlType: ControlType = .button
-    // Button type selection (for toggling between regular and small buttons)
     private enum ButtonType: String, CaseIterable, Identifiable { case regular, small; var id: String { rawValue } }
+    // UI-only state (not persisted in draft)
+    @State private var controlType: ControlType = .button
     @State private var buttonType: ButtonType = .regular
-    // Fader orientation and direction
-    @State private var faderOrientation: String = "vertical"
-    @State private var faderDirection: String = "up"
-    // Space validation warning
     @State private var showSpaceWarning: Bool = false
-    // Out-of-room warning for add mode
     @State private var isOutOfRoom: Bool = false
 
     @Environment(\.scenePhase) private var scenePhase
@@ -355,11 +428,11 @@ struct CBControlEditorSheet: View {
         let newHeight: Int
 
         if editingButton.isFader == true {
-            // Fader dimensions depend on orientation
-            newWidth = (faderOrientation == "horizontal") ? 2 : 1
-            newHeight = (faderOrientation == "horizontal") ? 1 : 2
+            // Fader dimensions depend on orientation (use draft state)
+            newWidth = (draft.faderOrientation == "horizontal") ? 2 : 1
+            newHeight = (draft.faderOrientation == "horizontal") ? 1 : 2
         } else {
-            // Button dimensions depend on button type
+            // Button dimensions depend on button type (use UI state)
             newWidth = (buttonType == .small) ? 1 : 2
             newHeight = 1
         }
@@ -438,10 +511,11 @@ struct CBControlEditorSheet: View {
         let height: Int
 
         if controlType == .fader {
-            width = (faderOrientation == "horizontal") ? 2 : 1
-            height = (faderOrientation == "horizontal") ? 1 : 2
+            // Use draft state for fader orientation
+            width = (draft.faderOrientation == "horizontal") ? 2 : 1
+            height = (draft.faderOrientation == "horizontal") ? 1 : 2
         } else {
-            // Button - check button type
+            // Button - check button type (UI state)
             if buttonType == .small {
                 width = 1
                 height = 1
@@ -493,9 +567,9 @@ struct CBControlEditorSheet: View {
                 Section(header: Text("Appearance")) {
                     // Control type is preselected by the add buttons; hide the picker
                     HStack {
-                        TextField("Control Name", text: $title, prompt: Text("Control Name").foregroundColor(.secondary))
-                        if !title.isEmpty {
-                            Button(action: { title = "" }) {
+                        TextField("Control Name", text: $draft.title, prompt: Text("Control Name").foregroundColor(.secondary))
+                        if !draft.title.isEmpty {
+                            Button(action: { draft.title = "" }) {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(Color.secondary)
                             }
@@ -504,8 +578,11 @@ struct CBControlEditorSheet: View {
                     }
 
                     // Button Type picker - only show for buttons (not faders)
-                    if controlType != .fader {
-                        Picker("Button Type", selection: $buttonType) {
+                    if !draft.isFader {
+                        Picker("Button Type", selection: Binding(
+                            get: { draft.isSmall ? ButtonType.small : ButtonType.regular },
+                            set: { draft.isSmall = ($0 == .small) }
+                        )) {
                             Text("Button").tag(ButtonType.regular)
                             Text("Small Button").tag(ButtonType.small)
                         }
@@ -519,23 +596,23 @@ struct CBControlEditorSheet: View {
                         }
                     }
 
-                    if controlType != .fader {
-                        IconPicker(symbol: $symbol, icons: icons)
+                    if !draft.isFader {
+                        IconPicker(symbol: $draft.symbol, icons: icons)
                             .equatable()
-                        Picker("Behavior", selection: $isToggle) {
+                        Picker("Behavior", selection: $draft.isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
                         }
                     }
 
                     // Fader orientation and direction (only for faders)
-                    if controlType == .fader {
-                        Picker("Fader Orientation", selection: $faderOrientation) {
+                    if draft.isFader {
+                        Picker("Fader Orientation", selection: $draft.faderOrientation) {
                             Text("Vertical").tag("vertical")
                             Text("Horizontal").tag("horizontal")
                         }
 
-                        Picker("Fader Direction", selection: $faderDirection) {
+                        Picker("Fader Direction", selection: $draft.faderDirection) {
                             Text("Up").tag("up")
                             Text("Down").tag("down")
                             Text("Left").tag("left")
@@ -556,21 +633,21 @@ struct CBControlEditorSheet: View {
                 Section(header: Text("Preview")) {
                     HStack {
                         Spacer(minLength: 0)
-                        if controlType == .fader {
-                            ControlFaderPreview(title: title, cc: number, channel: channel, orientation: faderOrientation, direction: faderDirection)
+                        if draft.isFader {
+                            ControlFaderPreview(title: draft.title, cc: draft.number, channel: draft.channel, orientation: draft.faderOrientation, direction: draft.faderDirection)
                         } else {
-                            ControlButtonPreview(title: title, symbol: symbol, kind: kind, number: number, channel: channel, velocity: velocity, isSmall: buttonType == .small)
+                            ControlButtonPreview(title: draft.title, symbol: draft.symbol, kind: draft.kind, number: draft.number, channel: draft.channel, velocity: draft.velocity, isSmall: draft.isSmall)
                         }
                         Spacer(minLength: 0)
                     }
                     .padding(.vertical, 6)
                 }
                 Section(header: Text("MIDI")) {
-                    Toggle(isOn: $autoAssign) {
+                    Toggle(isOn: $draft.autoAssign) {
                         Text("Assign MIDI automatically")
                     }
-                    if controlType != .fader {
-                        Picker("Type", selection: $kind) {
+                    if !draft.isFader {
+                        Picker("Type", selection: $draft.kind) {
                             Text("Control Change").tag(MIDIKind.cc)
                             Text("Note").tag(MIDIKind.note)
                         }
@@ -583,27 +660,27 @@ struct CBControlEditorSheet: View {
                                 .foregroundColor(.secondary)
                         }
                     } else {
-                        Picker("Channel", selection: $channel) {
+                        Picker("Channel", selection: $draft.channel) {
                             ForEach(1...16, id: \.self) { ch in
                                 Text("\(ch)").tag(ch)
                             }
                         }
                     }
                     MIDINumberPicker(
-                        kind: kind,
-                        number: $number,
-                        disabled: autoAssign,
-                        channel: isGlobalChannel ? globalChannel : channel,
+                        kind: draft.kind,
+                        number: $draft.number,
+                        disabled: draft.autoAssign,
+                        channel: isGlobalChannel ? globalChannel : draft.channel,
                         currentOwnerName: currentOwnerName,
                         editingControl: editing
                     )
-                    .id(kind == .note ? "note-picker" : "cc-picker")
+                    .id(draft.kind == .note ? "note-picker" : "cc-picker")
                     // Show conflict warning below picker (not inside picker items)
                     if let owner = conflictOwner() {
                         Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
                     }
-                    if controlType != .fader && kind == .note {
-                        VelocityPicker(velocity: $velocity, disabled: false)
+                    if !draft.isFader && draft.kind == .note {
+                        VelocityPicker(velocity: $draft.velocity, disabled: false)
                     }
                 }
 
@@ -615,7 +692,7 @@ struct CBControlEditorSheet: View {
                         } label: {
                             HStack {
                                 Spacer()
-                                Text(controlType == .fader ? "Delete Fader" : (buttonType == .small ? "Delete Small Button" : "Delete Button"))
+                                Text(draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"))
                                 Spacer()
                             }
                         }
@@ -637,7 +714,11 @@ struct CBControlEditorSheet: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button("Cancel") {
+                        // v1.0.8: Clear draft state on Cancel
+                        draft.clear()
+                        onCancel()
+                    }
                 }
                 // Show "Save & Add Another" when adding new controls (not when editing existing)
                 if !isEditMode {
@@ -668,33 +749,33 @@ struct CBControlEditorSheet: View {
                     isOutOfRoom = !validateSpaceForAddMode()
                 }
             }
-            .onChange(of: autoAssign) { _, newValue in
+            .onChange(of: draft.autoAssign) { _, newValue in
                 if newValue {
-                    number = firstFreeNumber(for: kind, channel: channel)
+                    draft.number = firstFreeNumber(for: draft.kind, channel: draft.channel)
                 }
             }
-            .onChange(of: kind) { _, newValue in
-                if autoAssign {
-                    number = firstFreeNumber(for: newValue, channel: channel)
+            .onChange(of: draft.kind) { _, newValue in
+                if draft.autoAssign {
+                    draft.number = firstFreeNumber(for: newValue, channel: draft.channel)
                 }
             }
-            .onChange(of: channel) { _, newValue in
-                if autoAssign {
-                    number = firstFreeNumber(for: kind, channel: newValue)
+            .onChange(of: draft.channel) { _, newValue in
+                if draft.autoAssign {
+                    draft.number = firstFreeNumber(for: draft.kind, channel: newValue)
                 }
             }
             .onChange(of: controlType) { _, newType in
-                if newType == .fader { kind = .cc }
+                if newType == .fader { draft.kind = .cc }
                 pendingIsFader = (newType == .fader)
                 // Re-validate space when control type changes
                 isOutOfRoom = !validateSpaceForAddMode()
             }
-            .onChange(of: faderOrientation) { _, newOrientation in
+            .onChange(of: draft.faderOrientation) { _, newOrientation in
                 // Auto-set appropriate direction when orientation changes
-                if newOrientation == "vertical" && (faderDirection == "left" || faderDirection == "right") {
-                    faderDirection = "up"
-                } else if newOrientation == "horizontal" && (faderDirection == "up" || faderDirection == "down") {
-                    faderDirection = "right"
+                if newOrientation == "vertical" && (draft.faderDirection == "left" || draft.faderDirection == "right") {
+                    draft.faderDirection = "up"
+                } else if newOrientation == "horizontal" && (draft.faderDirection == "up" || draft.faderDirection == "down") {
+                    draft.faderDirection = "right"
                 }
 
                 // FIX #8: Combine validation calls to reduce overhead
@@ -712,52 +793,73 @@ struct CBControlEditorSheet: View {
     }
 
     private func preset() {
-        debugPrint("📋 [CONTROL] preset() called, editing: \(editing != nil ? "exists" : "nil")")
-        guard let b = editing else {
-            // For new controls without editing state
+        debugPrint("📋 [CONTROL] preset() called, editing: \(editing != nil ? "exists" : "nil"), isEditMode: \(isEditMode)")
+        if let b = editing {
+            // v1.0.8: Check if draft has been modified from the original control
+            // If draft matches original, load from control (first open or after cancel)
+            // If draft differs from original, preserve draft (user made changes and tapped outside)
+            let draftMatchesOriginal = (
+                draft.title == b.title &&
+                draft.symbol == b.symbol &&
+                draft.kind == b.kind &&
+                draft.number == b.number &&
+                draft.channel == b.channel
+            )
+
+            if draftMatchesOriginal || draft.title.isEmpty {
+                // Draft is empty or matches original - safe to load from editing button
+                debugPrint("  📝 [CONTROL] Loading from editing button (isEditMode=\(isEditMode), draftMatchesOriginal=\(draftMatchesOriginal))")
+                draft.loadFrom(control: b)
+            } else {
+                // Draft has user modifications - preserve them
+                debugPrint("  💾 [CONTROL] Preserving modified draft content, NOT loading from editing button")
+            }
+
+            // Determine control type from button properties (for UI-only state)
+            if b.isFader == true {
+                controlType = .fader
+            } else {
+                controlType = .button
+                buttonType = (b.isSmall == true) ? .small : .regular
+            }
+
+            // v1.0.8: For ADD mode, always enable auto-assign (find free CC)
+            // For EDIT mode, disable auto-assign to preserve manual choices
+            if isEditMode {
+                draft.autoAssign = false
+            } else {
+                // ADD mode: enable auto-assign (but only if draft was just loaded from template)
+                if draftMatchesOriginal || draft.title.isEmpty {
+                    draft.autoAssign = true
+                    let nextChannel = isGlobalChannel ? globalChannel : draft.channel
+                    draft.channel = nextChannel
+                    draft.number = firstFreeNumber(for: draft.kind, channel: draft.channel)
+                    debugPrint("  ✅ [CONTROL] ADD mode - set autoAssign=true, channel=\(nextChannel), number=\(draft.number)")
+                } else {
+                    debugPrint("  ✅ [CONTROL] ADD mode - preserving draft autoAssign=\(draft.autoAssign)")
+                }
+            }
+        } else {
+            // v1.0.8: Clear draft for new control
             // Check if this is "Add Another" by seeing if number is already set to a valid value
-            if number > 0 {
+            if draft.number > 0 {
                 // "Add Another" already set the correct number - DON'T recalculate!
-                debugPrint("  🎯 [CONTROL] Number already set by 'Add Another': \(number), skipping recalculation")
+                debugPrint("  🎯 [CONTROL] Number already set by 'Add Another': \(draft.number), skipping recalculation")
                 // autoAssign is already set to true above
                 // All other values are already reset correctly
                 return
             }
 
             // This is a fresh "Add Control" (not "Add Another")
-            autoAssign = true
+            draft.clear()
+            draft.autoAssign = true
             // FIX: Use global channel if enabled, otherwise default to 1
             let nextChannel = isGlobalChannel ? globalChannel : 1
-            channel = nextChannel
-            debugPrint("  🆕 [CONTROL] No editing state, finding free number for \(kind) ch\(channel)")
-            number = firstFreeNumber(for: kind, channel: channel)
-            debugPrint("  ✅ [CONTROL] preset() set number to \(number)")
-            return
+            draft.channel = nextChannel
+            debugPrint("  🆕 [CONTROL] No editing state, finding free number for \(draft.kind) ch\(draft.channel)")
+            draft.number = firstFreeNumber(for: draft.kind, channel: draft.channel)
+            debugPrint("  ✅ [CONTROL] preset() set number to \(draft.number)")
         }
-
-        // Set fields from the editing button (whether it's a draft for adding or existing for editing)
-        title = b.title
-        symbol = b.symbol
-        kind = b.kind
-        number = b.number
-        channel = b.channel
-        velocity = b.velocity
-        isToggle = b.isToggle ?? false
-
-        // Determine control type from button properties
-        if b.isFader == true {
-            controlType = .fader
-            // Load fader orientation and direction with defaults
-            faderOrientation = b.faderOrientation ?? "vertical"
-            faderDirection = b.faderDirection ?? (faderOrientation == "vertical" ? "up" : "right")
-        } else {
-            controlType = .button
-            buttonType = (b.isSmall == true) ? .small : .regular
-        }
-
-        // For new buttons (add mode), enable auto-assign
-        // For existing buttons (edit mode), disable auto-assign to allow manual editing
-        autoAssign = !isEditMode
     }
 
     private func titleForSheet() -> String {
@@ -783,10 +885,10 @@ struct CBControlEditorSheet: View {
 
     private func conflictOwner() -> String? {
         // If we're editing an existing control and the MIDI assignment hasn't changed, no conflict
-        if let edit = editing, edit.kind == kind, edit.channel == channel, edit.number == number {
+        if let edit = editing, edit.kind == draft.kind, edit.channel == draft.channel, edit.number == draft.number {
             return nil
         }
-        let key = MIDIKey(kind: kind, channel: channel, number: number)
+        let key = MIDIKey(kind: draft.kind, channel: draft.channel, number: draft.number)
         return currentOwnerName(key)
     }
 
@@ -800,7 +902,7 @@ struct CBControlEditorSheet: View {
     }
 
     private func assignFreeNumber() {
-        number = firstFreeNumber(for: kind, channel: channel)
+        draft.number = firstFreeNumber(for: draft.kind, channel: draft.channel)
     }
 
     private func firstFreeNumber(for kind: MIDIKind, channel: Int) -> Int {
@@ -853,14 +955,14 @@ struct CBControlEditorSheet: View {
 
     private func saveControl(andAddAnother: Bool) {
         var b = editing ?? ControlButton(title: "", symbol: "square.grid.2x2.fill", kind: .cc, number: 0, channel: 1, velocity: 127, isToggle: nil)
-        b.title = title
-        b.symbol = symbol
-        b.kind = (controlType == .fader) ? .cc : kind
-        b.number = number
+        b.title = draft.title
+        b.symbol = draft.symbol
+        b.kind = (controlType == .fader) ? .cc : draft.kind
+        b.number = draft.number
         // Use global channel if enabled, otherwise use the selected channel
-        b.channel = isGlobalChannel ? globalChannel : channel
-        b.velocity = velocity
-        b.isToggle = isToggle
+        b.channel = isGlobalChannel ? globalChannel : draft.channel
+        b.velocity = draft.velocity
+        b.isToggle = draft.isToggle
         b.isFader = (controlType == .fader)
         // Set isSmall based on buttonType picker (not controlType)
         if controlType != .fader {
@@ -869,8 +971,8 @@ struct CBControlEditorSheet: View {
 
         // Save fader orientation and direction (only for faders)
         if controlType == .fader {
-            b.faderOrientation = faderOrientation
-            b.faderDirection = faderDirection
+            b.faderOrientation = draft.faderOrientation
+            b.faderDirection = draft.faderDirection
 
             // Check if we need to reposition due to orientation change
             if let originalButton = editing, originalButton.isFader == true {
@@ -929,38 +1031,43 @@ struct CBControlEditorSheet: View {
 
         if andAddAnother {
             debugPrint("➕ [CONTROL] Save & Add Another clicked")
-            // CRITICAL FIX: Reset state variables BEFORE setting editing = nil
-            // This prevents race condition where preset() uses old values when .onChange fires
+            // v1.0.8: Reset draft for next control
 
-            // Reset all form fields to defaults FIRST
-            title = ""
-            symbol = "square.grid.2x2.fill"
-            kind = .cc
-            velocity = 127
-            isToggle = false
-            autoAssign = true
-            // FIX: Preserve controlType to keep fader/button mode for "Add Another"
-            // Don't reset controlType - if adding fader, stay in fader mode
-            // controlType = .button  // ← REMOVED
-            // Only reset button-specific properties if it was a button
-            if controlType == .button {
-                buttonType = .regular
-            }
-            // Fader orientation and direction are preserved for next fader
-
-            // Calculate next channel and number with the reset values
-            debugPrint("  🔢 [CONTROL] Calculating next free number BEFORE setting editing=nil")
+            // Calculate next channel and number BEFORE resetting draft
+            debugPrint("  🔢 [CONTROL] Calculating next free number BEFORE resetting draft")
             let nextChannel = isGlobalChannel ? globalChannel : 1
-            channel = nextChannel
-            // FIX: After saving, find next free number starting from the one we just saved + 1
-            // The just-saved control is now in the array, so we need to search past it
             let savedNumber = b.number
-            let nextNumber = firstFreeNumberStartingFrom(savedNumber + 1, for: kind, channel: nextChannel)
-            number = nextNumber
-            debugPrint("  ✅ [CONTROL] Set channel to \(nextChannel), number to \(nextNumber)")
+            let savedKind = b.kind
+
+            // Clear draft to defaults
+            draft.clear()
+
+            // v1.0.8: Preserve MIDI kind (CC vs Note) for "Add Another"
+            // This ensures next control uses same MIDI type as the one just saved
+            draft.kind = savedKind
+
+            // Preserve fader state if we're adding faders
+            if controlType == .fader {
+                draft.isFader = true
+                // Fader orientation and direction are preserved from previous draft values
+                draft.faderOrientation = b.faderOrientation ?? "vertical"
+                draft.faderDirection = b.faderDirection ?? "up"
+            }
+            // Preserve button size if we're adding buttons
+            if controlType == .button {
+                draft.isSmall = (buttonType == .small)
+            }
+
+            // Set channel and find next free number
+            draft.channel = nextChannel
+            draft.autoAssign = true
+            // FIX: After saving, find next free number starting from the one we just saved + 1
+            // Uses savedKind to find next available CC or Note number
+            let nextNumber = firstFreeNumberStartingFrom(savedNumber + 1, for: savedKind, channel: nextChannel)
+            draft.number = nextNumber
+            debugPrint("  ✅ [CONTROL] Set kind=\(savedKind), channel=\(nextChannel), number=\(nextNumber)")
 
             // NOW set editing to nil (triggers .onChange which calls preset())
-            // preset() will now see the correct reset values above
             debugPrint("  🔄 [CONTROL] Setting editing=nil (will trigger .onChange)")
             editing = nil
 
@@ -1005,6 +1112,7 @@ struct CBEditControlSheet: View {
     // Fader orientation and direction
     @State private var faderOrientation: String = "vertical"
     @State private var faderDirection: String = "up"
+    @State private var userDismissedExplicitly: Bool = false  // v1.0.8: Track Save/Cancel clicks
 
     var body: some View {
         NavigationView {
@@ -1134,31 +1242,27 @@ struct CBEditControlSheet: View {
                 Text("Are you sure you want to delete this \(controlTypeName)? This action cannot be undone.")
             }
             .navigationBarItems(
-                leading: Button("Cancel", action: onCancel),
+                leading: Button("Cancel") {
+                    userDismissedExplicitly = true  // v1.0.8: Mark as explicit dismissal
+                    onCancel()
+                },
                 trailing: Button("Save") {
-                        if var b = editing {
-                            b.title = title
-                            b.symbol = symbol
-                            b.kind = isFaderUI ? .cc : kind
-                            b.number = number
-                            b.channel = channel
-                            b.velocity = velocity
-                            b.isToggle = isToggle
-                            b.isFader = isFaderUI
-                            if !isFaderUI { b.isSmall = editing?.isSmall ?? false } else { b.isSmall = false }
-
-                            // Save fader orientation and direction (only for faders)
-                            if isFaderUI {
-                                b.faderOrientation = faderOrientation
-                                b.faderDirection = faderDirection
-                            }
-
-                            onSave(b)
-                        }
-                    }
-                    .disabled(title.isEmpty || conflictOwner() != nil)
+                    userDismissedExplicitly = true  // v1.0.8: Mark as explicit dismissal
+                    saveEdit()
+                }
+                .disabled(title.isEmpty || conflictOwner() != nil)
             )
-            .onAppear { preset() }
+            .onAppear {
+                userDismissedExplicitly = false  // v1.0.8: Reset on appear
+                preset()
+            }
+            .onDisappear {
+                // v1.0.8: Auto-save if dismissed by tapping outside (not Cancel/Save)
+                if !userDismissedExplicitly && !title.isEmpty && conflictOwner() == nil {
+                    debugPrint("📝 [SHEET] Edit control dismissed by outside-tap - auto-saving")
+                    saveEdit()
+                }
+            }
             .onChange(of: autoAssign) { _, newValue in
                 if newValue {
                     number = firstFreeNumber(for: kind, channel: channel)
@@ -1184,7 +1288,30 @@ struct CBEditControlSheet: View {
             }
         }
     }
-    
+
+    // v1.0.8: Extract save logic to function for reuse in onDisappear
+    private func saveEdit() {
+        if var b = editing {
+            b.title = title
+            b.symbol = symbol
+            b.kind = isFaderUI ? .cc : kind
+            b.number = number
+            b.channel = channel
+            b.velocity = velocity
+            b.isToggle = isToggle
+            b.isFader = isFaderUI
+            if !isFaderUI { b.isSmall = editing?.isSmall ?? false } else { b.isSmall = false }
+
+            // Save fader orientation and direction (only for faders)
+            if isFaderUI {
+                b.faderOrientation = faderOrientation
+                b.faderDirection = faderDirection
+            }
+
+            onSave(b)
+        }
+    }
+
     private func preset() {
         guard let b = editing else { 
             // For new buttons, enable auto-assign by default
@@ -1482,9 +1609,18 @@ internal struct ContentView: View {
     @State private var setlistQuery: String = ""
     @State private var setlistQueryDebounced: String = ""
 
-    // Splash Screen
+    // Splash Screen - v1.0.8: Use AppStorage to persist across view recreations
+    @AppStorage("hasCompletedInitialLaunch") private var hasCompletedInitialLaunch = false
     @State private var showSplash = true
     @State private var hasInitialized = false
+
+    // v1.0.8: Draft managers to preserve edits across sheet dismissals
+    @StateObject private var cueEditorDraft = CueEditorDraft()
+    @StateObject private var controlEditorDraft = ControlEditorDraft()
+
+    // Tutorial
+    @StateObject private var tutorialCoordinator = TutorialCoordinator()
+
     // Projects
     @State private var showProjects = false
     @State private var showOnboarding = false
@@ -1579,20 +1715,8 @@ internal struct ContentView: View {
             if isEditing {
             return AnyView(
                 HStack(spacing: 0) {
-                    CBSetlistColumn(
-                        songs: filteredSetlistSongs(),
-                        searchText: $setlistQuery,
-                        onRename: { s in editingSong = s; showAddEdit = true },
-                        onRemove: { s in removeFromSetlist(s) },
-                        onMove: { inds, newOffset in
-                            pushSetlistUndo()
-                            store.setlist.songs.move(fromOffsets: inds, toOffset: newOffset)
-                        }
-                    )
-                    .padding(.top, 8)
-
-                    Divider()
-
+                    // v1.0.8: Swapped order - library on left, cue list on right
+                    // Logical flow: Song Library → Cue List
                     CBLibraryColumn(
                         rows: filteredLibraryRows(),
                         isEditing: $isEditing,
@@ -1604,6 +1728,20 @@ internal struct ContentView: View {
                         onAddToSetlist: { s in addToSetlist(s) },
                         onDeleteFromLibrary: { s in deleteFromLibrary(s) },
                         onRename: { s in editingSong = s; showAddEdit = true }
+                    )
+                    .padding(.top, 8)
+
+                    Divider()
+
+                    CBSetlistColumn(
+                        songs: filteredSetlistSongs(),
+                        searchText: $setlistQuery,
+                        onRename: { s in editingSong = s; showAddEdit = true },
+                        onRemove: { s in removeFromSetlist(s) },
+                        onMove: { inds, newOffset in
+                            pushSetlistUndo()
+                            store.setlist.songs.move(fromOffsets: inds, toOffset: newOffset)
+                        }
                     )
                     .padding(.top, 8)
                 }
@@ -2007,7 +2145,11 @@ internal struct ContentView: View {
                         showAddEdit = false
                     }
                 },
-                onCancel: { showAddEdit = false },
+                onCancel: {
+                    // v1.0.8: Don't clear draft - it persists across dismissals
+                    // Only close sheet
+                    showAddEdit = false
+                },
                 onDelete: { song in
                     deleteFromLibrary(song)
                     showAddEdit = false
@@ -2042,7 +2184,7 @@ internal struct ContentView: View {
                 editing: $editingControl,
                 conflictFor: conflictLookup(),
                 currentOwnerName: { key in ownerName(for: key) },
-                    pendingIsFader: $pendingAddIsFader,
+                pendingIsFader: $pendingAddIsFader,
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
                 onSave: { updated, andAddAnother in
@@ -2114,7 +2256,8 @@ internal struct ContentView: View {
                 allButtons: controlButtons,
                 columns: 8,
                 icons: icons,
-                isEditMode: false
+                isEditMode: false,
+                draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
         }
         .sheet(isPresented: $showEditControlSheet) {
@@ -2150,7 +2293,8 @@ internal struct ContentView: View {
                 allButtons: controlButtons,
                 columns: 8,
                 icons: icons,
-                isEditMode: true
+                isEditMode: true,
+                draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
         }
         .sheet(isPresented: $showProjects) {
@@ -2202,6 +2346,17 @@ internal struct ContentView: View {
                 .presentationBackground(Color(.systemBackground))
                 .presentationCornerRadius(20)
                 .interactiveDismissDisabled(false)
+                .onDisappear {
+                    // Start tutorial after onboarding if user hasn't completed it
+                    if TutorialCoordinator.shouldShowTutorial() {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            tutorialCoordinator.start()
+                        }
+                    }
+                }
+        }
+        .overlay {
+            TutorialOverlay(coordinator: tutorialCoordinator)
         }
     }
 
@@ -2273,6 +2428,29 @@ internal struct ContentView: View {
             cachedConflictLookup = computeConflictLookup()
         }
         .task {
+            // v1.0.8 FIX: Skip splash screen if app has launched before
+            // Only show splash on very first launch, not when returning from background
+            if hasCompletedInitialLaunch {
+                debugPrint("🚀 App returning from background - skipping splash screen")
+                showSplash = false
+
+                // Still rebuild conflict cache for UI consistency
+                cachedConflictLookup = computeConflictLookup()
+                debugPrint("🔄 Conflict cache rebuilt with \(cachedConflictLookup.count) entries")
+
+                // Reload projects list in case files changed
+                projectsList = ProjectIO.list()
+
+                // CRITICAL FIX: If view was recreated by iOS, data might be empty
+                // Reload the current project if library is empty but project has a name
+                if songLibrary.isEmpty && projectName != "Untitled" && !projectName.isEmpty {
+                    debugPrint("⚠️ Library is empty but project is '\(projectName)' - reloading from disk")
+                    autoOpenLastProject()
+                }
+
+                return
+            }
+
             debugPrint("🚀 App initialization starting...")
 
             // FIX: Build initial conflict cache BEFORE any data loads to prevent false "Taken by:" flashes
@@ -2304,7 +2482,7 @@ internal struct ContentView: View {
             // Connections are now managed by ConnectionCoordinator
             debugPrint("🔌 Connections managed by ConnectionCoordinator")
 
-            // Show splash screen for 2.5 seconds
+            // Show splash screen for 2.5 seconds (only on first launch)
             try? await Task.sleep(nanoseconds: 2_500_000_000)
             withAnimation(.easeInOut(duration: 0.6)) {
                 debugPrint("🎬 Hiding splash screen")
@@ -2318,6 +2496,9 @@ internal struct ContentView: View {
             }
 
             debugPrint("✅ App initialization complete")
+
+            // Mark that initial launch is complete
+            hasCompletedInitialLaunch = true
         }
         .onDisappear {
             // FIX #1: Clean up notification subscriptions to prevent memory leaks
@@ -2866,9 +3047,39 @@ internal struct ContentView: View {
             for s in songLibrary where libAddedAt[s.id] == nil { libAddedAt[s.id] = now }
             isDirty = false
             debugPrint("✅ Project loaded successfully: \(named)")
+
+            // v1.0.8: Auto-recover empty library from setlist
+            recoverEmptyLibrary()
         } catch {
             debugPrint("❌ Load failed for project \(named): \(error)")
         }
+    }
+
+    /// v1.0.8: Auto-recovery for corrupted projects where library is empty but setlist has songs
+    /// This copies all songs from setlist to library and marks project as dirty for save
+    private func recoverEmptyLibrary() {
+        // Only recover if library is empty AND setlist has songs
+        guard songLibrary.isEmpty && !store.setlist.songs.isEmpty else {
+            return
+        }
+
+        debugPrint("🔧 RECOVERY: Detected empty library with \(store.setlist.songs.count) songs in setlist")
+        debugPrint("🔧 RECOVERY: Auto-populating library from setlist...")
+
+        // Copy all songs from setlist to library
+        songLibrary = store.setlist.songs
+
+        // Set timestamps for all recovered songs
+        let now = Date()
+        for song in songLibrary {
+            libAddedAt[song.id] = now
+        }
+
+        // Mark project as dirty so it gets saved
+        isDirty = true
+
+        debugPrint("✅ RECOVERY: Added \(songLibrary.count) songs to library")
+        debugPrint("✅ RECOVERY: Project marked as dirty - save to keep changes")
     }
 
     /// Migrates controls that are positioned beyond the 4-row limit (rows 0-3) or 8-column limit (cols 0-7)
@@ -3146,10 +3357,15 @@ internal struct ContentView: View {
         libAddedAt.removeAll()
         isDirty = false
         // No seeding for shipping - start blank
+
+        // v1.0.8: Dismiss project sheet after creating new project
+        showProjects = false
     }
     
     private func checkUnsavedChangesBeforeAction(_ action: @escaping () -> Void) {
-        if isDirty {
+        // v1.0.8: Only show save prompt for projects that have been saved before (not "Untitled")
+        // Matches autosave behavior pattern used throughout the app
+        if isDirty && projectName != "Untitled" {
             showSaveChangesAlert = true
             pendingAction = action
         } else {
@@ -5878,7 +6094,17 @@ private struct iPadControlTile: View {
     var body: some View {
         ZStack {
             if button.isFader == true {
-                FaderTileContent()
+                if isEditing {
+                    // v1.0.8: In edit mode, wrap with tap gesture to open edit sheet
+                    ZStack {
+                        FaderTileContent()
+                            .contentShape(Rectangle())
+                    }
+                    .onTapGesture { onEdit() }
+                } else {
+                    // In play mode, render normally with drag gestures
+                    FaderTileContent()
+                }
             } else {
                 if isEditing {
                     // In edit mode, render as plain content to prioritize drag
