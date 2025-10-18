@@ -79,12 +79,38 @@ class USBMuxdMonitor {
                 strongSelf.context = ctx
                 strongSelf.isMonitoring = true
                 Logger.shared.log("✅ USBMuxdMonitor: Started monitoring iOS devices")
+
+                // Check for already-connected devices and trigger attach event
+                strongSelf.checkForAlreadyConnectedDevices()
             } else {
                 Logger.shared.log("❌ USBMuxdMonitor: Failed to subscribe to events (error: \(result))")
             }
         }
 
         queue.async(execute: workItem)
+    }
+
+    private func checkForAlreadyConnectedDevices() {
+        var deviceList: UnsafeMutablePointer<usbmuxd_device_info_t>?
+        var deviceCount: Int32 = 0
+
+        let result = usbmuxd_get_device_list(&deviceList, &deviceCount)
+
+        if result >= 0 && deviceCount > 0 {
+            Logger.shared.log("📱 USBMuxdMonitor: Found \(deviceCount) already-connected iOS device(s) on startup")
+
+            // Trigger onDeviceAttached for each already-connected device
+            DispatchQueue.main.async { [weak self] in
+                self?.onDeviceAttached?()
+            }
+
+            // Free the device list
+            usbmuxd_device_list_free(deviceList)
+        } else if result < 0 {
+            Logger.shared.log("⚠️ USBMuxdMonitor: Failed to get device list (error: \(result))")
+        } else {
+            Logger.shared.log("📱 USBMuxdMonitor: No iOS devices connected on startup")
+        }
     }
 
     func stop() {
