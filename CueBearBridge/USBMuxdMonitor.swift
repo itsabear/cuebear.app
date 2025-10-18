@@ -92,11 +92,10 @@ class USBMuxdMonitor {
 
     private func checkForAlreadyConnectedDevices() {
         var deviceList: UnsafeMutablePointer<usbmuxd_device_info_t>?
-        var deviceCount: Int32 = 0
 
-        let result = usbmuxd_get_device_list(&deviceList, &deviceCount)
+        let deviceCount = usbmuxd_get_device_list(&deviceList)
 
-        if result >= 0 && deviceCount > 0 {
+        if deviceCount > 0 {
             Logger.shared.log("📱 USBMuxdMonitor: Found \(deviceCount) already-connected iOS device(s) on startup")
 
             // Trigger onDeviceAttached for each already-connected device
@@ -105,9 +104,9 @@ class USBMuxdMonitor {
             }
 
             // Free the device list
-            usbmuxd_device_list_free(deviceList)
-        } else if result < 0 {
-            Logger.shared.log("⚠️ USBMuxdMonitor: Failed to get device list (error: \(result))")
+            usbmuxd_device_list_free(&deviceList)
+        } else if deviceCount < 0 {
+            Logger.shared.log("⚠️ USBMuxdMonitor: Failed to get device list (error: \(deviceCount))")
         } else {
             Logger.shared.log("📱 USBMuxdMonitor: No iOS devices connected on startup")
         }
