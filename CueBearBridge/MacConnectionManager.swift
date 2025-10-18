@@ -721,5 +721,5 @@ final class MacConnectionManager: ObservableObject {
             }
         })
     }
-    
+
 }

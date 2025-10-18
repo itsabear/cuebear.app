@@ -203,10 +203,23 @@ final class IProxyManager: ObservableObject {
         monitor.onDeviceAttached = { [weak self] in
             Logger.shared.log("🔧 IProxyManager: 🎯 iOS device attached! Starting automatic connection...")
 
+            // CRITICAL FIX: Only start iproxy if it's not already running
+            // This prevents killing a working iproxy process when multiple attach events fire
+            guard let self = self, !self.isRunning else {
+                Logger.shared.log("🔧 IProxyManager: iproxy already running - skipping auto-start")
+                return
+            }
+
             // Automatically start iproxy when iOS device is detected
             DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                // Double-check isRunning after the delay
+                guard let self = self, !self.isRunning else {
+                    Logger.shared.log("🔧 IProxyManager: iproxy already running after delay - skipping auto-start")
+                    return
+                }
+
                 do {
-                    try self?.start()
+                    try self.start()
                 } catch {
                     Logger.shared.log("🔧 IProxyManager: ❌ Failed to auto-start iproxy: \(error)")
                 }

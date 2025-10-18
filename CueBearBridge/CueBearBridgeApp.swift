@@ -944,6 +944,9 @@ final class BridgeApp: ObservableObject {
             self.wifiServer.setUSBConnectionManager(self.conn)
             self.wifiServer.setPort(8078)
             self.wifiServer.start()
+
+            // Always advertise WiFi via Bonjour - let the iPad choose which connection to use
+            print("🔗 BridgeApp: WiFi server started, publishing Bonjour service...")
             self.bonjour.publish(port: 8078)
         }
 
