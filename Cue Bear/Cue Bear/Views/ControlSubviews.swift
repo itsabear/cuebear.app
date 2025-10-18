@@ -644,7 +644,7 @@ struct CBConnectionsSheet: View {
                     KeyValueRow("Status", connectionCoordinator.activeConnection == .usb ? "Connected" : "Waiting")
                     if connectionCoordinator.activeConnection == .usb {
                         Button("Disconnect USB", role: .destructive) {
-                            usbServer.stop()
+                            connectionCoordinator.disconnectUSB()
                         }
                     }
 

@@ -15,6 +15,7 @@ class ConnectionCoordinator: ObservableObject {
     // Flags to track user intent for connections
     private var isManualWiFiConnection = false
     private var isManualUSBConnection = false
+    private var isManualUSBDisconnection = false  // Track when user explicitly disconnects USB
 
     // Timer references to prevent memory leaks
     private var usbMonitorTimer: Timer?
@@ -96,8 +97,9 @@ class ConnectionCoordinator: ObservableObject {
             connectionStatus = "USB Connected"
             debugPrint("🔌 ConnectionCoordinator: Updated activeConnection to .usb")
 
-            // Reset manual USB flag since connection is now established
+            // Reset manual flags since connection is now established
             isManualUSBConnection = false
+            isManualUSBDisconnection = false  // Clear disconnect flag when reconnected
         } else {
             // USB disconnected - don't auto-connect to WiFi (user choice only)
             debugPrint("🔌 USB disconnected - WiFi available for manual connection")
@@ -121,13 +123,19 @@ class ConnectionCoordinator: ObservableObject {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
                 guard let self = self, let usbServer = self.usbServer else { return }
-                
+
+                // Check if user manually disconnected USB - if so, don't auto-reconnect
+                if self.isManualUSBDisconnection {
+                    debugPrint("🔌 User manually disconnected USB - NOT auto-reconnecting (staying disconnected)")
+                    return
+                }
+
                 // Check if this is a manual WiFi connection attempt
                 if self.isManualWiFiConnection {
                     debugPrint("🔌 USB disconnected during manual WiFi connection - keeping USB server stopped to prevent loop")
                     return
                 }
-                
+
                 // Only restart USB server if WiFi is not connected
                 // This prevents the loop where WiFi connects -> USB restarts -> Bridge connects to USB
                 if !usbServer.isServerListening && !wifiClient.isConnected {
@@ -282,12 +290,31 @@ class ConnectionCoordinator: ObservableObject {
         wifiClient?.disconnect()
     }
 
+    func disconnectUSB() {
+        debugPrint("🔌 Manual USB disconnection requested")
+
+        // Set flag to indicate this is a manual disconnection
+        // This prevents automatic reconnection
+        isManualUSBDisconnection = true
+
+        // Stop the USB server
+        usbServer?.stop()
+
+        // Update status
+        activeConnection = .none
+        connectionStatus = "Disconnected"
+
+        debugPrint("🔌 USB manually disconnected - will NOT auto-reconnect until user chooses")
+    }
+
     // STORY 8: Manual USB connection (disconnect WiFi first, then connect USB)
     func connectToUSB() {
         debugPrint("🔌 Manual USB connection requested")
 
         // Set flag to indicate this is a manual USB connection
         isManualUSBConnection = true
+        // Clear manual disconnection flag - user wants to connect
+        isManualUSBDisconnection = false
 
         // Disconnect WiFi if it's connected to allow USB connection
         if let wifiClient = wifiClient, wifiClient.isConnected {
@@ -378,7 +405,10 @@ class ConnectionCoordinator: ObservableObject {
     func forceUSBReconnection() {
         debugPrint("🔌 Force USB reconnection requested")
         guard let usbServer = usbServer else { return }
-        
+
+        // Clear manual disconnection flag - user wants to reconnect
+        isManualUSBDisconnection = false
+
         // Force restart USB server regardless of WiFi state
         usbServer.stop()
         Task { @MainActor in
