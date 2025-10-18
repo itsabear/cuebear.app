@@ -91,10 +91,7 @@ final class MacConnectionManager: ObservableObject {
         
         guard let port = iproxyManager.boundLocalPort, iproxyManager.isRunning else {
             Logger.shared.log("🔗 MacConnectionManager: iproxy not ready - port: \(iproxyManager.boundLocalPort?.description ?? "nil"), running: \(iproxyManager.isRunning)")
-            // Fix Issue #10: Ensure @Published updates on main queue
-            DispatchQueue.main.async { [weak self] in
-                self?.connectionStatus = "USB: Waiting for iproxy…"
-            }
+            // Keep status as "Looking for iPad" - no need to update (avoid blinking)
             DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in self?.waitAndConnect() }
             return
         }
@@ -314,8 +311,8 @@ final class MacConnectionManager: ObservableObject {
                 Logger.shared.log("🔗 MacConnectionManager: receive error: \(error)")
                 self.cancelHandshakeTimeout()
                 self.isReceiving = false
-                DispatchQueue.main.async { [weak self] in 
-                    self?.connectionStatus = "USB: Disconnected"
+                DispatchQueue.main.async { [weak self] in
+                    self?.connectionStatus = "USB: Looking for iPad"
                     self?.connection = nil  // Clear the connection object
                 }
                 self.startReconnectTimer()
@@ -326,8 +323,8 @@ final class MacConnectionManager: ObservableObject {
                 Logger.shared.log("🔗 MacConnectionManager: connection closed by peer")
                 self.cancelHandshakeTimeout()
                 self.isReceiving = false
-                DispatchQueue.main.async { [weak self] in 
-                    self?.connectionStatus = "USB: Disconnected"
+                DispatchQueue.main.async { [weak self] in
+                    self?.connectionStatus = "USB: Looking for iPad"
                     self?.connection = nil  // Clear the connection object
                 }
                 self.startReconnectTimer()

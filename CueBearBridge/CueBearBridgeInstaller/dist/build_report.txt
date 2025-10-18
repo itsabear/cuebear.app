@@ -2,7 +2,7 @@
 CueBear Bridge Installer Build Report
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Build Date: Sat Oct 18 23:07:10 CEST 2025
+Build Date: Sat Oct 18 23:25:38 CEST 2025
 Builder: omribehr
 Machine: 172-11-1-169.lightspeed.jcvlfl.sbcglobal.net
 
@@ -37,7 +37,7 @@ Bundled Components:
 Package Signature:
 Package "CueBearBridge-Installer.pkg":
    Status: signed by a developer certificate issued by Apple for distribution
-   Signed with a trusted timestamp on: 2025-10-18 21:07:10 +0000
+   Signed with a trusted timestamp on: 2025-10-18 21:25:38 +0000
    Certificate Chain:
     1. Developer ID Installer: Omri Behr (2U78NYVLQN)
        Expires: 2030-10-05 17:25:43 +0000
