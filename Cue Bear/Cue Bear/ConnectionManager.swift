@@ -681,13 +681,9 @@ class ConnectionManager: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 self?.connectionHealth = .connecting // Listener is ready, waiting for client
 
-                // Heuristic: If listener starts successfully on localhost, assume USB cable is connected
-                // This handles the case where cable is already connected at app launch
-                if let self = self, !self.isUSBCableConnected {
-                    self.isUSBCableConnected = true
-                    debugPrint("🔗 ConnectionManager: 🎯 USB listener ready - assuming cable is connected")
-                    self.checkUSBBridgeAvailability()
-                }
+                // Don't assume cable is connected just because listener is ready
+                // Only Darwin notifications (host_attached/host_detached) should control isUSBCableConnected
+                debugPrint("🔗 ConnectionManager: USB listener ready - waiting for Darwin notification to confirm cable")
             }
         case .failed(let error):
             logMain("❌ USB Listener failed: \(error)")

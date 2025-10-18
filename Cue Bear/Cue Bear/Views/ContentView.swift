@@ -1618,8 +1618,8 @@ internal struct ContentView: View {
     @StateObject private var cueEditorDraft = CueEditorDraft()
     @StateObject private var controlEditorDraft = ControlEditorDraft()
 
-    // Tutorial
-    @StateObject private var tutorialCoordinator = TutorialCoordinator()
+    // Tutorial - TODO: Integrate when ready
+    // @StateObject private var tutorialCoordinator = TutorialCoordinator()
 
     // Projects
     @State private var showProjects = false
@@ -2346,18 +2346,20 @@ internal struct ContentView: View {
                 .presentationBackground(Color(.systemBackground))
                 .presentationCornerRadius(20)
                 .interactiveDismissDisabled(false)
-                .onDisappear {
-                    // Start tutorial after onboarding if user hasn't completed it
-                    if TutorialCoordinator.shouldShowTutorial() {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            tutorialCoordinator.start()
-                        }
-                    }
-                }
+                // TODO: Integrate tutorial when ready
+                // .onDisappear {
+                //     // Start tutorial after onboarding if user hasn't completed it
+                //     if TutorialCoordinator.shouldShowTutorial() {
+                //         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                //             tutorialCoordinator.start()
+                //         }
+                //     }
+                // }
         }
-        .overlay {
-            TutorialOverlay(coordinator: tutorialCoordinator)
-        }
+        // TODO: Integrate tutorial overlay when ready
+        // .overlay {
+        //     TutorialOverlay(coordinator: tutorialCoordinator)
+        // }
     }
 
     @ViewBuilder
@@ -2448,6 +2450,13 @@ internal struct ContentView: View {
                     autoOpenLastProject()
                 }
 
+                // NEW: Check onboarding even for returning users (for testing/debugging)
+                if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+                    debugPrint("📖 Onboarding not seen yet - showing after short delay")
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    showOnboarding = true
+                }
+
                 return
             }
 
@@ -2491,6 +2500,7 @@ internal struct ContentView: View {
 
             // Show onboarding after splash screen if user hasn't seen it
             if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+                debugPrint("📖 First launch - showing onboarding after splash")
                 try? await Task.sleep(nanoseconds: 500_000_000) // Wait 0.5s after splash
                 showOnboarding = true
             }
@@ -3221,10 +3231,28 @@ internal struct ContentView: View {
     private func autoOpenLastProject() {
         debugPrint("🔍 Auto-open check - projectName: '\(projectName)'")
         debugPrint("🔍 UserDefaults lastProjectName: '\(UserDefaults.standard.string(forKey: "lastProjectName") ?? "nil")'")
-        guard projectName != "Untitled" && !projectName.isEmpty else { 
+        debugPrint("🔍 hasCompletedInitialLaunch: \(hasCompletedInitialLaunch)")
+
+        // On first launch, always try to load the Beethoven Live demo project
+        if !hasCompletedInitialLaunch {
+            let demoName = "Beethoven Live"
+            debugPrint("🎵 First launch detected - attempting to load demo project: \(demoName)")
+
+            // Check if demo project exists
+            if ProjectIO.list().contains(demoName) {
+                loadProject(named: demoName)
+                return
+            } else {
+                debugPrint("⚠️ Demo project '\(demoName)' not found in saved projects")
+                debugPrint("⚠️ Available projects: \(ProjectIO.list())")
+                // Continue to normal flow - user will see empty project
+            }
+        }
+
+        // For subsequent launches, load the last opened project
+        guard projectName != "Untitled" && !projectName.isEmpty else {
             debugPrint("⏭️ Skipping auto-open - projectName is 'Untitled' or empty")
-            debugPrint("💡 To enable auto-open, save a project with a name (not 'Untitled')")
-            return 
+            return
         }
         
         // Check if the project file exists
@@ -3245,9 +3273,10 @@ internal struct ContentView: View {
             }
             isDirty = false
             
-            debugPrint("✅ Auto-opened project: \(projectName) - setlist: \(store.setlist.songs.count) songs, library: \(songLibrary.count) songs, controls: \(controlButtons.count) buttons")
+            debugPrint("✅ Successfully auto-opened: \(projectName)")
         } catch {
-            debugPrint("❌ Failed to auto-open project \(projectName): \(error)")
+            debugPrint("❌ Failed to auto-open '\(projectName)': \(error)")
+            debugPrint("💡 Project may have been deleted or corrupted")
             // Reset to untitled if project doesn't exist
             projectName = "Untitled"
         }
