@@ -33,3 +33,6 @@ QUICK_TEST_SCRIPT.md
 
 # App Store metadata (optional - uncomment if you want to keep private)
 # APP_STORE_METADATA.md
+# Ignore large installer files
+CueBearBridge/CueBearBridgeInstaller/dist/*.dmg
+CueBearBridge/CueBearBridgeInstaller/dist/*.pkg
