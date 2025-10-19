@@ -436,12 +436,6 @@ final class BridgeOutput: ObservableObject {
             switch state {
             case .ready:
                 debugPrint("BridgeOutput: Connected successfully to \(item.name)")
-                DispatchQueue.main.async {
-                    self.isConnected = true
-                    self.isConnecting = false
-                    self.current = item
-                    self.connectionQuality = .excellent
-                }
 
                 // Clear suspended flag when establishing new connection
                 self.isSuspended = false
@@ -451,15 +445,24 @@ final class BridgeOutput: ObservableObject {
                 // Stop reconnection timer when connected
                 self.stopReconnectionTimer()
 
-                // Start connection health monitoring
-                self.startConnectionHealthMonitoring()
-
                 // Reset last successful message timestamp
                 self.lastSuccessfulMessage = Date()
 
                 // Automatic pairing for security
                 if self.pairToken.isEmpty {
                     self.initiatePairing()
+                }
+
+                // CRITICAL: Set isConnected FIRST, then start health monitoring
+                // Must be done together on main queue to avoid race condition
+                DispatchQueue.main.async {
+                    self.isConnected = true
+                    self.isConnecting = false
+                    self.current = item
+                    self.connectionQuality = .excellent
+
+                    // Start health monitoring AFTER isConnected is set
+                    self.startConnectionHealthMonitoring()
                 }
             case .failed(let error):
                 debugPrint("BridgeOutput: Connection failed to \(item.name): \(error)")
