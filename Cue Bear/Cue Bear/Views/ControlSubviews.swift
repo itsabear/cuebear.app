@@ -186,11 +186,6 @@ struct CBSetlistDragPreview: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Show hamburger menu icon during drag
-            Image(systemName: "line.3.horizontal")
-                .foregroundColor(.secondary)
-                .font(.title3)
-
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.name).font(.body.bold()).foregroundColor(.primary)
                 if let sub = song.subtitle, !sub.isEmpty {
@@ -198,6 +193,10 @@ struct CBSetlistDragPreview: View {
                 }
             }
             Spacer()
+            // Show hamburger menu icon during drag on the RIGHT side
+            Image(systemName: "line.3.horizontal")
+                .foregroundColor(.secondary)
+                .font(.title3)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 14)
@@ -276,7 +275,7 @@ struct CBSetlistColumn: View {
                         // Custom preview without white border
                         CBSetlistDragPreview(song: s)
                     }
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
                             onRemove(s)
@@ -393,6 +392,9 @@ struct CBLibraryColumn: View {
                         onTap: batchMode ? nil : { onRename(row.song) }
                     )
                     .opacity(row.isInSetlist ? 0.55 : 1.0)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+                    .listRowSeparator(.hidden)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             onDeleteFromLibrary(row.song)
