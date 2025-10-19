@@ -154,19 +154,10 @@ struct CBPerformanceRow: View {
 // MARK: - Setlist Row (custom row for handling drag appearance)
 struct CBSetlistRow: View {
     let song: Song
-    var onRemove: () -> Void
+    var onTap: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            Button {
-                onRemove()
-            } label: {
-                Image(systemName: "minus.circle.fill")
-                    .foregroundColor(.red)
-                    .font(.title3)
-            }
-            .buttonStyle(.plain)
-
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.name).font(.body.bold()).foregroundColor(.primary)
                 if let sub = song.subtitle, !sub.isEmpty {
@@ -183,6 +174,9 @@ struct CBSetlistRow: View {
                 .fill(Color(.systemBackground))
         )
         .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 
@@ -226,10 +220,14 @@ struct CBSetlistColumn: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Cue List")
-                .font(.headline)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+            HStack(spacing: 12) {
+                Text("Cue List")
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                Spacer()
+            }
+            .frame(height: 44) // Match library column header height
 
             // Search TextField
             HStack(spacing: 8) {
@@ -264,9 +262,8 @@ struct CBSetlistColumn: View {
                 ForEach(songs) { s in
                     CBSetlistRow(
                         song: s,
-                        onRemove: {
-                            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                            onRemove(s)
+                        onTap: {
+                            onRename(s)
                         }
                     )
                     .listRowBackground(Color.clear)
@@ -279,11 +276,7 @@ struct CBSetlistColumn: View {
                         // Custom preview without white border
                         CBSetlistDragPreview(song: s)
                     }
-                    .contextMenu {
-                        Button("Edit Cue") { onRename(s) }
-                        Button("Remove from Cue List") { onRemove(s) }
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
                             onRemove(s)
@@ -348,6 +341,7 @@ struct CBLibraryColumn: View {
                 .buttonStyle(WhiteCapsuleButtonStyle())
                 .padding(.trailing, 16)
             }
+            .frame(height: 44) // Match cue list column header height
 
             // Search TextField
             HStack(spacing: 8) {
@@ -392,33 +386,30 @@ struct CBLibraryColumn: View {
                                 }
                                 .buttonStyle(.plain)
                             } else {
-                                Button {
-                                    if !row.isInSetlist {
-                                        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                        onAddToSetlist(row.song)
-                                    }
-                                } label: {
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundColor(row.isInSetlist ? .gray : .accentColor)
-                                        .font(.title3)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(row.isInSetlist)
+                                EmptyView()
                             }
                         },
-                        trailing: { EmptyView() }
+                        trailing: { EmptyView() },
+                        onTap: batchMode ? nil : { onRename(row.song) }
                     )
                     .opacity(row.isInSetlist ? 0.55 : 1.0)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if isEditing && !row.isInSetlist {
-                            Button(role: .destructive) {
-                                onDeleteFromLibrary(row.song)
-                            } label: { Label("Delete", systemImage: "trash") }
+                        Button(role: .destructive) {
+                            onDeleteFromLibrary(row.song)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
                         }
                     }
-                    .contextMenu {
-                        Button("Edit Cue") { onRename(row.song) }
-                        Button(role: .destructive) { onDeleteFromLibrary(row.song) } label: { Text("Delete") }
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        if !row.isInSetlist {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                onAddToSetlist(row.song)
+                            } label: {
+                                Label("Add", systemImage: "plus.circle")
+                            }
+                            .tint(.accentColor)
+                        }
                     }
                 }
             }
@@ -434,14 +425,17 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
     let subtitle: String?
     var leading: () -> Leading
     var trailing: () -> Trailing
+    var onTap: (() -> Void)?
 
     init(title: String, subtitle: String?,
          @ViewBuilder leading: @escaping () -> Leading = { EmptyView() },
-         @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }) {
+         @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() },
+         onTap: (() -> Void)? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.leading = leading
         self.trailing = trailing
+        self.onTap = onTap
     }
 
     var body: some View {
@@ -458,6 +452,9 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 6)
+        .onTapGesture {
+            onTap?()
+        }
     }
 }
 
