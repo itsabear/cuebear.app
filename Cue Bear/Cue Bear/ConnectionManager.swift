@@ -144,7 +144,7 @@ class ConnectionManager: ObservableObject {
             debugPrint("🔗 ConnectionManager: No connection - cannot send MIDI")
             return
         }
-        
+
         let payload: [String: Any]
         switch type {
         case .cc:
@@ -166,8 +166,49 @@ class ConnectionManager: ObservableObject {
                 "button_id": buttonID
             ]
         }
-        
+
         sendJSON(payload)
+    }
+
+    func sendSwitchToWiFiRequest(completion: @escaping () -> Void) {
+        guard isConnected && activeUSB != nil else {
+            debugPrint("🔗 ConnectionManager: No USB connection - cannot send switch request")
+            completion()
+            return
+        }
+
+        debugPrint("🔗 ConnectionManager: 🔄 Sending switch_to_wifi request to Bridge")
+
+        let payload: [String: Any] = [
+            "type": "switch_to_wifi"
+        ]
+
+        // Send the message immediately (not batched) and wait for it to be sent
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let message = String(data: data, encoding: .utf8) else {
+            debugPrint("🔗 ConnectionManager: Failed to create switch_to_wifi JSON")
+            completion()
+            return
+        }
+
+        // Send immediately as a single message with newline
+        let finalMessage = message + "\n"
+        guard let finalData = finalMessage.data(using: .utf8) else {
+            completion()
+            return
+        }
+
+        activeUSB?.send(content: finalData, completion: .contentProcessed { error in
+            if let error = error {
+                debugPrint("🔗 ConnectionManager: ❌ Failed to send switch_to_wifi: \(error)")
+            } else {
+                debugPrint("🔗 ConnectionManager: ✅ switch_to_wifi request sent successfully")
+            }
+            // Wait a moment for Bridge to process and close USB connection
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                completion()
+            }
+        })
     }
     
     private func sendJSON(_ obj: [String: Any]) {

@@ -385,9 +385,29 @@ final class MacConnectionManager: ObservableObject {
             // Handle individual MIDI messages
             handleMIDIMessage(sanitizedObj)
 
+        case "switch_to_wifi":
+            // iPad is requesting to switch from USB to WiFi
+            // Close USB connection cleanly so iPad can connect via WiFi
+            Logger.shared.log("🔗 MacConnectionManager: iPad requesting switch to WiFi - closing USB connection")
+            handleSwitchToWiFi()
+
         default:
             print("🔗 MacConnectionManager: Unhandled type: \(type)")
         }
+    }
+
+    private func handleSwitchToWiFi() {
+        Logger.shared.log("🔗 MacConnectionManager: 🔄 iPad switching to WiFi - closing USB connection cleanly")
+
+        // Close the USB connection immediately so iPad can connect via WiFi
+        disconnect()
+
+        // Update status to show we're ready for WiFi connection
+        DispatchQueue.main.async { [weak self] in
+            self?.connectionStatus = "Ready for WiFi"
+        }
+
+        Logger.shared.log("🔗 MacConnectionManager: ✅ USB closed - ready for WiFi connection from iPad")
     }
 
     private func startReconnectTimer() {
