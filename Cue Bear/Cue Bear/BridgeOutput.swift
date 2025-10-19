@@ -368,6 +368,8 @@ final class BridgeOutput: ObservableObject {
             return
         }
 
+        debugPrint("🔌 BridgeOutput: ✅ Starting connection health monitoring")
+
         // Stop existing timer
         connectionHealthTimer?.invalidate()
 
