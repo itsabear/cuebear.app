@@ -290,6 +290,7 @@ class WifiServer: ObservableObject {
         do {
             listener = try NWListener(using: parameters, on: nwPort)
             listener?.newConnectionHandler = { [weak self] connection in
+                self?.log("📡 WiFi: New connection attempt received by listener")
                 self?.acceptConnection(connection)
             }
 
@@ -339,7 +340,7 @@ class WifiServer: ObservableObject {
     }
     
     private func acceptConnection(_ conn: NWConnection) {
-        log("New WiFi connection received")
+        log("New WiFi connection received from: \(conn.currentPath?.remoteEndpoint?.debugDescription ?? "unknown")")
 
         // SECURITY: Validate connection before accepting
         guard let remoteEndpoint = conn.currentPath?.remoteEndpoint else {
@@ -349,10 +350,12 @@ class WifiServer: ObservableObject {
         }
 
         guard ConnectionSecurity.shared.validateConnection(from: remoteEndpoint) else {
-            log("🔒 WiFi: Connection validation failed, rejecting")
+            log("🔒 WiFi: Connection validation failed, rejecting connection from \(remoteEndpoint)")
             conn.cancel()
             return
         }
+
+        log("✅ WiFi: Connection validation passed, accepting connection")
 
         // RESILIENCE FIX: Properly cleanup old connection before replacing
         // This prevents memory leaks during many reconnections over long sessions
@@ -363,6 +366,8 @@ class WifiServer: ObservableObject {
             oldConn.pathUpdateHandler = nil
         }
         connection = conn
+
+        log("📡 WiFi: Connection object assigned, starting state handler")
 
         conn.stateUpdateHandler = { [weak self] nwState in
             guard let self = self else { return }
@@ -375,8 +380,10 @@ class WifiServer: ObservableObject {
                 self.state = .connected
                 self.stateLock.unlock()
                 DispatchQueue.main.async {
+                    self.log("📡 WiFi: Setting status to 'Connected' and isConnected to true")
                     self.status = "Connected"
                     self.isConnected = true
+                    self.log("📡 WiFi: Status updated - status=\(self.status), isConnected=\(self.isConnected)")
                 }
                 self.startReceiving(conn)
                 self.startHeartbeat()
@@ -426,13 +433,38 @@ class WifiServer: ObservableObject {
             }
         }
 
+        log("📡 WiFi: Starting connection processing on queue")
+        log("📡 WiFi: Current connection state before start: \(conn.state)")
         conn.start(queue: queue)
+        log("📡 WiFi: Connection.start() called, waiting for state updates...")
+
+        // FIX: Check if connection is already ready (can happen with incoming connections)
+        // The state handler only fires on state CHANGES, not the current state
+        if conn.state == .ready {
+            log("📡 WiFi: ⚠️ Connection already in ready state! Manually triggering ready logic...")
+            // Manually trigger the ready logic since state handler won't fire
+            DispatchQueue.main.async {
+                self.log("📡 WiFi: Setting status to 'Connected' (manual trigger)")
+                self.status = "Connected"
+                self.isConnected = true
+            }
+            self.stateLock.lock()
+            self.state = .connected
+            self.stateLock.unlock()
+            self.startReceiving(conn)
+            self.startHeartbeat()
+            self.startConnectionHealthMonitor()
+        }
     }
     
     private func startReceiving(_ conn: NWConnection) {
+        log("📡 WiFi: Starting receive loop for connection")
         conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             if let data = data, !data.isEmpty {
                 self?.log("📥 WiFi RX \(data.count)B")
+                if let dataString = String(data: data, encoding: .utf8) {
+                    self?.log("📥 WiFi RX data preview: \(dataString.prefix(100))...")
+                }
                 self?.processReceivedData(data)
             }
 
