@@ -162,6 +162,8 @@ struct CBSetlistRow: View {
                 Text(song.name).font(.body.bold()).foregroundColor(.primary)
                 if let sub = song.subtitle, !sub.isEmpty {
                     Text(sub).font(.caption).foregroundColor(.secondary)
+                } else {
+                    Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
             Spacer()
@@ -190,6 +192,8 @@ struct CBSetlistDragPreview: View {
                 Text(song.name).font(.body.bold()).foregroundColor(.primary)
                 if let sub = song.subtitle, !sub.isEmpty {
                     Text(sub).font(.caption).foregroundColor(.secondary)
+                } else {
+                    Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
             Spacer()
@@ -447,6 +451,8 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
                 Text(title).font(.body.bold()).foregroundColor(.primary)
                 if let sub = subtitle, !sub.isEmpty {
                     Text(sub).font(.caption).foregroundColor(.secondary)
+                } else {
+                    Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
             Spacer()
