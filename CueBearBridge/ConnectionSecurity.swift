@@ -135,6 +135,8 @@ final class ConnectionSecurity {
             return validateBatchMessage(json)
         case "handshake", "handshake_response":
             return validateHandshake(json)
+        case "switch_to_wifi":
+            return validateSwitchToWiFi(json)
         default:
             Logger.shared.log("🔒 ConnectionSecurity: Unknown message type: \(type)")
             return nil
@@ -242,11 +244,21 @@ final class ConnectionSecurity {
         guard json["type"] is String else {
             return nil
         }
-        
+
         // Allow handshake messages through with minimal validation
         return json
     }
-    
+
+    private func validateSwitchToWiFi(_ json: [String: Any]) -> [String: Any]? {
+        // Validate switch_to_wifi message - just check that type field exists
+        guard json["type"] is String else {
+            return nil
+        }
+
+        // Allow switch_to_wifi messages through with minimal validation
+        return json
+    }
+
     // MARK: - Device Management
     
     private func generateDeviceId(from endpoint: NWEndpoint) -> String {
