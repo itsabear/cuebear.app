@@ -418,18 +418,13 @@ class WifiServer: ObservableObject {
             guard let self = self else { return }
             self.log("📡 WiFi path changed: \(path.status)")
 
-            if path.status == .unsatisfied && conn.state == .ready {
-                // Path became unsatisfied - connection is zombie (can't send/receive)
-                // Cancel immediately so iPad can reconnect with a working connection
-                self.log("📡 WiFi path unsatisfied - canceling connection for immediate reconnect")
-                self.stopHeartbeat()
-                DispatchQueue.main.async {
-                    self.isConnected = false
-                    self.status = "Disconnected"
-                }
-                conn.cancel()
-            } else if path.status == .satisfied {
+            // v1.2.0 FIX: Don't cancel on path.unsatisfied - this happens when USB is plugged in
+            // and routing priorities change, but the WiFi connection still works fine.
+            // Only log the path change for debugging. Let heartbeat timeout handle true failures.
+            if path.status == .satisfied {
                 self.log("📡 WiFi path satisfied")
+            } else if path.status == .unsatisfied {
+                self.log("📡 WiFi path unsatisfied (routing changed, but connection may still work)")
             }
         }
 
