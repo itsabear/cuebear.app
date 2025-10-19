@@ -2,14 +2,14 @@
 CueBear Bridge Notarization Report
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Notarization Date: Sat Oct 18 23:38:45 CEST 2025
+Notarization Date: Sat Oct 18 23:46:54 CEST 2025
 Operator: omribehr
 Machine: 172-11-1-169.lightspeed.jcvlfl.sbcglobal.net
 
 Package Information:
   Original: dist/CueBearBridge-Installer.pkg
   Notarized: dist/CueBearBridge-Installer-notarized.pkg
-  Submission ID: 0f2d5407-1d3f-4599-841c-4cc53e3708a3
+  Submission ID: aa07fddb-7c44-44d8-891c-62ebfecb2536
 
 Status: ✅ APPROVED
 

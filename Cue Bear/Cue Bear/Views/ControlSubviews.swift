@@ -155,9 +155,21 @@ struct CBPerformanceRow: View {
 struct CBSetlistRow: View {
     let song: Song
     var onTap: () -> Void
+    var onRemove: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
+            // Red minus button on the left
+            Button {
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                onRemove()
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundColor(.red)
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.name).font(.body.bold()).foregroundColor(.primary)
                 if let sub = song.subtitle, !sub.isEmpty {
@@ -197,7 +209,7 @@ struct CBSetlistDragPreview: View {
                 }
             }
             Spacer()
-            // Show hamburger menu icon during drag on the RIGHT side
+            // Show drag handle on the right during drag
             Image(systemName: "line.3.horizontal")
                 .foregroundColor(.secondary)
                 .font(.title3)
@@ -267,35 +279,21 @@ struct CBSetlistColumn: View {
                         song: s,
                         onTap: {
                             onRename(s)
+                        },
+                        onRemove: {
+                            onRemove(s)
                         }
                     )
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowSeparator(.visible)
-                    .onDrag {
-                        // Provide item for drag
-                        NSItemProvider(object: s.id.uuidString as NSString)
-                    } preview: {
-                        // Custom preview without white border
-                        CBSetlistDragPreview(song: s)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                            onRemove(s)
-                        } label: {
-                            Label("Remove", systemImage: "minus.circle")
-                        }
-                    }
                 }
-                // Only allow reordering when not searching
                 .onMove { inds, newOffset in
                     if searchText.isEmpty {
                         onMove(inds, newOffset)
                     }
                 }
             }
-            // Only show edit mode when not searching (to allow reordering)
             .environment(\.editMode, .constant(searchText.isEmpty ? .active : .inactive))
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -388,6 +386,16 @@ struct CBLibraryColumn: View {
                                         .font(.title3)
                                 }
                                 .buttonStyle(.plain)
+                            } else if !row.isInSetlist {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                    onAddToSetlist(row.song)
+                                } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.accentColor)
+                                        .font(.title3)
+                                }
+                                .buttonStyle(.plain)
                             } else {
                                 EmptyView()
                             }
@@ -399,24 +407,6 @@ struct CBLibraryColumn: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowSeparator(.visible)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            onDeleteFromLibrary(row.song)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        if !row.isInSetlist {
-                            Button {
-                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                onAddToSetlist(row.song)
-                            } label: {
-                                Label("Add", systemImage: "plus.circle")
-                            }
-                            .tint(.accentColor)
-                        }
-                    }
                 }
             }
             .listStyle(.plain)
@@ -1144,6 +1134,43 @@ struct CBMIDIPickerSheet: View {
     private func conflictOwner() -> String? {
         let key = MIDIKey(kind: kind, channel: channel, number: number)
         return conflictFor[key]
+    }
+}
+
+// MARK: - Drop Delegate for reordering without edit mode
+struct ReorderDropDelegate: DropDelegate {
+    let song: Song
+    let songs: [Song]
+    @Binding var draggedSong: Song?
+    let onMove: (Int, Int) -> Void
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+
+    func dropEntered(info: DropInfo) {
+        // Provide visual feedback by triggering layout updates
+        guard let draggedSong = draggedSong,
+              let fromIndex = songs.firstIndex(where: { $0.id == draggedSong.id }),
+              let toIndex = songs.firstIndex(where: { $0.id == song.id }),
+              fromIndex != toIndex else {
+            return
+        }
+
+        // Call onMove to provide real-time visual feedback as user drags
+        // This makes the list reorder dynamically during the drag
+        // Use a snappier spring animation for better responsiveness
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.85, blendDuration: 0.1)) {
+            onMove(fromIndex, toIndex)
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        // Clear the dragged song reference
+        self.draggedSong = nil
+        // Return true to indicate drop was handled
+        // Note: The actual reordering already happened in dropEntered()
+        return true
     }
 }
 
