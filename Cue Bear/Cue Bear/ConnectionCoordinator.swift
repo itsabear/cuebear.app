@@ -176,10 +176,11 @@ class ConnectionCoordinator: ObservableObject {
             // Reset manual WiFi flag since connection is now established
             isManualWiFiConnection = false
             
-            // If USB is also connected, disconnect it to avoid conflicts
+            // If USB is also connected, cleanly terminate it without triggering callbacks
+            // This prevents USB disconnection handlers from interfering with the fresh WiFi connection
             if usbServer.isConnected {
-                debugPrint("🔌 WiFi connected manually - disconnecting USB to avoid conflicts")
-                usbServer.stop()
+                debugPrint("🔌 WiFi connected manually - cleanly terminating USB without callbacks")
+                usbServer.stop(notifyCallback: false)
             }
         } else {
             // WiFi disconnected - only update if we were using WiFi

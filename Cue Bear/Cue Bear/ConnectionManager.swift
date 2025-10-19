@@ -286,23 +286,23 @@ class ConnectionManager: ObservableObject {
         }
     }
     
-    func stop() {
-        debugPrint("🔗 ConnectionManager: Stopping connection system")
+    func stop(notifyCallback: Bool = true) {
+        debugPrint("🔗 ConnectionManager: Stopping connection system (notifyCallback: \(notifyCallback))")
         shouldReconnect = false
-        
+
         // Cancel all handshake timers
         for timer in handshakeTimers.values {
             timer.cancel()
         }
         handshakeTimers.removeAll()
-        
+
         // Clear message batch
         batchTimer?.invalidate()
         batchTimer = nil
         messageBatch.removeAll()
         isSendingBatch = false
-        
-        stopListening()
+
+        stopListening(notifyCallback: notifyCallback)
         stopHealthMonitoring()
         stopHeartbeatMonitoring()
         stopConnectionMonitoring()
@@ -472,8 +472,8 @@ class ConnectionManager: ObservableObject {
         }
     }
     
-    private func stopListening() {
-        debugPrint("🔗 ConnectionManager: Stopping listener")
+    private func stopListening(notifyCallback: Bool = true) {
+        debugPrint("🔗 ConnectionManager: Stopping listener (notifyCallback: \(notifyCallback))")
 
         // CRITICAL: Must set isListening = false so startListening() can run
         isListening = false
@@ -492,8 +492,14 @@ class ConnectionManager: ObservableObject {
             // self?.connectedComputerName = nil
             self?.connectionQuality = .disconnected
 
-            // Notify callback of connection state change
-            self?.connectionStateCallback?(false)
+            // Notify callback of connection state change ONLY if requested
+            // When manually switching to WiFi, we don't want to trigger USB disconnection handlers
+            if notifyCallback {
+                debugPrint("🔗 ConnectionManager: Calling connectionStateCallback(false) for USB disconnection")
+                self?.connectionStateCallback?(false)
+            } else {
+                debugPrint("🔗 ConnectionManager: Skipping connectionStateCallback - clean termination for manual WiFi switch")
+            }
 
             // Update USB bridge availability to keep chip visible
             self?.checkUSBBridgeAvailability()
