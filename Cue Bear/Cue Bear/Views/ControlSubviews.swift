@@ -267,7 +267,7 @@ struct CBSetlistColumn: View {
                     )
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
-                    .listRowSeparator(.hidden)
+                    .listRowSeparator(.visible)
                     .onDrag {
                         // Provide item for drag
                         NSItemProvider(object: s.id.uuidString as NSString)
@@ -394,7 +394,7 @@ struct CBLibraryColumn: View {
                     .opacity(row.isInSetlist ? 0.55 : 1.0)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
-                    .listRowSeparator(.hidden)
+                    .listRowSeparator(.visible)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             onDeleteFromLibrary(row.song)
