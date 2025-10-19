@@ -880,7 +880,7 @@ class ConnectionManager: ObservableObject {
             
             if isComplete {
                 debugPrint("🔗 ConnectionManager: Connection completed by remote")
-                
+
                 // Update connection state when connection is completed
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
@@ -888,20 +888,20 @@ class ConnectionManager: ObservableObject {
                     self.isConnected = false
                     self.isConnecting = false
                     self.connectionHealth = .disconnected
-                    // Don't clear connectedComputerName to keep USB chip visible
-                    // self.connectedComputerName = nil
+                    // Clear connectedComputerName when Bridge quits so chip disappears
+                    self.connectedComputerName = nil
                     self.connectionQuality = .disconnected
-                    
+
                     // Stop listening since Bridge app has quit
                     self.isListening = false
                     debugPrint("🔗 ConnectionManager: 🛑 Stopped listening - Bridge app has quit")
-                    
-                    // Update USB bridge availability
+
+                    // Update USB bridge availability to hide chip
                     self.checkUSBBridgeAvailability()
-                    
+
                     self.connectionStateCallback?(false)
                 }
-                
+
                 return  // Don't continue receiving, but don't treat as failure
             }
             
@@ -931,17 +931,17 @@ class ConnectionManager: ObservableObject {
                     self.isConnected = false
                     self.isConnecting = false
                     self.connectionHealth = .disconnected
-                    // Don't clear connectedComputerName to keep USB chip visible
-                    // self.connectedComputerName = nil
+                    // Clear connectedComputerName when Bridge quits so chip disappears
+                    self.connectedComputerName = nil
                     self.connectionQuality = .disconnected
-                    
+
                     // Stop listening since Bridge app has quit
                     self.isListening = false
                     debugPrint("🔗 ConnectionManager: 🛑 Stopped listening - Bridge app has quit")
-                    
-                    // Update USB bridge availability
+
+                    // Update USB bridge availability to hide chip
                     self.checkUSBBridgeAvailability()
-                    
+
                     self.connectionStateCallback?(false)
                 }
                 return
@@ -1500,6 +1500,8 @@ class ConnectionManager: ObservableObject {
                 self.isConnected = false
                 self.isConnecting = false
                 self.connectionHealth = .disconnected
+                // Clear connectedComputerName when cable unplugged so chip disappears
+                self.connectedComputerName = nil
                 self.connectionQuality = .disconnected
                 self.stopHeartbeatMonitoring()
                 self.closeUSB(self.activeUSB)
@@ -1516,8 +1518,8 @@ class ConnectionManager: ObservableObject {
             self.isConnected = false
             self.isConnecting = false
             self.connectionHealth = .disconnected
-            // Don't clear connectedComputerName to keep USB chip visible
-            // self.connectedComputerName = nil
+            // Clear connectedComputerName when cable unplugged so chip disappears
+            self.connectedComputerName = nil
             self.connectionQuality = .disconnected
 
             // Stop heartbeat monitoring since connection is lost
@@ -1687,19 +1689,20 @@ class ConnectionManager: ObservableObject {
     }
     
     private func checkUSBBridgeAvailability() {
-        // Show USB chip based on physical USB cable connection
+        // Show USB chip based on Bridge app running (handshake completed)
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
 
-            // Show USB bridge chip ONLY when USB cable is physically connected
-            let shouldBeAvailable = self.isUSBCableConnected
+            // Show USB bridge chip ONLY when Bridge app is running (has sent handshake)
+            // Having connectedComputerName means Bridge app connected at some point
+            let shouldBeAvailable = self.connectedComputerName != nil
             let wasAvailable = self.usbBridgeAvailable
             self.usbBridgeAvailable = shouldBeAvailable
 
             if shouldBeAvailable && !wasAvailable {
-                debugPrint("🔗 ConnectionManager: 🎯 USB Bridge available - showing USB chip (cable connected)")
+                debugPrint("🔗 ConnectionManager: 🎯 USB Bridge available - showing USB chip (Bridge running)")
             } else if !shouldBeAvailable && wasAvailable {
-                debugPrint("🔗 ConnectionManager: ❌ USB Bridge unavailable - hiding USB chip (cable disconnected)")
+                debugPrint("🔗 ConnectionManager: ❌ USB Bridge unavailable - hiding USB chip (Bridge not running)")
             }
         }
     }

@@ -644,8 +644,8 @@ struct CBConnectionsSheet: View {
                     }
 
 
-                    // Bridge device card for USB connection - show ONLY when USB cable is physically connected
-                    if usbServer.isUSBCableConnected {
+                    // Bridge device card for USB connection - show ONLY when Bridge app is running
+                    if usbServer.usbBridgeAvailable {
                         BridgeDeviceCard(
                             computerName: usbServer.connectedComputerName ?? "Bear Bridge",
                             isConnected: connectionCoordinator.activeConnection == .usb,
@@ -660,13 +660,13 @@ struct CBConnectionsSheet: View {
                             }
                         )
                         .transition(.scale.combined(with: .opacity))
-                        .animation(.easeInOut(duration: 0.2), value: usbServer.isUSBCableConnected)
+                        .animation(.easeInOut(duration: 0.2), value: usbServer.usbBridgeAvailable)
                     } else {
-                        Text("USB cable not connected")
+                        Text("Bridge app not running")
                             .foregroundColor(.secondary)
                             .font(.caption)
                             .transition(.opacity)
-                            .animation(.easeInOut(duration: 0.2), value: usbServer.isUSBCableConnected)
+                            .animation(.easeInOut(duration: 0.2), value: usbServer.usbBridgeAvailable)
                     }
                 }
 
