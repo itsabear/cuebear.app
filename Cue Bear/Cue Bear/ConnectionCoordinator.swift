@@ -280,17 +280,30 @@ class ConnectionCoordinator: ObservableObject {
         // Set flag to indicate this is a manual WiFi connection
         isManualWiFiConnection = true
 
-        // If USB is connected, just disconnect it first
+        // If USB is connected, tell Bridge to switch to WiFi first
         if let usbServer = usbServer, usbServer.isConnected {
-            debugPrint("🔌 USB is connected - disconnecting USB before connecting WiFi")
-            // Disconnect USB cleanly without triggering callbacks
-            usbServer.stop(notifyCallback: false)
+            debugPrint("🔌 USB is connected - sending switch_to_wifi message to Bridge")
+
+            // Send switch message and wait for it to be sent
+            usbServer.sendSwitchToWiFiRequest { [weak self] in
+                guard let self = self else { return }
+
+                debugPrint("🔌 Bridge notified - disconnecting USB and connecting WiFi")
+                // Disconnect USB cleanly without triggering callbacks
+                usbServer.stop(notifyCallback: false)
+
+                // Connect to WiFi after Bridge knows to expect it
+                debugPrint("🔌 DEBUG: Calling wifiClient.connect(to: bridge)")
+                self.wifiClient?.connect(to: bridge)
+                self.connectionStatus = "Connecting to WiFi..."
+            }
+        } else {
+            // No USB connection, just connect WiFi directly
+            debugPrint("🔌 DEBUG: Calling wifiClient.connect(to: bridge)")
+            wifiClient?.connect(to: bridge)
+            connectionStatus = "Connecting to WiFi..."
         }
 
-        // Connect to WiFi
-        debugPrint("🔌 DEBUG: Calling wifiClient.connect(to: bridge)")
-        wifiClient?.connect(to: bridge)
-        connectionStatus = "Connecting to WiFi..."
         debugPrint("🔌 DEBUG: Connection status updated to: \(self.connectionStatus)")
     }
     
