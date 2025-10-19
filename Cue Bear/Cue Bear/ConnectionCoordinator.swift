@@ -280,32 +280,18 @@ class ConnectionCoordinator: ObservableObject {
         // Set flag to indicate this is a manual WiFi connection
         isManualWiFiConnection = true
 
-        // If USB is connected, send switch_to_wifi message first, then disconnect
+        // If USB is connected, just disconnect it first
         if let usbServer = usbServer, usbServer.isConnected {
-            debugPrint("🔌 Sending switch_to_wifi request to Bridge before disconnecting USB")
-
-            // Send the switch request and wait for it to be sent
-            usbServer.sendSwitchToWiFiRequest { [weak self] in
-                guard let self = self else { return }
-
-                debugPrint("🔌 Bridge notified - now disconnecting USB cleanly")
-                // Now disconnect USB cleanly without triggering callbacks
-                usbServer.stop(notifyCallback: false)
-
-                // Connect to WiFi after USB is cleanly closed
-                debugPrint("🔌 DEBUG: Calling wifiClient.connect(to: bridge)")
-                self.wifiClient?.connect(to: bridge)
-
-                // Update status immediately to show we're attempting connection
-                self.connectionStatus = "Connecting to WiFi..."
-                debugPrint("🔌 DEBUG: Connection status updated to: \(self.connectionStatus)")
-            }
-        } else {
-            // No USB connection, just connect WiFi directly
-            debugPrint("🔌 DEBUG: No USB connection - connecting WiFi directly")
-            wifiClient?.connect(to: bridge)
-            connectionStatus = "Connecting to WiFi..."
+            debugPrint("🔌 USB is connected - disconnecting USB before connecting WiFi")
+            // Disconnect USB cleanly without triggering callbacks
+            usbServer.stop(notifyCallback: false)
         }
+
+        // Connect to WiFi
+        debugPrint("🔌 DEBUG: Calling wifiClient.connect(to: bridge)")
+        wifiClient?.connect(to: bridge)
+        connectionStatus = "Connecting to WiFi..."
+        debugPrint("🔌 DEBUG: Connection status updated to: \(self.connectionStatus)")
     }
     
     func disconnectWiFi() {
