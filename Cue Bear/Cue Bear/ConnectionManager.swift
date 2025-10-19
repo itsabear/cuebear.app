@@ -1487,10 +1487,26 @@ class ConnectionManager: ObservableObject {
             guard let self = self else { return }
 
             debugPrint("🔗 ConnectionManager: 🔌 Updating connection state to disconnected")
+            debugPrint("🔗 ConnectionManager: 🔌 WiFi connected: \(self.isWiFiConnected), USB connected: \(self.isConnected)")
 
             // Mark USB cable as physically disconnected
             self.isUSBCableConnected = false
             debugPrint("🔗 ConnectionManager: ❌ USB cable disconnected - chip will disappear")
+
+            // CRITICAL FIX: If WiFi is connected, don't notify callback at all
+            // This prevents the ConnectionCoordinator from processing USB disconnection while WiFi is active
+            if self.isWiFiConnected {
+                debugPrint("🔗 ConnectionManager: 🔌 WiFi is connected - skipping all USB disconnection handling")
+                self.isConnected = false
+                self.isConnecting = false
+                self.connectionHealth = .disconnected
+                self.connectionQuality = .disconnected
+                self.stopHeartbeatMonitoring()
+                self.closeUSB(self.activeUSB)
+                self.activeUSB = nil
+                self.checkUSBBridgeAvailability()
+                return
+            }
 
             // CRITICAL FIX: Only notify callback if USB was actually connected
             // In Story 6, USB cable was plugged but never connected, so don't notify

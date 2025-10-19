@@ -101,6 +101,13 @@ class ConnectionCoordinator: ObservableObject {
             isManualUSBConnection = false
             isManualUSBDisconnection = false  // Clear disconnect flag when reconnected
         } else {
+            // v1.0.8 FIX: If WiFi is already active and connected, don't process USB disconnection
+            // This prevents the delayed USB restart logic from interfering with active WiFi
+            if wifiClient.isConnected && activeConnection == .wifi {
+                debugPrint("🔌 ConnectionCoordinator: WiFi is active - ignoring USB disconnection event")
+                return
+            }
+
             // USB disconnected - don't auto-connect to WiFi (user choice only)
             debugPrint("🔌 USB disconnected - WiFi available for manual connection")
 
@@ -161,21 +168,23 @@ class ConnectionCoordinator: ObservableObject {
     
     private func handleWiFiConnectionChange(_ isConnected: Bool) {
         guard let usbServer = usbServer else { return }
-        
+
+        debugPrint("🔌 ConnectionCoordinator: WiFi connection change - isConnected: \(isConnected), current activeConnection: \(activeConnection)")
+
         // Inform USB server about WiFi connection state to keep USB chip visible
         usbServer.setWiFiConnectionState(isConnected)
-        
+
         // Allow manual WiFi connections even when USB is active
         // This enables user override functionality
         if isConnected {
             // WiFi connected - update status immediately
             activeConnection = .wifi
             connectionStatus = "WiFi Connected"
-            debugPrint("✅ WiFi connection established")
-            
+            debugPrint("✅ WiFi connection established - activeConnection set to .wifi")
+
             // Reset manual WiFi flag since connection is now established
             isManualWiFiConnection = false
-            
+
             // If USB is also connected, cleanly terminate it without triggering callbacks
             // This prevents USB disconnection handlers from interfering with the fresh WiFi connection
             if usbServer.isConnected {
@@ -225,11 +234,17 @@ class ConnectionCoordinator: ObservableObject {
     // MARK: - Public Interface
     
     func sendMIDI(type: MIDIKind, channel: Int, number: Int, value: Int, label: String, buttonID: String) {
+        debugPrint("🎵 ConnectionCoordinator: sendMIDI called - activeConnection: \(activeConnection), type: \(type), value: \(value)")
         switch activeConnection {
         case .usb:
+            debugPrint("🎵 Routing MIDI to USB")
             usbServer?.sendMIDI(type: type, channel: channel, number: number, value: value, label: label, buttonID: buttonID)
         case .wifi:
-            guard let wifiClient = wifiClient else { return }
+            debugPrint("🎵 Routing MIDI to WiFi")
+            guard let wifiClient = wifiClient else {
+                debugPrint("❌ WiFi client is nil!")
+                return
+            }
             switch type {
             case .cc:
                 wifiClient.sendCC(channel: channel, cc: number, value: value, label: label, buttonID: buttonID)
