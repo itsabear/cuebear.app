@@ -189,8 +189,13 @@ final class BridgeOutput: ObservableObject {
             self.isConnecting = false
         }
 
-        // Keep all timers running to maintain the connection
-        // Keep message batch alive
+        // CRITICAL FIX: Stop health monitoring timer while suspended
+        // The timer's guard clause (line 366) will exit early while isConnected = false
+        // This leaves the timer in a broken state where it exists but doesn't work
+        // We must stop it now so resume() can restart it properly
+        stopConnectionHealthMonitoring()
+
+        // Keep message batch alive - don't stop batch timer
 
         debugPrint("📡 BridgeOutput: WiFi connection suspended - connection object preserved for resume")
     }
@@ -216,22 +221,21 @@ final class BridgeOutput: ObservableObject {
         // Clear suspended flag
         isSuspended = false
 
-        // Restore UI state to show WiFi is active
+        // Reset last successful message timestamp to prevent immediate stale detection
+        self.lastSuccessfulMessage = Date()
+
+        // CRITICAL FIX: Must set isConnected FIRST, then start health monitoring
+        // The health monitoring has a guard clause that checks isConnected
+        // Do both on main queue together to avoid race condition
         DispatchQueue.main.async {
             self.isConnected = true
             self.connectionQuality = .excellent
-        }
 
-        // Only restart health monitoring if it's not already running
-        // This prevents duplicate timers
-        if connectionHealthTimer == nil {
+            // CRITICAL FIX: Start health monitoring AFTER isConnected is set
+            // The timer was stopped in suspend(), so we must restart it
+            // This is what keeps the WiFi connection alive with periodic checks
             self.startConnectionHealthMonitoring()
-        } else {
-            debugPrint("📡 BridgeOutput: Health monitoring already running - not restarting")
         }
-
-        // Reset last successful message timestamp to prevent immediate stale detection
-        self.lastSuccessfulMessage = Date()
 
         debugPrint("📡 BridgeOutput: ✅ WiFi connection resumed - MIDI data can flow again")
     }
