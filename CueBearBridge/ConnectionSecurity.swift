@@ -137,6 +137,8 @@ final class ConnectionSecurity {
             return validateHandshake(json)
         case "switch_to_wifi":
             return validateSwitchToWiFi(json)
+        case "pair_request":
+            return validatePairRequest(json)
         default:
             Logger.shared.log("🔒 ConnectionSecurity: Unknown message type: \(type)")
             return nil
@@ -256,6 +258,16 @@ final class ConnectionSecurity {
         }
 
         // Allow switch_to_wifi messages through with minimal validation
+        return json
+    }
+
+    private func validatePairRequest(_ json: [String: Any]) -> [String: Any]? {
+        // Validate pair_request message - just check that type field exists
+        guard json["type"] is String else {
+            return nil
+        }
+
+        // Allow pair_request messages through with minimal validation
         return json
     }
 
