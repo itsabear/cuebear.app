@@ -281,9 +281,10 @@ class ConnectionCoordinator: ObservableObject {
         isManualWiFiConnection = true
         
         // Disconnect USB if it's connected to allow WiFi connection
+        // Use notifyCallback: false to cleanly terminate USB without interfering with fresh WiFi connection
         if let usbServer = usbServer, usbServer.isConnected {
-            debugPrint("🔌 Disconnecting USB to allow manual WiFi connection")
-            usbServer.stop()
+            debugPrint("🔌 Disconnecting USB to allow manual WiFi connection (clean termination)")
+            usbServer.stop(notifyCallback: false)
         }
         
         // Connect to WiFi
