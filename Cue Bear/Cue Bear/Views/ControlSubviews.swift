@@ -6,6 +6,7 @@ struct CBPerformanceList: View {
     let songs: [Song]
     let isCueMode: Bool
     let cuedID: UUID?
+    let isEditing: Bool
     var onTapSong: (Song) -> Void
     var onLongPressChangeMIDI: (Song) -> Void
     var onRename: (Song) -> Void
@@ -26,6 +27,7 @@ struct CBPerformanceList: View {
                         song: s,
                         isCued: isCueMode && cuedID == s.id,
                         isCueMode: isCueMode,
+                        isEditing: isEditing,
                         takenBy: (takenBy != nil && takenBy != s.name) ? takenBy : nil,
                         onTap: { onTapSong(s) },
                         onLongPressChangeMIDI: { onLongPressChangeMIDI(s) },
@@ -52,6 +54,7 @@ struct CBPerformanceRow: View {
     let song: Song
     let isCued: Bool
     let isCueMode: Bool
+    let isEditing: Bool
     let takenBy: String?
     var onTap: () -> Void
     var onLongPressChangeMIDI: () -> Void
@@ -74,13 +77,17 @@ struct CBPerformanceRow: View {
                 }
             }
             .onEnded { _ in
-                // Only flash and send MIDI on quick tap (not long-press/context menu)
-                if !didDrag && takenBy == nil {
-                    if !isCued && !isCueMode {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        flash()
+                // In edit mode: tap opens edit sheet
+                if isEditing {
+                    if !didDrag {
+                        onRename()
                     }
-                    onTap()
+                } else {
+                    // Normal mode: send MIDI on quick tap
+                    // Flash and haptic are triggered in .onChange(of: isPressed) for instant feedback
+                    if !didDrag && takenBy == nil {
+                        onTap()
+                    }
                 }
                 didDrag = false
             }
@@ -96,10 +103,10 @@ struct CBPerformanceRow: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(song.name)
                         .font(.title3.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(Color(uiColor: .systemBackground))
                         .lineLimit(1)
                     if let sub = song.subtitle, !sub.isEmpty {
-                        Text(sub).font(.footnote).foregroundColor(Color.white.opacity(0.85)).lineLimit(1)
+                        Text(sub).font(.footnote).foregroundColor(Color(uiColor: .systemBackground).opacity(0.85)).lineLimit(1)
                     }
                 }
                 Spacer(minLength: 12)
@@ -113,13 +120,13 @@ struct CBPerformanceRow: View {
                 }()
                 Text(subtitle)
                     .font(.caption2)
-                    .foregroundColor(Color.white.opacity(0.9))
+                    .foregroundColor(Color(uiColor: .systemBackground).opacity(0.9))
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 16)
 
             RoundedRectangle(cornerRadius: corner)
-                .fill(Color.white)
+                .fill(Color(uiColor: .systemBackground))
                 .opacity(flashOpacity)
                 .allowsHitTesting(false)
 
@@ -128,26 +135,30 @@ struct CBPerformanceRow: View {
                     .font(.caption2)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
-                    .foregroundColor(.white)
-                    .background(Color.black.opacity(0.6))
+                    .foregroundColor(Color(uiColor: .systemBackground))
+                    .background(Color.primary.opacity(0.6))
                     .clipShape(Capsule())
             }
         }
         .contentShape(Rectangle())
         .scaleEffect(isPressed ? 0.985 : 1.0)
-        .animation(.spring(response: 0.18, dampingFraction: 0.85), value: isPressed)
+        .animation(.spring(response: 0.10, dampingFraction: 0.85), value: isPressed)
         .simultaneousGesture(press)
-        .contextMenu {
-            Button("Edit Cue", action: onRename)
-            Button(role: .destructive) { onDelete() } label: { Text("Delete") }
+        .onChange(of: isPressed) { oldValue, newValue in
+            // Trigger flash immediately when finger is released (isPressed becomes false)
+            if oldValue && !newValue && !isEditing && !didDrag && takenBy == nil && !isCued {
+                flash()
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
         }
+        // No context menu in either mode (Option A: disabled in both normal and edit mode)
         .accessibilityLabel("\(song.name), \(song.kind == .cc ? "CC \(song.cc)" : "Note \(song.note ?? 0)")")
     }
 
     private func flash() {
         flashOpacity = 1.0
-        // v1.0.3: Removed 20ms delay for instant visual feedback
-        withAnimation(.easeOut(duration: 0.18)) { flashOpacity = 0.0 }
+        // v1.0.9: Balanced flash duration - noticeable but snappy
+        withAnimation(.easeOut(duration: 0.20)) { flashOpacity = 0.0 }
     }
 }
 
@@ -386,27 +397,38 @@ struct CBLibraryColumn: View {
                                         .font(.title3)
                                 }
                                 .buttonStyle(.plain)
-                            } else if !row.isInSetlist {
+                            } else {
+                                // Always show + icon, but grey and disabled if already in cue list
                                 Button {
-                                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                    onAddToSetlist(row.song)
+                                    if !row.isInSetlist {
+                                        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                        onAddToSetlist(row.song)
+                                    }
                                 } label: {
                                     Image(systemName: "plus.circle.fill")
-                                        .foregroundColor(.accentColor)
+                                        .foregroundColor(row.isInSetlist ? .gray : .accentColor)
                                         .font(.title3)
                                 }
                                 .buttonStyle(.plain)
-                            } else {
-                                EmptyView()
+                                .disabled(row.isInSetlist)
                             }
                         },
                         trailing: { EmptyView() },
-                        onTap: batchMode ? nil : { onRename(row.song) }
+                        onTap: (!isEditing || batchMode) ? nil : { onRename(row.song) }
                     )
                     .opacity(row.isInSetlist ? 0.55 : 1.0)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowSeparator(.visible)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if isEditing && !batchMode {
+                            Button(role: .destructive) {
+                                onDeleteFromLibrary(row.song)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
                 }
             }
             .listStyle(.plain)
@@ -777,13 +799,13 @@ struct CBProjectsSheet: View {
                 }
 
                 Section(header: Text("Actions")) {
+                    Button("New Project") { onNew() }
                     Button("Save") { onSave() }
                         .disabled(!isDirty && projectName != "Untitled")
                     Button("Save As…") {
                         tempSaveAs = (projectName == "Untitled") ? "" : projectName
                         onSaveAs(tempSaveAs)
                     }
-                    Button("New Project") { onNew() }
                     Button("Open from Files") {
                         // Simple document picker - will be handled in ContentView
                         onOpenDocument()
@@ -863,6 +885,8 @@ struct CBAddEditCueSheet: View {
     @State private var autoAssign: Bool = true
     @State private var error: String? = nil
     @State private var showDeleteAlert: Bool = false
+    @State private var showGlobalModeMaxReachedAlert: Bool = false
+    @State private var lastEditingSongID: UUID? = nil  // Track which song we're editing to preserve unsaved changes
 
     var body: some View {
         NavigationView {
@@ -930,11 +954,18 @@ struct CBAddEditCueSheet: View {
                 Button("Delete", role: .destructive) {
                     if let song = editingSong {
                         onDelete?(song)
+                        // Clear the draft tracking since we deleted
+                        lastEditingSongID = nil
                     }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Are you sure you want to delete '\(name.isEmpty ? defaultName : name)'? This action cannot be undone.")
+            }
+            .alert("Maximum Controls Reached", isPresented: $showGlobalModeMaxReachedAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.")
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { onCancel() } }
@@ -945,27 +976,57 @@ struct CBAddEditCueSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save(andAddAnother: false) } }
             }
-            .onAppear { preset() }
-            .onChange(of: editingSong) { oldValue, newValue in
-                // When editingSong changes (especially when set to nil for "Add Another"),
-                // re-run preset to ensure form is properly initialized
-                if oldValue != nil && newValue == nil {
+            .onAppear {
+                // Only preset if we're editing a different song (or switching to/from add mode)
+                let currentID = editingSong?.id
+                if currentID != lastEditingSongID {
                     preset()
+                    lastEditingSongID = currentID
+                }
+            }
+            .onChange(of: editingSong) { oldValue, newValue in
+                // When editingSong changes, check if we need to preset
+                let oldID = oldValue?.id
+                let newID = newValue?.id
+                if oldID != newID {
+                    preset()
+                    lastEditingSongID = newID
                 }
             }
             .onChange(of: autoAssign) { _, newValue in
                 if newValue {
-                    number = firstFreeNumber(for: kind, channel: channel)
+                    let result = autoAssignMIDI(for: kind, startChannel: channel, startNumber: 0)
+                    if result.reachedLimit {
+                        showGlobalModeMaxReachedAlert = true
+                        autoAssign = false
+                    } else {
+                        channel = result.channel
+                        number = result.number
+                    }
                 }
             }
             .onChange(of: kind) { _, newValue in
                 if autoAssign {
-                    number = firstFreeNumber(for: newValue, channel: channel)
+                    let result = autoAssignMIDI(for: newValue, startChannel: channel, startNumber: 0)
+                    if result.reachedLimit {
+                        showGlobalModeMaxReachedAlert = true
+                        autoAssign = false
+                    } else {
+                        channel = result.channel
+                        number = result.number
+                    }
                 }
             }
             .onChange(of: channel) { _, newValue in
                 if autoAssign {
-                    number = firstFreeNumber(for: kind, channel: newValue)
+                    let result = autoAssignMIDI(for: kind, startChannel: newValue, startNumber: 0)
+                    if result.reachedLimit {
+                        showGlobalModeMaxReachedAlert = true
+                        autoAssign = false
+                    } else {
+                        channel = result.channel
+                        number = result.number
+                    }
                 }
             }
         }
@@ -992,27 +1053,87 @@ struct CBAddEditCueSheet: View {
             // For new songs, enable auto-assign and find free MIDI
             autoAssign = true
             debugPrint("  🆕 [CUE] No editing state, finding free number for \(kind) ch\(channel)")
-            number = firstFreeNumber(for: kind, channel: channel)
-            debugPrint("  ✅ [CUE] preset() set number to \(number)")
+            let result = autoAssignMIDI(for: kind, startChannel: channel, startNumber: 0)
+            if result.reachedLimit {
+                showGlobalModeMaxReachedAlert = true
+                autoAssign = false
+            } else {
+                channel = result.channel
+                number = result.number
+                debugPrint("  ✅ [CUE] preset() set channel=\(result.channel), number=\(result.number)")
+            }
         }
     }
 
-    private func firstFreeNumber(for kind: MIDIKind, channel: Int) -> Int {
-        debugPrint("🔍 [CUE] Finding first free \(kind) number on channel \(channel), editingSong: \(editingSong?.name ?? "nil")")
-        for n in 0...127 {
-            let key = MIDIKey(kind: kind, channel: channel, number: n)
-            if let owner = currentOwnerName(key) {
-                if owner != editingSong?.name {
-                    debugPrint("  ✗ [CUE] \(n) is taken by '\(owner)', skipping")
-                    continue
+    // Result type for auto-assign with channel increment support
+    private struct AutoAssignResult {
+        let channel: Int
+        let number: Int
+        let reachedLimit: Bool  // true if hit 127 in global mode
+    }
+
+    // New auto-assign function that can increment channel when reaching 127
+    private func autoAssignMIDI(for kind: MIDIKind, startChannel: Int, startNumber: Int = 0) -> AutoAssignResult {
+        debugPrint("🔍 [CUE] Auto-assigning \(kind) starting from channel \(startChannel), number \(startNumber)")
+
+        // In global mode, we can't increment channel
+        if isGlobalChannel {
+            // Search only on the global channel
+            for n in startNumber...127 {
+                let key = MIDIKey(kind: kind, channel: globalChannel, number: n)
+                if let owner = currentOwnerName(key) {
+                    if owner != editingSong?.name {
+                        debugPrint("  ✗ [CUE] \(n) is taken by '\(owner)', skipping")
+                        continue
+                    }
+                    debugPrint("  ✓ [CUE] \(n) is taken by editing song, available")
                 }
-                debugPrint("  ✓ [CUE] \(n) is taken by editing song, available")
+                debugPrint("  ✅ [CUE] Assigned: channel \(globalChannel), number \(n)")
+                return AutoAssignResult(channel: globalChannel, number: n, reachedLimit: false)
             }
-            debugPrint("  ✅ [CUE] First free number: \(n)")
-            return n
+            // Reached limit in global mode
+            debugPrint("  ⚠️ [CUE] Reached limit of 127 in global mode")
+            return AutoAssignResult(channel: globalChannel, number: 0, reachedLimit: true)
         }
-        debugPrint("  ⚠️ [CUE] No free numbers found, returning 0")
-        return 0
+
+        // Non-global mode: can increment channel when reaching 127
+        var currentChannel = startChannel
+        var currentNumber = startNumber
+
+        // Try up to 16 channels
+        for _ in 0..<16 {
+            // Search from currentNumber to 127 on current channel
+            for n in currentNumber...127 {
+                let key = MIDIKey(kind: kind, channel: currentChannel, number: n)
+                if let owner = currentOwnerName(key) {
+                    if owner != editingSong?.name {
+                        debugPrint("  ✗ [CUE] \(n) is taken by '\(owner)', skipping")
+                        continue
+                    }
+                    debugPrint("  ✓ [CUE] \(n) is taken by editing song, available")
+                }
+                debugPrint("  ✅ [CUE] Assigned: channel \(currentChannel), number \(n)")
+                return AutoAssignResult(channel: currentChannel, number: n, reachedLimit: false)
+            }
+
+            // Reached end of current channel, increment and start from 0
+            debugPrint("  🔄 [CUE] Channel \(currentChannel) full, moving to channel \(currentChannel + 1)")
+            currentChannel += 1
+            if currentChannel > 16 {
+                currentChannel = 1  // Wrap around
+            }
+            currentNumber = 0  // Reset to start of new channel
+        }
+
+        // Exhausted all channels (unlikely but handle it)
+        debugPrint("  ⚠️ [CUE] No free slots found across all channels")
+        return AutoAssignResult(channel: startChannel, number: 0, reachedLimit: false)
+    }
+
+    // Legacy function for compatibility
+    private func firstFreeNumber(for kind: MIDIKind, channel: Int) -> Int {
+        let result = autoAssignMIDI(for: kind, startChannel: channel, startNumber: 0)
+        return result.number
     }
 
     private func conflictOwner() -> String? {
@@ -1062,26 +1183,43 @@ struct CBAddEditCueSheet: View {
 
         onSave(song, andAddAnother)
 
+        // Clear the draft tracking since we saved
+        lastEditingSongID = nil
+
         if andAddAnother {
             debugPrint("➕ [CUE] Save & Add Another clicked")
             // CRITICAL FIX: Reset state variables BEFORE setting editingSong = nil
             // This prevents race condition where preset() uses old values when .onChange fires
 
+            // Calculate next channel and number BEFORE resetting form fields
+            debugPrint("  🔢 [CUE] Calculating next free number BEFORE resetting form")
+            let nextChannel = isGlobalChannel ? globalChannel : 1
+            let savedNumber = number
+            let savedKind = kind
+
             // Reset all form fields to defaults FIRST
             name = ""
             subtitle = ""
-            kind = .cc
+            // v1.0.8: Preserve MIDI kind (CC vs Note) for "Add Another"
+            // This ensures next cue uses same MIDI type as the one just saved
+            kind = savedKind
             velocity = 127
             autoAssign = true
             error = nil
 
-            // Calculate next channel and number with the reset values
-            debugPrint("  🔢 [CUE] Calculating next free number BEFORE setting editingSong=nil")
-            let nextChannel = isGlobalChannel ? globalChannel : 1
-            channel = nextChannel
-            let nextNumber = firstFreeNumber(for: .cc, channel: nextChannel)
-            number = nextNumber
-            debugPrint("  ✅ [CUE] Set number to \(nextNumber)")
+            // Find next free number starting from the one we just saved + 1
+            // Uses savedKind to find next available CC or Note number
+            let result = autoAssignMIDI(for: savedKind, startChannel: nextChannel, startNumber: savedNumber + 1)
+            if result.reachedLimit {
+                showGlobalModeMaxReachedAlert = true
+                autoAssign = false
+                channel = nextChannel
+                number = 0
+            } else {
+                channel = result.channel
+                number = result.number
+                debugPrint("  ✅ [CUE] Set channel=\(result.channel), number=\(result.number)")
+            }
 
             // NOW set editingSong to nil (triggers .onChange which calls preset())
             // preset() will now see the correct reset values above

@@ -398,6 +398,7 @@ struct CBControlEditorSheet: View {
     @ObservedObject var draft: ControlEditorDraft
 
     @State private var showDeleteAlert: Bool = false
+    @State private var showGlobalModeMaxReachedAlert: Bool = false
     private enum ControlType: String, CaseIterable, Identifiable { case button, fader; var id: String { rawValue } }
     private enum ButtonType: String, CaseIterable, Identifiable { case regular, small; var id: String { rawValue } }
     // UI-only state (not persisted in draft)
@@ -712,6 +713,11 @@ struct CBControlEditorSheet: View {
                 let controlTypeName = controlType == .fader ? "fader" : (buttonType == .small ? "small button" : "button")
                 Text("Are you sure you want to delete this \(controlTypeName)? This action cannot be undone.")
             }
+            .alert("Maximum Controls Reached", isPresented: $showGlobalModeMaxReachedAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -751,17 +757,38 @@ struct CBControlEditorSheet: View {
             }
             .onChange(of: draft.autoAssign) { _, newValue in
                 if newValue {
-                    draft.number = firstFreeNumber(for: draft.kind, channel: draft.channel)
+                    let result = autoAssignMIDI(for: draft.kind, startChannel: draft.channel, startNumber: 0)
+                    if result.reachedLimit {
+                        showGlobalModeMaxReachedAlert = true
+                        draft.autoAssign = false  // Turn off auto-assign since we hit the limit
+                    } else {
+                        draft.channel = result.channel
+                        draft.number = result.number
+                    }
                 }
             }
             .onChange(of: draft.kind) { _, newValue in
                 if draft.autoAssign {
-                    draft.number = firstFreeNumber(for: newValue, channel: draft.channel)
+                    let result = autoAssignMIDI(for: newValue, startChannel: draft.channel, startNumber: 0)
+                    if result.reachedLimit {
+                        showGlobalModeMaxReachedAlert = true
+                        draft.autoAssign = false
+                    } else {
+                        draft.channel = result.channel
+                        draft.number = result.number
+                    }
                 }
             }
             .onChange(of: draft.channel) { _, newValue in
                 if draft.autoAssign {
-                    draft.number = firstFreeNumber(for: draft.kind, channel: newValue)
+                    let result = autoAssignMIDI(for: draft.kind, startChannel: newValue, startNumber: 0)
+                    if result.reachedLimit {
+                        showGlobalModeMaxReachedAlert = true
+                        draft.autoAssign = false
+                    } else {
+                        draft.channel = result.channel
+                        draft.number = result.number
+                    }
                 }
             }
             .onChange(of: controlType) { _, newType in
@@ -832,9 +859,15 @@ struct CBControlEditorSheet: View {
                 if draftMatchesOriginal || draft.title.isEmpty {
                     draft.autoAssign = true
                     let nextChannel = isGlobalChannel ? globalChannel : draft.channel
-                    draft.channel = nextChannel
-                    draft.number = firstFreeNumber(for: draft.kind, channel: draft.channel)
-                    debugPrint("  ✅ [CONTROL] ADD mode - set autoAssign=true, channel=\(nextChannel), number=\(draft.number)")
+                    let result = autoAssignMIDI(for: draft.kind, startChannel: nextChannel, startNumber: 0)
+                    if result.reachedLimit {
+                        showGlobalModeMaxReachedAlert = true
+                        draft.autoAssign = false
+                    } else {
+                        draft.channel = result.channel
+                        draft.number = result.number
+                        debugPrint("  ✅ [CONTROL] ADD mode - set autoAssign=true, channel=\(result.channel), number=\(result.number)")
+                    }
                 } else {
                     debugPrint("  ✅ [CONTROL] ADD mode - preserving draft autoAssign=\(draft.autoAssign)")
                 }
@@ -855,10 +888,16 @@ struct CBControlEditorSheet: View {
             draft.autoAssign = true
             // FIX: Use global channel if enabled, otherwise default to 1
             let nextChannel = isGlobalChannel ? globalChannel : 1
-            draft.channel = nextChannel
-            debugPrint("  🆕 [CONTROL] No editing state, finding free number for \(draft.kind) ch\(draft.channel)")
-            draft.number = firstFreeNumber(for: draft.kind, channel: draft.channel)
-            debugPrint("  ✅ [CONTROL] preset() set number to \(draft.number)")
+            debugPrint("  🆕 [CONTROL] No editing state, finding free number for \(draft.kind) ch\(nextChannel)")
+            let result = autoAssignMIDI(for: draft.kind, startChannel: nextChannel, startNumber: 0)
+            if result.reachedLimit {
+                showGlobalModeMaxReachedAlert = true
+                draft.autoAssign = false
+            } else {
+                draft.channel = result.channel
+                draft.number = result.number
+                debugPrint("  ✅ [CONTROL] preset() set channel=\(result.channel), number=\(result.number)")
+            }
         }
     }
 
@@ -905,52 +944,90 @@ struct CBControlEditorSheet: View {
         draft.number = firstFreeNumber(for: draft.kind, channel: draft.channel)
     }
 
-    private func firstFreeNumber(for kind: MIDIKind, channel: Int) -> Int {
-        debugPrint("🔍 [CONTROL] Finding first free \(kind) number on channel \(channel), editing: \(editing?.title ?? "nil")")
-        for n in 0...127 {
-            let key = MIDIKey(kind: kind, channel: channel, number: n)
-            let owner = currentOwnerName(key)
-            if owner != nil {
-                // Skip if occupied by a different control
-                if let edit = editing, edit.kind == kind, edit.channel == channel, edit.number == n {
-                    // This is the control we're editing, so this number is available for it
-                    debugPrint("  ✓ [CONTROL] \(n) is taken by editing control, available")
-                } else {
-                    // Occupied by a different control, skip this number
-                    debugPrint("  ✗ [CONTROL] \(n) is taken by '\(owner!)', skipping")
-                    continue
+    // Result type for auto-assign with channel increment support
+    private struct AutoAssignResult {
+        let channel: Int
+        let number: Int
+        let reachedLimit: Bool  // true if hit 127 in global mode
+    }
+
+    // New auto-assign function that can increment channel when reaching 127
+    private func autoAssignMIDI(for kind: MIDIKind, startChannel: Int, startNumber: Int = 0) -> AutoAssignResult {
+        debugPrint("🔍 [CONTROL] Auto-assigning \(kind) starting from channel \(startChannel), number \(startNumber)")
+
+        // In global mode, we can't increment channel
+        if isGlobalChannel {
+            // Search only on the global channel
+            for n in startNumber...127 {
+                let key = MIDIKey(kind: kind, channel: globalChannel, number: n)
+                let owner = currentOwnerName(key)
+                if owner != nil {
+                    // Skip if occupied by a different control
+                    if let edit = editing, edit.kind == kind, edit.channel == globalChannel, edit.number == n {
+                        debugPrint("  ✓ [CONTROL] \(n) is taken by editing control, available")
+                        debugPrint("  ✅ [CONTROL] Assigned: channel \(globalChannel), number \(n)")
+                        return AutoAssignResult(channel: globalChannel, number: n, reachedLimit: false)
+                    } else {
+                        debugPrint("  ✗ [CONTROL] \(n) is taken by '\(owner!)', skipping")
+                        continue
+                    }
                 }
+                debugPrint("  ✅ [CONTROL] Assigned: channel \(globalChannel), number \(n)")
+                return AutoAssignResult(channel: globalChannel, number: n, reachedLimit: false)
             }
-            debugPrint("  ✅ [CONTROL] First free number: \(n)")
-            return n
+            // Reached limit in global mode
+            debugPrint("  ⚠️ [CONTROL] Reached limit of 127 in global mode")
+            return AutoAssignResult(channel: globalChannel, number: 0, reachedLimit: true)
         }
-        debugPrint("  ⚠️ [CONTROL] No free numbers found, returning 0")
-        return 0
+
+        // Non-global mode: can increment channel when reaching 127
+        var currentChannel = startChannel
+        var currentNumber = startNumber
+
+        // Try up to 16 channels
+        for _ in 0..<16 {
+            // Search from currentNumber to 127 on current channel
+            for n in currentNumber...127 {
+                let key = MIDIKey(kind: kind, channel: currentChannel, number: n)
+                let owner = currentOwnerName(key)
+                if owner != nil {
+                    // Skip if occupied by a different control
+                    if let edit = editing, edit.kind == kind, edit.channel == currentChannel, edit.number == n {
+                        debugPrint("  ✓ [CONTROL] \(n) is taken by editing control, available")
+                        debugPrint("  ✅ [CONTROL] Assigned: channel \(currentChannel), number \(n)")
+                        return AutoAssignResult(channel: currentChannel, number: n, reachedLimit: false)
+                    } else {
+                        debugPrint("  ✗ [CONTROL] \(n) is taken by '\(owner!)', skipping")
+                        continue
+                    }
+                }
+                debugPrint("  ✅ [CONTROL] Assigned: channel \(currentChannel), number \(n)")
+                return AutoAssignResult(channel: currentChannel, number: n, reachedLimit: false)
+            }
+
+            // Reached end of current channel, increment and start from 0
+            debugPrint("  🔄 [CONTROL] Channel \(currentChannel) full, moving to channel \(currentChannel + 1)")
+            currentChannel += 1
+            if currentChannel > 16 {
+                currentChannel = 1  // Wrap around
+            }
+            currentNumber = 0  // Reset to start of new channel
+        }
+
+        // Exhausted all channels (unlikely but handle it)
+        debugPrint("  ⚠️ [CONTROL] No free slots found across all channels")
+        return AutoAssignResult(channel: startChannel, number: 0, reachedLimit: false)
+    }
+
+    // Legacy function for compatibility - uses new auto-assign logic
+    private func firstFreeNumber(for kind: MIDIKind, channel: Int) -> Int {
+        let result = autoAssignMIDI(for: kind, startChannel: channel, startNumber: 0)
+        return result.number
     }
 
     private func firstFreeNumberStartingFrom(_ start: Int, for kind: MIDIKind, channel: Int) -> Int {
-        debugPrint("🔍 [CONTROL] Finding first free \(kind) number on channel \(channel) starting from \(start)")
-        for n in start...127 {
-            let key = MIDIKey(kind: kind, channel: channel, number: n)
-            let owner = currentOwnerName(key)
-            if owner == nil {
-                debugPrint("  ✅ [CONTROL] First free number: \(n)")
-                return n
-            } else {
-                debugPrint("  ✗ [CONTROL] \(n) is taken by '\(owner!)', skipping")
-            }
-        }
-        // Wrap around and search from 0 if nothing found above start
-        for n in 0..<start {
-            let key = MIDIKey(kind: kind, channel: channel, number: n)
-            let owner = currentOwnerName(key)
-            if owner == nil {
-                debugPrint("  ✅ [CONTROL] First free number (wrapped): \(n)")
-                return n
-            }
-        }
-        debugPrint("  ⚠️ [CONTROL] No free numbers found, returning 0")
-        return 0
+        let result = autoAssignMIDI(for: kind, startChannel: channel, startNumber: start)
+        return result.number
     }
 
     private func saveControl(andAddAnother: Bool) {
@@ -1058,14 +1135,21 @@ struct CBControlEditorSheet: View {
                 draft.isSmall = (buttonType == .small)
             }
 
-            // Set channel and find next free number
-            draft.channel = nextChannel
+            // Set channel and find next free number (with channel increment if needed)
             draft.autoAssign = true
             // FIX: After saving, find next free number starting from the one we just saved + 1
             // Uses savedKind to find next available CC or Note number
-            let nextNumber = firstFreeNumberStartingFrom(savedNumber + 1, for: savedKind, channel: nextChannel)
-            draft.number = nextNumber
-            debugPrint("  ✅ [CONTROL] Set kind=\(savedKind), channel=\(nextChannel), number=\(nextNumber)")
+            let result = autoAssignMIDI(for: savedKind, startChannel: nextChannel, startNumber: savedNumber + 1)
+            if result.reachedLimit {
+                showGlobalModeMaxReachedAlert = true
+                draft.autoAssign = false
+                draft.channel = nextChannel
+                draft.number = 0
+            } else {
+                draft.channel = result.channel
+                draft.number = result.number
+                debugPrint("  ✅ [CONTROL] Set kind=\(savedKind), channel=\(result.channel), number=\(result.number)")
+            }
 
             // NOW set editing to nil (triggers .onChange which calls preset())
             debugPrint("  🔄 [CONTROL] Setting editing=nil (will trigger .onChange)")
@@ -1174,7 +1258,7 @@ struct CBEditControlSheet: View {
                         if isFaderUI {
                             ControlFaderPreview(title: title, cc: number, channel: channel, orientation: faderOrientation, direction: faderDirection)
                         } else {
-                            ControlButtonPreview(title: title, symbol: symbol, kind: kind, number: number, channel: channel, velocity: velocity)
+                            ControlButtonPreview(title: title, symbol: symbol, kind: kind, number: number, channel: channel, velocity: velocity, isSmall: editing?.isSmall ?? false)
                         }
                         Spacer(minLength: 0)
                     }
@@ -1380,30 +1464,50 @@ struct ControlButtonPreview: View {
     let channel: Int
     let velocity: Int
     var isSmall: Bool = false
-    
+
+    private var midiLabel: String {
+        kind == .cc ? "\(channel)•\(number)" : "\(channel)•\(number)•\(velocity)"
+    }
+
     var body: some View {
-        let frameWidth: CGFloat = isSmall ? 92 : 120
-        let frameHeight: CGFloat = isSmall ? 72 : 86
-        let corner: CGFloat = isSmall ? 12 : 14
-        let iconSize: CGFloat = isSmall ? 24 : 24
-        let titleFont: Font = isSmall ? .footnote.weight(.semibold) : .footnote.weight(.semibold)
-        let textOnlyFont: Font = isSmall ? .headline.weight(.semibold) : .title3.weight(.semibold)
-        
+        // Match real button dimensions: regular is 2 cells wide (2*cellSize + 12 spacing), small is 1 cell (cellSize x cellSize)
+        // Using preview cellSize of 72 to match the aspect ratio of real buttons in the grid
+        let previewCellSize: CGFloat = 72
+        let columnSpacing: CGFloat = 12
+        let frameWidth: CGFloat = isSmall ? previewCellSize : (2 * previewCellSize + columnSpacing)
+        let frameHeight: CGFloat = previewCellSize
+        let corner: CGFloat = 14
+
         return VStack(spacing: 6) {
             if symbol.isEmpty {
+                // Text only - matches real button
                 Text(title.isEmpty ? "Custom" : title)
-                    .font(textOnlyFont)
-                Text(kind == .cc ? "\(channel)•\(number)" : "\(channel)•\(number)•\(velocity)")
+                    .font(.title3.weight(.semibold))
+                Text(midiLabel)
                     .font(.caption2)
                     .foregroundColor(.secondary)
+            } else if title.isEmpty {
+                // Icon only - center it vertically with MIDI label at bottom, matches real button
+                VStack {
+                    Spacer()
+                    Image(systemName: symbol)
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundColor(.accentColor)
+                    Spacer()
+                    Text(midiLabel)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.bottom, 4)
+                }
             } else {
-                Image(systemName: symbol).font(.system(size: iconSize, weight: .semibold))
-                Text(title.isEmpty ? "Custom" : title).font(titleFont)
-                if !isSmall {
-            Text(kind == .cc ? "\(channel)•\(number)" : "\(channel)•\(number)•\(velocity)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
+                // Icon + text - matches real button
+                Image(systemName: symbol)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(.accentColor)
+                Text(title).font(.footnote.weight(.semibold))
+                Text(midiLabel)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
         }
         .frame(width: frameWidth, height: frameHeight)
@@ -1764,6 +1868,7 @@ internal struct ContentView: View {
                     songs: store.setlist.songs,
                     isCueMode: store.mode == .cue,
                     cuedID: store.cuedSong?.id,
+                    isEditing: isEditing,
                     onTapSong: { song in
                         if store.mode == .regular {
                             trigger(song)
@@ -3432,11 +3537,11 @@ private struct SplashScreen: View {
                 // App name
                 Text("Cue Bear")
                     .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                
+                    .foregroundColor(Color(uiColor: .systemBackground))
+
                 // Subtle loading indicator
                 ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .progressViewStyle(CircularProgressViewStyle(tint: Color(uiColor: .systemBackground)))
                     .scaleEffect(1.2)
                     .padding(.top, 20)
             }
@@ -5210,14 +5315,16 @@ private struct ControlButtonTile: View {
                             Text(button.title)
                                 .font(.title3.weight(.semibold))
                         } else {
-                    Image(systemName: button.symbol).font(.system(size: 24, weight: .semibold))
+                    Image(systemName: button.symbol)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.accentColor)
                     Text(button.title).font(.footnote.weight(.semibold))
                     Text(midiLabel())
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         }
                 }
-                .foregroundColor(down ? .white : .primary)
+                .foregroundColor(down ? Color(uiColor: .systemBackground) : .primary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
@@ -5232,18 +5339,17 @@ private struct ControlButtonTile: View {
                         Button(action: onDelete) {
                                 ZStack {
                                     Circle()
-                                        .fill(Color.gray.opacity(0.85))
-                                        .frame(width: 22, height: 22)
+                                        .fill(Color.gray.opacity(0.9))
+                                        .frame(width: 30, height: 30)
                                     Image(systemName: "xmark")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.black)
-                                        .offset(x: -1.5, y: -1.5)
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundColor(Color(uiColor: .systemBackground))
                                 }
                         }
                         .buttonStyle(.plain)
                         .contentShape(Rectangle())
-                        .frame(width: 60, height: 60)
-                            .offset(x: -25, y: -25)
+                        .frame(width: 70, height: 70)
+                            .offset(x: -32, y: -32)
                     }
                 }
             }
@@ -5261,8 +5367,8 @@ private struct ControlButtonTile: View {
             if let owner = takenBy, !isEditing {
                 Text("Taken by: \(owner)")
                     .font(.caption2).padding(6)
-                    .foregroundColor(.white)
-                    .background(Color.black.opacity(0.6))
+                    .foregroundColor(Color(uiColor: .systemBackground))
+                    .background(Color.primary.opacity(0.6))
                     .clipShape(Capsule())
                     .padding(6)
                     .allowsHitTesting(false)
@@ -5512,18 +5618,17 @@ private struct ControlButtonTile: View {
                     Button(action: onDelete) {
                         ZStack {
                             Circle()
-                                .fill(Color.gray.opacity(0.85))
-                                .frame(width: 22, height: 22)
+                                .fill(Color.gray.opacity(0.9))
+                                .frame(width: 30, height: 30)
                             Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.black)
-                                .offset(x: -1.5, y: -1.5)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(Color(uiColor: .systemBackground))
                         }
                     }
                     .buttonStyle(.plain)
                     .contentShape(Rectangle())
-                    .frame(width: 60, height: 60)
-                    .offset(x: -25, y: -25)
+                    .frame(width: 70, height: 70)
+                    .offset(x: -32, y: -32)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
@@ -6184,23 +6289,23 @@ private struct iPadControlTile: View {
                 Button(action: onDelete) {
                     ZStack {
                         Circle()
-                            .fill(Color.gray.opacity(0.85))
-                            .frame(width: 22, height: 22)
+                            .fill(Color.gray.opacity(0.9))
+                            .frame(width: 30, height: 30)
                         Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.black)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(Color(uiColor: .systemBackground))
                     }
                 }
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
-                .frame(width: 60, height: 60)
-                .offset(x: -23, y: -23)
+                .frame(width: 70, height: 70)
+                .offset(x: -30, y: -30)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(isEditing ? Rectangle() : Rectangle())
-        .background(isEditing ? Color.clear : Color.black.opacity(0.001))
+        .background(isEditing ? Color.clear : Color.primary.opacity(0.001))
             .opacity(isDragging ? (button.isFader == true ? 0.8 : 0.5) : 1.0)
             // .modifier(ConditionalDragModifier(isEditing: isEditing, onDrag: onDrag, buttonTitle: button.title)) // Disabled in favor of smooth drag
             .allowsHitTesting(isEditing ? true : true)
@@ -6261,14 +6366,14 @@ private struct iPadControlTile: View {
         } else if button.isToggle == true && button.toggleState {
             return Color.accentColor.opacity(0.3) // Light accent for toggle ON
         } else {
-            return Color.white
+            return Color(uiColor: .systemBackground)
         }
     }
     
     // Computed property for button text color based on toggle state
     private var buttonTextColor: Color {
         if isPressed {
-            return .white
+            return Color(uiColor: .systemBackground)
         } else if button.isToggle == true && button.toggleState {
             return .accentColor // Accent color for toggle ON
         } else {
@@ -6289,7 +6394,9 @@ private struct iPadControlTile: View {
                     // Icon only - center it vertically with MIDI label at bottom
                     VStack {
                         Spacer()
-                        Image(systemName: button.symbol).font(.system(size: 32, weight: .semibold))
+                        Image(systemName: button.symbol)
+                            .font(.system(size: 32, weight: .semibold))
+                            .foregroundColor(.accentColor)
                         Spacer()
                         Text(midiLabel())
                             .font(.caption2)
@@ -6298,7 +6405,9 @@ private struct iPadControlTile: View {
                     }
                 } else {
                     // Icon + text
-                    Image(systemName: button.symbol).font(.system(size: 24, weight: .semibold))
+                    Image(systemName: button.symbol)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.accentColor)
                     Text(button.title).font(.footnote.weight(.semibold))
                     Text(midiLabel())
                         .font(.caption2)
@@ -6346,7 +6455,7 @@ private struct iPadControlTile: View {
                 ZStack(alignment: fillAlignment) {
                     // Main fader track background
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white)
+                        .fill(Color(uiColor: .systemBackground))
                         .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(Color.accentColor, lineWidth: 2)
@@ -6450,7 +6559,7 @@ private struct iPadControlTile: View {
                 ZStack(alignment: fillAlignment) {
                     // Main fader track background
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white)
+                        .fill(Color(uiColor: .systemBackground))
                         .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(Color.accentColor, lineWidth: 2)
