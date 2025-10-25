@@ -2895,7 +2895,12 @@ internal struct ContentView: View {
     }
 
     private func toggleLibSelection(_ id: UUID) {
+        let songName = songLibrary.first(where: { $0.id == id })?.name ?? "Unknown"
+        let wasSelected = libSelected.contains(id)
+        debugPrint("🔵 toggleLibSelection called for: \(songName) (ID: \(id)), wasSelected: \(wasSelected)")
         if libSelected.contains(id) { libSelected.remove(id) } else { libSelected.insert(id) }
+        let nowSelected = libSelected.contains(id)
+        debugPrint("🔵 toggleLibSelection completed for: \(songName), nowSelected: \(nowSelected)")
     }
 
     private func selectAllLibrary() {
@@ -2931,8 +2936,14 @@ internal struct ContentView: View {
     }
 
     private func addToSetlist(_ s: Song) {
+        debugPrint("➕ addToSetlist called for: \(s.name) (ID: \(s.id))")
         pushSetlistUndo()
-        guard !store.setlist.songs.contains(where: { $0.id == s.id }) else { return }
+        let alreadyInSetlist = store.setlist.songs.contains(where: { $0.id == s.id })
+        debugPrint("➕ Already in setlist: \(alreadyInSetlist)")
+        guard !alreadyInSetlist else {
+            debugPrint("➕ Skipping add - song already in setlist")
+            return
+        }
 
         // Auto-assign MIDI message if not already assigned
         var songToAdd = s
@@ -2947,9 +2958,11 @@ internal struct ContentView: View {
             }
         }
 
+        debugPrint("➕ Appending \(s.name) to setlist")
         store.setlist.songs.append(songToAdd)
         invalidateConflictCache()
         isDirty = true
+        debugPrint("➕ addToSetlist completed for: \(s.name), setlist now has \(store.setlist.songs.count) songs")
     }
 
     private func firstFreeCC() -> Int {
@@ -2963,9 +2976,15 @@ internal struct ContentView: View {
     }
 
     private func removeFromSetlist(_ s: Song) {
+        debugPrint("🔴 removeFromSetlist called for: \(s.name) (ID: \(s.id))")
+        let countBefore = store.setlist.songs.count
+        debugPrint("🔴 Setlist size before removal: \(countBefore)")
         pushSetlistUndo()
         store.setlist.songs.removeAll { $0.id == s.id }
+        let countAfter = store.setlist.songs.count
+        debugPrint("🔴 Setlist size after removal: \(countAfter)")
         isDirty = true
+        debugPrint("🔴 removeFromSetlist completed for: \(s.name), removed: \(countBefore - countAfter) song(s)")
     }
 
     private func deleteFromLibrary(_ s: Song) {

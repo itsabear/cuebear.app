@@ -172,8 +172,11 @@ struct CBSetlistRow: View {
         HStack(spacing: 12) {
             // Red minus button on the left
             Button {
+                debugPrint("🔴 Minus button tapped for: \(song.name) (ID: \(song.id))")
                 UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                debugPrint("🔴 Calling onRemove for: \(song.name)")
                 onRemove()
+                debugPrint("🔴 onRemove completed for: \(song.name)")
             } label: {
                 Image(systemName: "minus.circle.fill")
                     .foregroundColor(.red)
@@ -291,13 +294,17 @@ struct CBSetlistColumn: View {
 
             List {
                 ForEach(songs) { s in
+                    let _ = debugPrint("📋 Rendering setlist row for: \(s.name) (ID: \(s.id))")
                     CBSetlistRow(
                         song: s,
                         onTap: {
+                            debugPrint("📝 Setlist row tapped (onTap) for: \(s.name)")
                             onRename(s)
                         },
                         onRemove: {
+                            debugPrint("🔴 Setlist row onRemove callback fired for: \(s.name) (ID: \(s.id))")
                             onRemove(s)
+                            debugPrint("🔴 Setlist row onRemove callback completed for: \(s.name)")
                         }
                     )
                     .listRowBackground(Color.clear)
@@ -391,12 +398,18 @@ struct CBLibraryColumn: View {
 
             List {
                 ForEach(rows) { row in
+                    let _ = debugPrint("📋 Rendering library row for: \(row.song.name), isInSetlist: \(row.isInSetlist), isSelected: \(row.isSelected), batchMode: \(batchMode)")
                     CBRowLikeLibrary(
                         title: row.song.name,
                         subtitle: row.song.subtitle,
                         leading: {
                             if batchMode {
-                                Button { onToggleSelect(row.song.id) } label: {
+                                Button {
+                                    debugPrint("🔵 Radio button tapped for: \(row.song.name) (ID: \(row.song.id)), isSelected: \(row.isSelected), batchMode: \(batchMode)")
+                                    debugPrint("🔵 Calling onToggleSelect for: \(row.song.name)")
+                                    onToggleSelect(row.song.id)
+                                    debugPrint("🔵 onToggleSelect completed for: \(row.song.name)")
+                                } label: {
                                     Image(systemName: row.isSelected ? "checkmark.circle.fill" : "circle")
                                         .foregroundColor(.accentColor)
                                         .font(.title3)
@@ -408,9 +421,14 @@ struct CBLibraryColumn: View {
                             } else {
                                 // Always show + icon, but grey and disabled if already in cue list
                                 Button {
+                                    debugPrint("➕ Plus button tapped for: \(row.song.name) (ID: \(row.song.id)), isInSetlist: \(row.isInSetlist)")
                                     if !row.isInSetlist {
                                         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                        debugPrint("➕ Calling onAddToSetlist for: \(row.song.name)")
                                         onAddToSetlist(row.song)
+                                        debugPrint("➕ onAddToSetlist completed for: \(row.song.name)")
+                                    } else {
+                                        debugPrint("➕ Plus button blocked: song already in setlist")
                                     }
                                 } label: {
                                     Image(systemName: "plus.circle.fill")
