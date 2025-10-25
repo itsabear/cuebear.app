@@ -192,7 +192,13 @@ struct CBSetlistRow: View {
                     Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // Only trigger tap on text area, not on minus button
+                onTap()
+            }
+            Spacer(minLength: 0)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 14)
@@ -201,10 +207,6 @@ struct CBSetlistRow: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(.systemBackground))
         )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onTap()
-        }
     }
 }
 
@@ -481,14 +483,16 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
                     Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // Only trigger tap on text area, not on buttons
+                onTap?()
+            }
+            Spacer(minLength: 0)
             trailing()
         }
-        .contentShape(Rectangle())
         .padding(.vertical, 6)
-        .onTapGesture {
-            onTap?()
-        }
     }
 }
 
