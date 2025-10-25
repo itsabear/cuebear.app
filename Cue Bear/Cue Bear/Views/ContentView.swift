@@ -2899,7 +2899,8 @@ internal struct ContentView: View {
     }
 
     private func selectAllLibrary() {
-        let candidates = filteredLibraryRows().filter { row in !store.setlist.songs.contains(where: { $0.id == row.id }) }
+        // Select ALL items in the library, including those already in the cue list
+        let candidates = filteredLibraryRows()
         libSelected = Set(candidates.map { $0.id })
     }
 
