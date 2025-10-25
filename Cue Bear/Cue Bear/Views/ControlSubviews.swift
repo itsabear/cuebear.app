@@ -179,7 +179,9 @@ struct CBSetlistRow: View {
                     .foregroundColor(.red)
                     .font(.title3)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.name).font(.body.bold()).foregroundColor(.primary)
@@ -396,7 +398,9 @@ struct CBLibraryColumn: View {
                                         .foregroundColor(.accentColor)
                                         .font(.title3)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.borderless)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                             } else {
                                 // Always show + icon, but grey and disabled if already in cue list
                                 Button {
@@ -409,7 +413,9 @@ struct CBLibraryColumn: View {
                                         .foregroundColor(row.isInSetlist ? .gray : .accentColor)
                                         .font(.title3)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.borderless)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                                 .disabled(row.isInSetlist)
                             }
                         },

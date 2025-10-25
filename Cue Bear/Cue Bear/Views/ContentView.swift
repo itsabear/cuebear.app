@@ -2913,7 +2913,18 @@ internal struct ContentView: View {
 
     private func deleteSelectedFromLibrary() {
         guard !libSelected.isEmpty else { return }
+        pushSetlistUndo()
+        pushLibraryUndo()
+
+        // Remove from both library and cue list
         songLibrary.removeAll { libSelected.contains($0.id) }
+        store.setlist.songs.removeAll { libSelected.contains($0.id) }
+
+        // Clean up metadata for deleted songs
+        libSelected.forEach { libAddedAt[$0] = nil }
+        invalidateConflictCache()
+        isDirty = true
+
         libSelected.removeAll()
         UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
     }
