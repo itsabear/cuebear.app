@@ -182,6 +182,7 @@ struct CBSetlistRow: View {
             .buttonStyle(.borderless)
             .frame(width: 44, height: 44)
             .contentShape(Rectangle())
+            .zIndex(1)  // Ensure button is above other content
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.name).font(.body.bold()).foregroundColor(.primary)
@@ -403,6 +404,7 @@ struct CBLibraryColumn: View {
                                 .buttonStyle(.borderless)
                                 .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
+                                .allowsHitTesting(true)  // Explicitly allow hit testing
                             } else {
                                 // Always show + icon, but grey and disabled if already in cue list
                                 Button {
@@ -418,6 +420,7 @@ struct CBLibraryColumn: View {
                                 .buttonStyle(.borderless)
                                 .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
+                                .allowsHitTesting(true)  // Explicitly allow hit testing
                                 .disabled(row.isInSetlist)
                             }
                         },
@@ -467,6 +470,7 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
     var body: some View {
         HStack(spacing: 12) {
             leading()
+                .zIndex(1)  // Ensure buttons are above other content
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.body.bold()).foregroundColor(.primary)
                 if let sub = subtitle, !sub.isEmpty {
@@ -483,8 +487,15 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
             }
             Spacer(minLength: 0)
             trailing()
+                .zIndex(1)  // Ensure buttons are above other content
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 10)  // Match CBSetlistRow height
+        .padding(.horizontal, 14)  // Match CBSetlistRow horizontal padding
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(.systemBackground))
+        )
     }
 }
 
