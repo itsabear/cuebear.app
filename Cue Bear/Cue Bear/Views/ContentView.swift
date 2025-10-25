@@ -1192,6 +1192,7 @@ struct CBEditControlSheet: View {
     @State private var autoAssign: Bool = true
     @State private var isToggle: Bool = false
     @State private var isFaderUI: Bool = false
+    @State private var isSmall: Bool = false  // Track small button state for preview
     @State private var showDeleteAlert: Bool = false
     // Fader orientation and direction
     @State private var faderOrientation: String = "vertical"
@@ -1211,10 +1212,7 @@ struct CBEditControlSheet: View {
                     }
                     .contentShape(Rectangle())
                     if !isFaderUI {
-                        Toggle("Small Button", isOn: Binding(
-                            get: { editing?.isSmall ?? false },
-                            set: { newVal in editing?.isSmall = newVal }
-                        ))
+                        Toggle("Small Button", isOn: $isSmall)
                     }
                     HStack {
                         TextField("Control Name", text: $title, prompt: Text("Control Name").foregroundColor(.secondary))
@@ -1258,7 +1256,7 @@ struct CBEditControlSheet: View {
                         if isFaderUI {
                             ControlFaderPreview(title: title, cc: number, channel: channel, orientation: faderOrientation, direction: faderDirection)
                         } else {
-                            ControlButtonPreview(title: title, symbol: symbol, kind: kind, number: number, channel: channel, velocity: velocity, isSmall: editing?.isSmall ?? false)
+                            ControlButtonPreview(title: title, symbol: symbol, kind: kind, number: number, channel: channel, velocity: velocity, isSmall: isSmall)
                         }
                         Spacer(minLength: 0)
                     }
@@ -1384,7 +1382,7 @@ struct CBEditControlSheet: View {
             b.velocity = velocity
             b.isToggle = isToggle
             b.isFader = isFaderUI
-            if !isFaderUI { b.isSmall = editing?.isSmall ?? false } else { b.isSmall = false }
+            if !isFaderUI { b.isSmall = isSmall } else { b.isSmall = false }
 
             // Save fader orientation and direction (only for faders)
             if isFaderUI {
@@ -1397,10 +1395,10 @@ struct CBEditControlSheet: View {
     }
 
     private func preset() {
-        guard let b = editing else { 
+        guard let b = editing else {
             // For new buttons, enable auto-assign by default
             autoAssign = true
-            return 
+            return
         }
         title = b.title
         symbol = b.symbol
@@ -1411,7 +1409,7 @@ struct CBEditControlSheet: View {
         autoAssign = false  // For editing existing buttons, allow manual assignment
         isToggle = b.isToggle ?? false
         isFaderUI = b.isFader ?? false
-        if !(b.isFader ?? false) { editing?.isSmall = b.isSmall ?? false }
+        isSmall = b.isSmall ?? false  // Load small button state for preview
 
         // Load fader orientation and direction with defaults
         if b.isFader == true {
