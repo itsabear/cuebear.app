@@ -1,0 +1,517 @@
+{
+  "controls" : [
+    {
+      "channel" : 1,
+      "faderDirection" : "up",
+      "faderOrientation" : "vertical",
+      "faderValue" : 0.5826771653543307,
+      "gridCol" : 0,
+      "gridRow" : 0,
+      "id" : "BFB5EE68-00DA-43D3-B714-CAF9590E86CA",
+      "isFader" : true,
+      "isSmall" : false,
+      "isToggle" : false,
+      "kind" : "cc",
+      "number" : 1,
+      "symbol" : "",
+      "title" : "Winds",
+      "toggleState" : false,
+      "velocity" : 127
+    },
+    {
+      "channel" : 1,
+      "faderDirection" : "up",
+      "faderOrientation" : "vertical",
+      "faderValue" : 0.6220472440944882,
+      "gridCol" : 1,
+      "gridRow" : 0,
+      "id" : "2DDCBD10-A69E-443B-AC87-BDF3D2AEF4F9",
+      "isFader" : true,
+      "isToggle" : false,
+      "kind" : "cc",
+      "number" : 0,
+      "symbol" : "square.grid.2x2.fill",
+      "title" : "Horns",
+      "toggleState" : false,
+      "velocity" : 127
+    },
+    {
+      "channel" : 1,
+      "faderDirection" : "up",
+      "faderOrientation" : "vertical",
+      "faderValue" : 0.7401574803149606,
+      "gridCol" : 2,
+      "gridRow" : 0,
+      "id" : "6EF7E2E4-ADA4-4C98-8D2E-6A4E8C05BC10",
+      "isFader" : true,
+      "isToggle" : false,
+      "kind" : "cc",
+      "number" : 2,
+      "symbol" : "square.grid.2x2.fill",
+      "title" : "Strings",
+      "toggleState" : false,
+      "velocity" : 127
+    },
+    {
+      "channel" : 1,
+      "faderDirection" : "up",
+      "faderOrientation" : "vertical",
+      "faderValue" : 0.3937007874015748,
+      "gridCol" : 3,
+      "gridRow" : 0,
+      "id" : "963F590C-D257-4632-8000-BDCEA0F15D72",
+      "isFader" : true,
+      "isToggle" : false,
+      "kind" : "cc",
+      "number" : 3,
+      "symbol" : "square.grid.2x2.fill",
+      "title" : "Percussion",
+      "toggleState" : false,
+      "velocity" : 127
+    },
+    {
+      "channel" : 1,
+      "faderDirection" : "up",
+      "faderOrientation" : "vertical",
+      "faderValue" : 1,
+      "gridCol" : 4,
+      "gridRow" : 0,
+      "id" : "27C3CC8B-1CFB-4B2E-A8EC-4B725EF32556",
+      "isFader" : true,
+      "isToggle" : false,
+      "kind" : "cc",
+      "number" : 4,
+      "symbol" : "square.grid.2x2.fill",
+      "title" : "Choir",
+      "toggleState" : false,
+      "velocity" : 127
+    },
+    {
+      "channel" : 1,
+      "gridCol" : 5,
+      "gridRow" : 0,
+      "id" : "5197116D-34DC-41D1-A3B3-527A7B8355CA",
+      "isFader" : false,
+      "isSmall" : false,
+      "isToggle" : false,
+      "kind" : "cc",
+      "number" : 5,
+      "symbol" : "play.fill",
+      "title" : "Play",
+      "toggleState" : false,
+      "velocity" : 127
+    },
+    {
+      "channel" : 1,
+      "gridCol" : 5,
+      "gridRow" : 1,
+      "id" : "D9DFCA5E-9C31-4189-A84A-E8345F5A0DEB",
+      "isFader" : false,
+      "isSmall" : false,
+      "isToggle" : false,
+      "kind" : "cc",
+      "number" : 6,
+      "symbol" : "stop.fill",
+      "title" : "Stop",
+      "toggleState" : false,
+      "velocity" : 127
+    },
+    {
+      "channel" : 1,
+      "gridCol" : 7,
+      "gridRow" : 1,
+      "id" : "A7B72347-4D8F-4333-ADE9-15C8D70BD6F9",
+      "isFader" : false,
+      "isSmall" : true,
+      "isToggle" : false,
+      "kind" : "cc",
+      "number" : 7,
+      "symbol" : "plus.circle.fill",
+      "title" : "",
+      "toggleState" : false,
+      "velocity" : 127
+    },
+    {
+      "channel" : 1,
+      "gridCol" : 7,
+      "gridRow" : 0,
+      "id" : "F1BB83F1-F155-46DB-88EC-371575321D1B",
+      "isFader" : false,
+      "isSmall" : true,
+      "isToggle" : false,
+      "kind" : "cc",
+      "number" : 8,
+      "symbol" : "minus.circle.fill",
+      "title" : "",
+      "toggleState" : false,
+      "velocity" : 127
+    }
+  ],
+  "globalChannel" : 1,
+  "isGlobalChannel" : false,
+  "library" : [
+    {
+      "cc" : 60,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111101",
+      "kind" : "cc",
+      "name" : "Symphony No. 5",
+      "subtitle" : "Allegro con brio",
+      "velocity" : 127
+    },
+    {
+      "cc" : 61,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111102",
+      "kind" : "cc",
+      "name" : "Symphony No. 9",
+      "subtitle" : "Ode to Joy",
+      "velocity" : 127
+    },
+    {
+      "cc" : 62,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111103",
+      "kind" : "cc",
+      "name" : "Moonlight Sonata",
+      "subtitle" : "Op. 27, No. 2",
+      "velocity" : 127
+    },
+    {
+      "cc" : 63,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111104",
+      "kind" : "cc",
+      "name" : "Für Elise",
+      "subtitle" : "Bagatelle in A minor",
+      "velocity" : 127
+    },
+    {
+      "cc" : 64,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111105",
+      "kind" : "cc",
+      "name" : "Symphony No. 6",
+      "subtitle" : "Pastoral",
+      "velocity" : 127
+    },
+    {
+      "cc" : 65,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111106",
+      "kind" : "cc",
+      "name" : "Piano Concerto No. 5",
+      "subtitle" : "Emperor",
+      "velocity" : 127
+    },
+    {
+      "cc" : 66,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111107",
+      "kind" : "cc",
+      "name" : "Symphony No. 3",
+      "subtitle" : "Eroica",
+      "velocity" : 127
+    },
+    {
+      "cc" : 67,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111108",
+      "kind" : "cc",
+      "name" : "Violin Concerto",
+      "subtitle" : "Op. 61 in D major",
+      "velocity" : 127
+    },
+    {
+      "cc" : 68,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111109",
+      "kind" : "cc",
+      "name" : "Pathétique Sonata",
+      "subtitle" : "Op. 13",
+      "velocity" : 127
+    },
+    {
+      "cc" : 69,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111110",
+      "kind" : "cc",
+      "name" : "Symphony No. 7",
+      "subtitle" : "Allegretto",
+      "velocity" : 127
+    },
+    {
+      "cc" : 70,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111111",
+      "kind" : "cc",
+      "name" : "Appassionata Sonata",
+      "subtitle" : "Op. 57",
+      "velocity" : 127
+    },
+    {
+      "cc" : 71,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111112",
+      "kind" : "cc",
+      "name" : "Waldstein Sonata",
+      "subtitle" : "Op. 53",
+      "velocity" : 127
+    },
+    {
+      "cc" : 72,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111113",
+      "kind" : "cc",
+      "name" : "Symphony No. 1",
+      "subtitle" : "Op. 21 in C major",
+      "velocity" : 127
+    },
+    {
+      "cc" : 73,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111114",
+      "kind" : "cc",
+      "name" : "Fidelio Overture",
+      "subtitle" : "Op. 72",
+      "velocity" : 127
+    },
+    {
+      "cc" : 74,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111115",
+      "kind" : "cc",
+      "name" : "Piano Concerto No. 4",
+      "subtitle" : "Op. 58 in G major",
+      "velocity" : 127
+    },
+    {
+      "cc" : 75,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111116",
+      "kind" : "cc",
+      "name" : "Triple Concerto",
+      "subtitle" : "Op. 56",
+      "velocity" : 127
+    },
+    {
+      "cc" : 76,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111117",
+      "kind" : "cc",
+      "name" : "Coriolan Overture",
+      "subtitle" : "Op. 62",
+      "velocity" : 127
+    },
+    {
+      "cc" : 77,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111118",
+      "kind" : "cc",
+      "name" : "Egmont Overture",
+      "subtitle" : "Op. 84",
+      "velocity" : 127
+    },
+    {
+      "cc" : 78,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111119",
+      "kind" : "cc",
+      "name" : "Piano Sonata No. 32",
+      "subtitle" : "Op. 111 in C minor",
+      "velocity" : 127
+    },
+    {
+      "cc" : 79,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111120",
+      "kind" : "cc",
+      "name" : "String Quartet No. 14",
+      "subtitle" : "Op. 131 in C-sharp minor",
+      "velocity" : 127
+    }
+  ],
+  "name" : "Beethoven Live",
+  "setlist" : [
+    {
+      "cc" : 60,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111101",
+      "kind" : "cc",
+      "name" : "Symphony No. 5",
+      "subtitle" : "Allegro con brio",
+      "velocity" : 127
+    },
+    {
+      "cc" : 61,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111102",
+      "kind" : "cc",
+      "name" : "Symphony No. 9",
+      "subtitle" : "Ode to Joy",
+      "velocity" : 127
+    },
+    {
+      "cc" : 62,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111103",
+      "kind" : "cc",
+      "name" : "Moonlight Sonata",
+      "subtitle" : "Op. 27, No. 2",
+      "velocity" : 127
+    },
+    {
+      "cc" : 63,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111104",
+      "kind" : "cc",
+      "name" : "Für Elise",
+      "subtitle" : "Bagatelle in A minor",
+      "velocity" : 127
+    },
+    {
+      "cc" : 64,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111105",
+      "kind" : "cc",
+      "name" : "Symphony No. 6",
+      "subtitle" : "Pastoral",
+      "velocity" : 127
+    },
+    {
+      "cc" : 65,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111106",
+      "kind" : "cc",
+      "name" : "Piano Concerto No. 5",
+      "subtitle" : "Emperor",
+      "velocity" : 127
+    },
+    {
+      "cc" : 66,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111107",
+      "kind" : "cc",
+      "name" : "Symphony No. 3",
+      "subtitle" : "Eroica",
+      "velocity" : 127
+    },
+    {
+      "cc" : 67,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111108",
+      "kind" : "cc",
+      "name" : "Violin Concerto",
+      "subtitle" : "Op. 61 in D major",
+      "velocity" : 127
+    },
+    {
+      "cc" : 68,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111109",
+      "kind" : "cc",
+      "name" : "Pathétique Sonata",
+      "subtitle" : "Op. 13",
+      "velocity" : 127
+    },
+    {
+      "cc" : 69,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111110",
+      "kind" : "cc",
+      "name" : "Symphony No. 7",
+      "subtitle" : "Allegretto",
+      "velocity" : 127
+    },
+    {
+      "cc" : 70,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111111",
+      "kind" : "cc",
+      "name" : "Appassionata Sonata",
+      "subtitle" : "Op. 57",
+      "velocity" : 127
+    },
+    {
+      "cc" : 71,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111112",
+      "kind" : "cc",
+      "name" : "Waldstein Sonata",
+      "subtitle" : "Op. 53",
+      "velocity" : 127
+    },
+    {
+      "cc" : 72,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111113",
+      "kind" : "cc",
+      "name" : "Symphony No. 1",
+      "subtitle" : "Op. 21 in C major",
+      "velocity" : 127
+    },
+    {
+      "cc" : 73,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111114",
+      "kind" : "cc",
+      "name" : "Fidelio Overture",
+      "subtitle" : "Op. 72",
+      "velocity" : 127
+    },
+    {
+      "cc" : 74,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111115",
+      "kind" : "cc",
+      "name" : "Piano Concerto No. 4",
+      "subtitle" : "Op. 58 in G major",
+      "velocity" : 127
+    },
+    {
+      "cc" : 75,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111116",
+      "kind" : "cc",
+      "name" : "Triple Concerto",
+      "subtitle" : "Op. 56",
+      "velocity" : 127
+    },
+    {
+      "cc" : 76,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111117",
+      "kind" : "cc",
+      "name" : "Coriolan Overture",
+      "subtitle" : "Op. 62",
+      "velocity" : 127
+    },
+    {
+      "cc" : 77,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111118",
+      "kind" : "cc",
+      "name" : "Egmont Overture",
+      "subtitle" : "Op. 84",
+      "velocity" : 127
+    },
+    {
+      "cc" : 78,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111119",
+      "kind" : "cc",
+      "name" : "Piano Sonata No. 32",
+      "subtitle" : "Op. 111 in C minor",
+      "velocity" : 127
+    },
+    {
+      "cc" : 79,
+      "channel" : 1,
+      "id" : "11111111-1111-1111-1111-111111111120",
+      "kind" : "cc",
+      "name" : "String Quartet No. 14",
+      "subtitle" : "Op. 131 in C-sharp minor",
+      "velocity" : 127
+    }
+  ]
+}
