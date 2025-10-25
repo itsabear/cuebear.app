@@ -360,7 +360,7 @@ struct DraggableTransportDock: View {
             // NO AUTO-SNAPPING - leave capsule exactly where user placed it
             // CONSTRAINED MOVEMENT - prevent dragging onto menu bar or control area
         }
-        .onChange(of: isControlEditing) { _, editing in
+        .onChange(of: isControlEditing) { _, _ in
             guard !isDragging else { return }
             // NO AUTO-SNAPPING - leave capsule exactly where user placed it
             // CONSTRAINED MOVEMENT - prevent dragging onto menu bar or control area
