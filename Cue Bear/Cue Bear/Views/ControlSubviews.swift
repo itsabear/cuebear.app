@@ -918,7 +918,7 @@ struct CBAddEditCueSheet: View {
     @State private var name: String = ""
     @State private var subtitle: String = ""
     @State private var kind: MIDIKind = .cc
-    @State private var number: Int = 1
+    @State private var number: Int = 0
     @State private var channel: Int = 1
     @State private var velocity: Int = 127
     @State private var autoAssign: Bool = true

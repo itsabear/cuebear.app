@@ -15,7 +15,7 @@ class CueEditorDraft: ObservableObject {
     @Published var name: String = ""
     @Published var subtitle: String = ""
     @Published var kind: MIDIKind = .cc
-    @Published var number: Int = 1
+    @Published var number: Int = 0
     @Published var channel: Int = 1
     @Published var velocity: Int = 127
     @Published var autoAssign: Bool = true
@@ -24,7 +24,7 @@ class CueEditorDraft: ObservableObject {
         name = ""
         subtitle = ""
         kind = .cc
-        number = 1
+        number = 0
         channel = 1
         velocity = 127
         autoAssign = true
