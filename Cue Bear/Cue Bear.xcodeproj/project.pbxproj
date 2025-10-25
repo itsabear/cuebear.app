@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		578F122981D54A98AB33C424 /* Beethoven Live.cuebearproj in Resources */ = {isa = PBXBuildFile; fileRef = D6B8C6D811E8775384274173 /* Beethoven Live.cuebearproj */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		9E6AA9F52E50EE4B00F22798 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,11 +31,14 @@
 		9E6AA9E42E50EE4A00F22798 /* Cue Bear.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cue Bear.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E6AA9F42E50EE4B00F22798 /* Cue BearTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cue BearTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E6AA9FE2E50EE4B00F22798 /* Cue BearUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cue BearUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6B8C6D811E8775384274173 /* Beethoven Live.cuebearproj */ = {isa = PBXFileReference; includeInIndex = 1; name = "Beethoven Live.cuebearproj"; path = "Cue Bear/Beethoven Live.cuebearproj"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9E6AA9E62E50EE4A00F22798 /* Cue Bear */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "Cue Bear";
 			sourceTree = "<group>";
 		};
@@ -67,6 +74,7 @@
 			children = (
 				9E6AA9E62E50EE4A00F22798 /* Cue Bear */,
 				9E6AA9E52E50EE4A00F22798 /* Products */,
+				D6B8C6D811E8775384274173 /* Beethoven Live.cuebearproj */,
 			);
 			sourceTree = "<group>";
 		};
@@ -99,8 +107,6 @@
 				9E6AA9E62E50EE4A00F22798 /* Cue Bear */,
 			);
 			name = "Cue Bear";
-			packageProductDependencies = (
-			);
 			productName = "Cue Bear";
 			productReference = 9E6AA9E42E50EE4A00F22798 /* Cue Bear.app */;
 			productType = "com.apple.product-type.application";
@@ -119,8 +125,6 @@
 				9E6AA9F62E50EE4B00F22798 /* PBXTargetDependency */,
 			);
 			name = "Cue BearTests";
-			packageProductDependencies = (
-			);
 			productName = "Cue BearTests";
 			productReference = 9E6AA9F42E50EE4B00F22798 /* Cue BearTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -139,8 +143,6 @@
 				9E6AAA002E50EE4B00F22798 /* PBXTargetDependency */,
 			);
 			name = "Cue BearUITests";
-			packageProductDependencies = (
-			);
 			productName = "Cue BearUITests";
 			productReference = 9E6AA9FE2E50EE4B00F22798 /* Cue BearUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -193,6 +195,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				578F122981D54A98AB33C424 /* Beethoven Live.cuebearproj in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

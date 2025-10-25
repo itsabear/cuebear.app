@@ -56,22 +56,22 @@ enum ProjectIO {
 
     static func delete(name: String) {
         debugPrint("🗑️ ProjectIO.delete called with name: '\(name)'")
-        
-        do { 
+
+        do {
             let filePath = try path(for: name)
             debugPrint("🗑️ Attempting to delete project: \(name) at \(filePath.path)")
             debugPrint("🗑️ File exists check: \(FileManager.default.fileExists(atPath: filePath.path))")
-            
+
             if FileManager.default.fileExists(atPath: filePath.path) {
                 try FileManager.default.removeItem(at: filePath)
                 debugPrint("✅ Successfully deleted project: \(name)")
-                
+
                 // Verify deletion
                 let stillExists = FileManager.default.fileExists(atPath: filePath.path)
                 debugPrint("🗑️ Verification - file still exists after deletion: \(stillExists)")
             } else {
                 debugPrint("❌ Project file does not exist: \(filePath.path)")
-                
+
                 // List all files in the directory to see what's there
                 let baseFolder = try baseFolder()
                 let files = try FileManager.default.contentsOfDirectory(atPath: baseFolder.path)
@@ -80,6 +80,47 @@ enum ProjectIO {
         } catch {
             debugPrint("❌ Failed to delete project \(name): \(error)")
             debugPrint("❌ Error details: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Autosave for song library
+    // These functions save the library independently so it persists even for "Untitled" projects
+
+    private static var autosaveURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        return docs.appendingPathComponent("songLibrary.autosave.json")
+    }
+
+    static func saveLibraryAutosave(_ library: [Song]) {
+        do {
+            let data = try JSONEncoder().encode(library)
+            try data.write(to: autosaveURL, options: [.atomic])
+            debugPrint("💾 Autosaved song library (\(library.count) songs)")
+        } catch {
+            debugPrint("❌ Failed to autosave library: \(error)")
+        }
+    }
+
+    static func loadLibraryAutosave() -> [Song]? {
+        guard FileManager.default.fileExists(atPath: autosaveURL.path) else {
+            debugPrint("ℹ️ No library autosave file found")
+            return nil
+        }
+        do {
+            let data = try Data(contentsOf: autosaveURL)
+            let library = try JSONDecoder().decode([Song].self, from: data)
+            debugPrint("📂 Loaded autosaved library (\(library.count) songs)")
+            return library
+        } catch {
+            debugPrint("❌ Failed to load library autosave: \(error)")
+            return nil
+        }
+    }
+
+    static func clearLibraryAutosave() {
+        if FileManager.default.fileExists(atPath: autosaveURL.path) {
+            try? FileManager.default.removeItem(at: autosaveURL)
+            debugPrint("🗑️ Cleared library autosave")
         }
     }
 }

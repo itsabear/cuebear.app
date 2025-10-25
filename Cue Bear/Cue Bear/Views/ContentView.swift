@@ -2551,6 +2551,12 @@ internal struct ContentView: View {
                 if songLibrary.isEmpty && projectName != "Untitled" && !projectName.isEmpty {
                     debugPrint("⚠️ Library is empty but project is '\(projectName)' - reloading from disk")
                     autoOpenLastProject()
+                } else if songLibrary.isEmpty && projectName == "Untitled" {
+                    // For "Untitled" projects, try to restore from autosave
+                    if let saved = ProjectIO.loadLibraryAutosave() {
+                        songLibrary = saved
+                        debugPrint("📂 Restored library from autosave for Untitled project")
+                    }
                 }
 
                 // NEW: Check onboarding even for returning users (for testing/debugging)
@@ -2663,6 +2669,11 @@ internal struct ContentView: View {
                 }
                 autosaveWorkItem = workItem
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
+            }
+            .onChange(of: songLibrary) { _, newLibrary in
+                // Always autosave library, even for "Untitled" projects
+                // This ensures library persists across app restarts
+                ProjectIO.saveLibraryAutosave(newLibrary)
             }
             .onChange(of: isEditing) { _, newValue in
                 if !newValue {
@@ -3190,6 +3201,10 @@ internal struct ContentView: View {
             let now = Date()
             for s in songLibrary where libAddedAt[s.id] == nil { libAddedAt[s.id] = now }
             isDirty = false
+
+            // Clear autosave when loading a named project
+            ProjectIO.clearLibraryAutosave()
+
             debugPrint("✅ Project loaded successfully: \(named)")
 
             // v1.0.8: Auto-recover empty library from setlist
@@ -3386,6 +3401,11 @@ internal struct ContentView: View {
         // For subsequent launches, load the last opened project
         guard projectName != "Untitled" && !projectName.isEmpty else {
             debugPrint("⏭️ Skipping auto-open - projectName is 'Untitled' or empty")
+            // For "Untitled" projects, try to restore library from autosave
+            if let saved = ProjectIO.loadLibraryAutosave() {
+                songLibrary = saved
+                debugPrint("📂 Restored library from autosave for Untitled project (\(saved.count) songs)")
+            }
             return
         }
         
@@ -3402,11 +3422,14 @@ internal struct ContentView: View {
             isGlobalChannel = payload.isGlobalChannel ?? false
             globalChannel = payload.globalChannel ?? 1
             let now = Date()
-            for s in songLibrary where libAddedAt[s.id] == nil { 
-                libAddedAt[s.id] = now 
+            for s in songLibrary where libAddedAt[s.id] == nil {
+                libAddedAt[s.id] = now
             }
             isDirty = false
-            
+
+            // Clear autosave when loading a named project
+            ProjectIO.clearLibraryAutosave()
+
             debugPrint("✅ Successfully auto-opened: \(projectName)")
         } catch {
             debugPrint("❌ Failed to auto-open '\(projectName)': \(error)")

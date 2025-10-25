@@ -182,10 +182,7 @@ struct CBSetlistRow: View {
                     .foregroundColor(.red)
                     .font(.title3)
             }
-            .buttonStyle(.borderless)
-            .frame(width: 44, height: 44)
-            .contentShape(Rectangle())
-            .zIndex(1)  // Ensure button is above other content
+            .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.name).font(.body.bold()).foregroundColor(.primary)
@@ -195,13 +192,7 @@ struct CBSetlistRow: View {
                     Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                // Only trigger tap on text area, not on minus button
-                onTap()
-            }
-            Spacer(minLength: 0)
+            Spacer()
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 14)
@@ -210,6 +201,10 @@ struct CBSetlistRow: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(.systemBackground))
         )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 
@@ -414,32 +409,22 @@ struct CBLibraryColumn: View {
                                         .foregroundColor(.accentColor)
                                         .font(.title3)
                                 }
-                                .buttonStyle(.borderless)
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                                .allowsHitTesting(true)  // Explicitly allow hit testing
-                            } else {
-                                // Always show + icon, but grey and disabled if already in cue list
+                                .buttonStyle(.plain)
+                            } else if !row.isInSetlist {
                                 Button {
                                     debugPrint("➕ Plus button tapped for: \(row.song.name) (ID: \(row.song.id)), isInSetlist: \(row.isInSetlist)")
-                                    if !row.isInSetlist {
-                                        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                        debugPrint("➕ Calling onAddToSetlist for: \(row.song.name)")
-                                        onAddToSetlist(row.song)
-                                        debugPrint("➕ onAddToSetlist completed for: \(row.song.name)")
-                                    } else {
-                                        debugPrint("➕ Plus button blocked: song already in setlist")
-                                    }
+                                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                    debugPrint("➕ Calling onAddToSetlist for: \(row.song.name)")
+                                    onAddToSetlist(row.song)
+                                    debugPrint("➕ onAddToSetlist completed for: \(row.song.name)")
                                 } label: {
                                     Image(systemName: "plus.circle.fill")
-                                        .foregroundColor(row.isInSetlist ? .gray : .accentColor)
+                                        .foregroundColor(.accentColor)
                                         .font(.title3)
                                 }
-                                .buttonStyle(.borderless)
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                                .allowsHitTesting(true)  // Explicitly allow hit testing
-                                .disabled(row.isInSetlist)
+                                .buttonStyle(.plain)
+                            } else {
+                                EmptyView()
                             }
                         },
                         trailing: { EmptyView() },
@@ -488,7 +473,6 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
     var body: some View {
         HStack(spacing: 12) {
             leading()
-                .zIndex(1)  // Ensure buttons are above other content
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.body.bold()).foregroundColor(.primary)
                 if let sub = subtitle, !sub.isEmpty {
@@ -497,23 +481,14 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
                     Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                // Only trigger tap on text area, not on buttons
-                onTap?()
-            }
-            Spacer(minLength: 0)
+            Spacer()
             trailing()
-                .zIndex(1)  // Ensure buttons are above other content
         }
-        .padding(.vertical, 10)  // Match CBSetlistRow height
-        .padding(.horizontal, 14)  // Match CBSetlistRow horizontal padding
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(.systemBackground))
-        )
+        .contentShape(Rectangle())
+        .padding(.vertical, 6)
+        .onTapGesture {
+            onTap?()
+        }
     }
 }
 
