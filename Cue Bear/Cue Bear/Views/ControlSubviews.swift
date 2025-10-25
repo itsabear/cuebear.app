@@ -84,12 +84,20 @@ struct CBPerformanceRow: View {
                     }
                 } else {
                     // Normal mode: send MIDI on quick tap
-                    // Flash and haptic are triggered in .onChange(of: isPressed) for instant feedback
                     if !didDrag && takenBy == nil {
+                        // Only flash/haptic when actually sending MIDI (regular mode, not cued)
+                        if !isCueMode {
+                            flash()
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        }
                         onTap()
                     }
                 }
-                didDrag = false
+
+                // Delay resetting didDrag to ensure flash check completes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    didDrag = false
+                }
             }
 
         ZStack(alignment: .center) {
@@ -144,13 +152,6 @@ struct CBPerformanceRow: View {
         .scaleEffect(isPressed ? 0.985 : 1.0)
         .animation(.spring(response: 0.10, dampingFraction: 0.85), value: isPressed)
         .simultaneousGesture(press)
-        .onChange(of: isPressed) { oldValue, newValue in
-            // Trigger flash immediately when finger is released (isPressed becomes false)
-            if oldValue && !newValue && !isEditing && !didDrag && takenBy == nil && !isCued {
-                flash()
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            }
-        }
         // No context menu in either mode (Option A: disabled in both normal and edit mode)
         .accessibilityLabel("\(song.name), \(song.kind == .cc ? "CC \(song.cc)" : "Note \(song.note ?? 0)")")
     }
@@ -162,28 +163,13 @@ struct CBPerformanceRow: View {
     }
 }
 
-// MARK: - Setlist Row (custom row for handling drag appearance)
+// MARK: - Setlist Row (simple row for swipe gestures)
 struct CBSetlistRow: View {
     let song: Song
     var onTap: () -> Void
-    var onRemove: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            // Red minus button on the left
-            Button {
-                debugPrint("🔴 Minus button tapped for: \(song.name) (ID: \(song.id))")
-                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                debugPrint("🔴 Calling onRemove for: \(song.name)")
-                onRemove()
-                debugPrint("🔴 onRemove completed for: \(song.name)")
-            } label: {
-                Image(systemName: "minus.circle.fill")
-                    .foregroundColor(.red)
-                    .font(.title3)
-            }
-            .buttonStyle(.plain)
-
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.name).font(.body.bold()).foregroundColor(.primary)
                 if let sub = song.subtitle, !sub.isEmpty {
@@ -192,21 +178,19 @@ struct CBSetlistRow: View {
                     Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                // Only trigger tap on text area, not on minus button
-                onTap()
-            }
-            Spacer(minLength: 0)
+            Spacer()
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
         .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(.systemBackground))
         )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 
@@ -245,6 +229,7 @@ struct CBSetlistDragPreview: View {
 struct CBSetlistColumn: View {
     let songs: [Song]
     @Binding var searchText: String
+    @Binding var reorderMode: Bool
     var onRename: (Song) -> Void
     var onRemove: (Song) -> Void
     var onMove: (IndexSet, Int) -> Void
@@ -257,6 +242,17 @@ struct CBSetlistColumn: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                 Spacer()
+
+                Button {
+                    withAnimation(.easeInOut) { reorderMode.toggle() }
+                } label: {
+                    Image(systemName: reorderMode ? "checkmark" : "line.3.horizontal")
+                        .font(.system(size: 17))
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(WhiteCapsuleButtonStyle())
+                .foregroundColor(.blue)
+                .padding(.trailing, 16)
             }
             .frame(height: 44) // Match library column header height
 
@@ -291,30 +287,32 @@ struct CBSetlistColumn: View {
 
             List {
                 ForEach(songs) { s in
-                    let _ = debugPrint("📋 Rendering setlist row for: \(s.name) (ID: \(s.id))")
                     CBSetlistRow(
                         song: s,
                         onTap: {
-                            debugPrint("📝 Setlist row tapped (onTap) for: \(s.name)")
                             onRename(s)
-                        },
-                        onRemove: {
-                            debugPrint("🔴 Setlist row onRemove callback fired for: \(s.name) (ID: \(s.id))")
-                            onRemove(s)
-                            debugPrint("🔴 Setlist row onRemove callback completed for: \(s.name)")
                         }
                     )
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowSeparator(.visible)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if !reorderMode {
+                            Button(role: .destructive) {
+                                onRemove(s)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
                 }
                 .onMove { inds, newOffset in
-                    if searchText.isEmpty {
+                    if searchText.isEmpty && reorderMode {
                         onMove(inds, newOffset)
                     }
                 }
             }
-            .environment(\.editMode, .constant(searchText.isEmpty ? .active : .inactive))
+            .environment(\.editMode, .constant(reorderMode && searchText.isEmpty ? .active : .inactive))
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
@@ -336,6 +334,10 @@ struct CBLibraryColumn: View {
     var onAddToSetlist: (Song) -> Void
     var onDeleteFromLibrary: (Song) -> Void
     var onRename: (Song) -> Void
+    var onSelectAll: (() -> Void)?
+    var onClearSelection: (() -> Void)?
+    var onBatchAddToSetlist: (() -> Void)?
+    var onBatchDelete: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -351,98 +353,152 @@ struct CBLibraryColumn: View {
                         ForEach(LibrarySortMode.allCases) { mode in Text(mode.label).tag(mode) }
                     }
                 } label: {
-                    Label(sortMode.label, systemImage: "arrow.up.arrow.down")
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 17))
+                        .frame(width: 24, height: 24)
                 }
                 .buttonStyle(WhiteCapsuleButtonStyle())
+                .foregroundColor(.blue)
 
-                Button(batchMode ? "Cancel" : "Select") {
+                Button {
                     withAnimation(.easeInOut) { batchMode.toggle() }
                     if !batchMode { selected.removeAll() }
+                } label: {
+                    Image(systemName: batchMode ? "xmark" : "checkmark.circle")
+                        .font(.system(size: 17))
+                        .frame(width: 24, height: 24)
                 }
                 .buttonStyle(WhiteCapsuleButtonStyle())
+                .foregroundColor(.blue)
                 .padding(.trailing, 16)
             }
             .frame(height: 44) // Match cue list column header height
 
-            // Search TextField
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
-                    .font(.body)
-
-                TextField("Search songs...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-
-                if !searchText.isEmpty {
-                    Button(action: {
-                        searchText = ""
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                            .font(.body)
+            // v1.0.9: Batch controls replace search bar when in batch mode
+            if batchMode {
+                HStack(spacing: 20) {
+                    Button("Select All") {
+                        onSelectAll?()
                     }
-                    .buttonStyle(.plain)
+                    .foregroundColor(.blue)
+
+                    Button("Clear") {
+                        onClearSelection?()
+                    }
+                    .foregroundColor(.blue)
+
+                    Spacer()
+
+                    Button("Add") {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onBatchAddToSetlist?()
+                    }
+                    .foregroundColor(selected.isEmpty ? .gray : .blue)
+                    .disabled(selected.isEmpty)
+
+                    Button("Delete") {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onBatchDelete?()
+                    }
+                    .foregroundColor(selected.isEmpty ? .gray : .red)
+                    .disabled(selected.isEmpty)
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            } else {
+                // Search TextField
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.gray)
+                        .font(.body)
+
+                    TextField("Search songs...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.gray)
+                                .font(.body)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color(.systemGray6))
-            .cornerRadius(10)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 4)
 
             List {
-                ForEach(rows) { row in
-                    let _ = debugPrint("📋 Rendering library row for: \(row.song.name), isInSetlist: \(row.isInSetlist), isSelected: \(row.isSelected), batchMode: \(batchMode)")
-                    CBRowLikeLibrary(
-                        title: row.song.name,
-                        subtitle: row.song.subtitle,
-                        leading: {
-                            if batchMode {
-                                Button {
-                                    debugPrint("🔵 Radio button tapped for: \(row.song.name) (ID: \(row.song.id)), isSelected: \(row.isSelected), batchMode: \(batchMode)")
-                                    debugPrint("🔵 Calling onToggleSelect for: \(row.song.name)")
-                                    onToggleSelect(row.song.id)
-                                    debugPrint("🔵 onToggleSelect completed for: \(row.song.name)")
-                                } label: {
-                                    Image(systemName: row.isSelected ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(.accentColor)
-                                        .font(.title3)
+                ForEach(rows, id: \.id) { row in
+                    HStack(spacing: 12) {
+                        // Show selection circle in batch mode
+                        if batchMode {
+                            ZStack {
+                                Circle()
+                                    .strokeBorder(Color.gray.opacity(0.5), lineWidth: 2)
+                                    .frame(width: 24, height: 24)
+                                if row.isSelected {
+                                    Circle()
+                                        .fill(Color.accentColor)
+                                        .frame(width: 24, height: 24)
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(.white)
                                 }
-                                .buttonStyle(.plain)
-                            } else if !row.isInSetlist {
-                                Button {
-                                    debugPrint("➕ Plus button tapped for: \(row.song.name) (ID: \(row.song.id)), isInSetlist: \(row.isInSetlist)")
-                                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                    debugPrint("➕ Calling onAddToSetlist for: \(row.song.name)")
-                                    onAddToSetlist(row.song)
-                                    debugPrint("➕ onAddToSetlist completed for: \(row.song.name)")
-                                } label: {
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundColor(.accentColor)
-                                        .font(.title3)
-                                }
-                                .buttonStyle(.plain)
-                            } else {
-                                EmptyView()
                             }
-                        },
-                        trailing: { EmptyView() },
-                        onTap: (!isEditing || batchMode) ? nil : { onRename(row.song) }
-                    )
+                            .frame(width: 24, height: 24)
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(row.song.name).font(.body.bold()).foregroundColor(.primary)
+                            if let sub = row.song.subtitle, !sub.isEmpty {
+                                Text(sub).font(.caption).foregroundColor(.secondary)
+                            } else {
+                                Text(" ").font(.caption).foregroundColor(.clear)
+                            }
+                        }
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.vertical, 6)
                     .opacity(row.isInSetlist ? 0.55 : 1.0)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowSeparator(.visible)
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        if !row.isInSetlist && !batchMode {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                onAddToSetlist(row.song)
+                            } label: {
+                                Label("Add to Cue List", systemImage: "plus.circle.fill")
+                            }
+                            .tint(.accentColor)
+                        }
+                    }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if isEditing && !batchMode {
+                        if !batchMode {
                             Button(role: .destructive) {
                                 onDeleteFromLibrary(row.song)
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
+                        }
+                    }
+                    .onTapGesture {
+                        if batchMode {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            onToggleSelect(row.song.id)
+                        } else {
+                            onRename(row.song)
                         }
                     }
                 }

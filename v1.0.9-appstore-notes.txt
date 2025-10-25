@@ -1,0 +1,10 @@
+What's New in Cue Bear v1.0.9
+
+• Enhanced Edit Mode - Tap any cue or song to edit, with swipe gestures for quick actions
+• Smarter MIDI Assignment - Auto-assigns across all 16 channels (up to 2,032 controls!)
+• Improved Dark Mode - All interface elements now fully support dark mode
+• Better Feedback - Enhanced haptic and visual feedback throughout the app
+• UI Polish - Streamlined batch controls, consistent button heights, and refined animations
+• Bug Fixes - Resolved USB connection timing, button sizing, and various UI issues
+
+Enjoy the update!

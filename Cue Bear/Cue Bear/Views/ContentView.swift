@@ -636,8 +636,10 @@ struct CBControlEditorSheet: View {
                         Spacer(minLength: 0)
                         if draft.isFader {
                             ControlFaderPreview(title: draft.title, cc: draft.number, channel: draft.channel, orientation: draft.faderOrientation, direction: draft.faderDirection)
+                                .id("fader-\(draft.faderOrientation)-\(draft.faderDirection)")
                         } else {
                             ControlButtonPreview(title: draft.title, symbol: draft.symbol, kind: draft.kind, number: draft.number, channel: draft.channel, velocity: draft.velocity, isSmall: draft.isSmall)
+                                .id("button-\(draft.isSmall)")
                         }
                         Spacer(minLength: 0)
                     }
@@ -1041,9 +1043,9 @@ struct CBControlEditorSheet: View {
         b.velocity = draft.velocity
         b.isToggle = draft.isToggle
         b.isFader = (controlType == .fader)
-        // Set isSmall based on buttonType picker (not controlType)
+        // v1.0.9: Set isSmall from draft (picker updates draft.isSmall directly)
         if controlType != .fader {
-            b.isSmall = (buttonType == .small)
+            b.isSmall = draft.isSmall
         }
 
         // Save fader orientation and direction (only for faders)
@@ -1699,6 +1701,7 @@ internal struct ContentView: View {
     @State private var showAddEdit = false
     @State private var editingSong: Song? = nil
     @State private var isEditing = false
+    @State private var reorderMode = false  // v1.0.9: Reorder mode for cue list
 
     // Library state
     @State private var songLibrary: [Song] = []
@@ -1829,7 +1832,11 @@ internal struct ContentView: View {
                         onToggleSelect: { id in toggleLibSelection(id) },
                         onAddToSetlist: { s in addToSetlist(s) },
                         onDeleteFromLibrary: { s in deleteFromLibrary(s) },
-                        onRename: { s in editingSong = s; showAddEdit = true }
+                        onRename: { s in editingSong = s; showAddEdit = true },
+                        onSelectAll: selectAllLibrary,
+                        onClearSelection: { libSelected.removeAll() },
+                        onBatchAddToSetlist: addSelectedToSetlist,
+                        onBatchDelete: deleteSelectedFromLibrary
                     )
                     .padding(.top, 8)
 
@@ -1838,6 +1845,7 @@ internal struct ContentView: View {
                     CBSetlistColumn(
                         songs: filteredSetlistSongs(),
                         searchText: $setlistQuery,
+                        reorderMode: $reorderMode,
                         onRename: { s in editingSong = s; showAddEdit = true },
                         onRemove: { s in removeFromSetlist(s) },
                         onMove: { inds, newOffset in
@@ -1846,17 +1854,6 @@ internal struct ContentView: View {
                         }
                     )
                     .padding(.top, 8)
-                }
-                .overlay(alignment: .bottom) {
-                    if libBatchMode {
-                        CBBatchToolbar(
-                            selectedCount: libSelected.count,
-                            onSelectAll: selectAllLibrary,
-                            onClear: { libSelected.removeAll() },
-                            onAddToSetlist: addSelectedToSetlist,
-                            onDelete: deleteSelectedFromLibrary
-                        )
-                    }
                 }
             )
             } else {
@@ -4037,9 +4034,9 @@ private struct CBControlSection: View {
                 }
             }
                 // Always show Edit/Done button
-                Button(isEditing ? "Done" : "Edit") { 
+                Button(isEditing ? "Done" : "Edit") {
                     debugPrint("🎛️ Edit button tapped, current isEditing: \(isEditing)")
-                    withAnimation(.easeInOut) { 
+                    withAnimation(.easeInOut) {
                         isEditing.toggle()
                         debugPrint("🎛️ Edit mode changed to: \(isEditing)")
                         if !isEditing {
@@ -4048,11 +4045,10 @@ private struct CBControlSection: View {
                             editSessionNonce &+= 1
                             clearDragState(reason: "main edit button - entering edit mode")
                         }
-                    } 
+                    }
                 }
                 .buttonStyle(WhiteCapsuleButtonStyle())
                 .foregroundColor(.blue)
-            .controlSize(.small)
             }
             .padding(.horizontal, 16)
         .padding(.vertical, 4)

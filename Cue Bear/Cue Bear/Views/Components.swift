@@ -134,13 +134,16 @@ struct CBTransportDock: View {
     var onNext: () -> Void
     var onClear: () -> Void
 
+    @State private var isGoPressed = false
+
     var body: some View {
         let chipHeight: CGFloat = 28
         VStack(spacing: 6) {
             ZStack {
             if let name = cuedName {
                 HStack(spacing: 8) {
-                    Text("Next: \(name)")
+                    // v1.0.9: Truncate to 19 characters with ellipsis
+                    Text("Next: \(String(name.prefix(19)))\(name.count > 19 ? "..." : "")")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.primary)
                     Button(action: onClear) {
@@ -185,6 +188,20 @@ struct CBTransportDock: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!isGoEnabled)
+                // v1.0.9: Add tap animation like control area buttons
+                .scaleEffect(isGoPressed ? 1.05 : 1.0)
+                .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isGoPressed)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            if !isGoPressed {
+                                isGoPressed = true
+                            }
+                        }
+                        .onEnded { _ in
+                            isGoPressed = false
+                        }
+                )
 
                 Button(action: onNext) {
                     Image(systemName: "forward.fill")
@@ -211,12 +228,13 @@ struct WhiteCapsuleButtonStyle: ButtonStyle {
     var cornerRadius: CGFloat = 10
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .frame(minHeight: 28)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.white)
+            .background(Color(UIColor.secondarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(Color.gray.opacity(0.15)))
-            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+            .shadow(color: Color.primary.opacity(0.05), radius: 2, x: 0, y: 1)
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
     }
 }

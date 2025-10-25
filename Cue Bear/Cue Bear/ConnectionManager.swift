@@ -706,9 +706,12 @@ class ConnectionManager: ObservableObject {
                     let cleanComputerName = computerName.hasSuffix(".local") ? String(computerName.dropLast(6)) : computerName
                     self?.connectedComputerName = cleanComputerName
                     self?.connectionQuality = .excellent
-                    
+
                     // Notify callback of connection state change
                     self?.connectionStateCallback?(true)
+
+                    // Update USB bridge availability to show chip immediately
+                    self?.checkUSBBridgeAvailability()
                 }
             }
         }))

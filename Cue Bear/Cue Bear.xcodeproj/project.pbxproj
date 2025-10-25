@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		578F122981D54A98AB33C424 /* Beethoven Live.cuebearproj in Resources */ = {isa = PBXBuildFile; fileRef = D6B8C6D811E8775384274173 /* Beethoven Live.cuebearproj */; };
+		E8B7F0DBD2BB523BA2EFF77D /* Beethoven Live.cuebearproj in Resources */ = {isa = PBXBuildFile; fileRef = 8F648AF8B7D3374861610AC1 /* Beethoven Live.cuebearproj */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,16 +28,27 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		8F648AF8B7D3374861610AC1 /* Beethoven Live.cuebearproj */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "Beethoven Live.cuebearproj"; path = "Cue Bear/Beethoven Live.cuebearproj"; sourceTree = "<group>"; };
 		9E6AA9E42E50EE4A00F22798 /* Cue Bear.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cue Bear.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E6AA9F42E50EE4B00F22798 /* Cue BearTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cue BearTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E6AA9FE2E50EE4B00F22798 /* Cue BearUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cue BearUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		D6B8C6D811E8775384274173 /* Beethoven Live.cuebearproj */ = {isa = PBXFileReference; includeInIndex = 1; name = "Beethoven Live.cuebearproj"; path = "Cue Bear/Beethoven Live.cuebearproj"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		9E2BA0992EAD4945000E6AC7 /* Exceptions for "Cue Bear" folder in "Cue Bear" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Beethoven Live.cuebearproj",
+			);
+			target = 9E6AA9E32E50EE4A00F22798 /* Cue Bear */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9E6AA9E62E50EE4A00F22798 /* Cue Bear */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				9E2BA0992EAD4945000E6AC7 /* Exceptions for "Cue Bear" folder in "Cue Bear" target */,
 			);
 			path = "Cue Bear";
 			sourceTree = "<group>";
@@ -74,7 +85,7 @@
 			children = (
 				9E6AA9E62E50EE4A00F22798 /* Cue Bear */,
 				9E6AA9E52E50EE4A00F22798 /* Products */,
-				D6B8C6D811E8775384274173 /* Beethoven Live.cuebearproj */,
+				8F648AF8B7D3374861610AC1 /* Beethoven Live.cuebearproj */,
 			);
 			sourceTree = "<group>";
 		};
@@ -195,7 +206,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				578F122981D54A98AB33C424 /* Beethoven Live.cuebearproj in Resources */,
+				E8B7F0DBD2BB523BA2EFF77D /* Beethoven Live.cuebearproj in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
