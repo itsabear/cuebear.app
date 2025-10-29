@@ -6,7 +6,8 @@
 	objectVersion = 60;
 	objects = {
 
-/* Begin PBXBuildFile section */		AA1111000000000000000001 /* CueBearBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000001 /* CueBearBridgeApp.swift */; };
+/* Begin PBXBuildFile section */
+		ED9704723C234E34BD5561E7 /* OnboardingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0558A9C21D2141E58BC44369 /* OnboardingWindow.swift */; };		AA1111000000000000000001 /* CueBearBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000001 /* CueBearBridgeApp.swift */; };
 		AA1111000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000002 /* ContentView.swift */; };
 		AA1111000000000000000003 /* IProxyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000003 /* IProxyManager.swift */; };
 		AA1111000000000000000004 /* MacConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1112000000000000000004 /* MacConnectionManager.swift */; };
@@ -18,7 +19,8 @@
 		AA111100000000000000000B /* USBMuxdMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA111200000000000000000B /* USBMuxdMonitor.swift */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXFileReference section */		A313445E766241B89A2BB542 /* CueBearBridge-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "CueBearBridge-Bridging-Header.h"; sourceTree = "<group>"; };
+/* Begin PBXFileReference section */
+		0558A9C21D2141E58BC44369 /* OnboardingWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindow.swift; sourceTree = "<group>"; };		A313445E766241B89A2BB542 /* CueBearBridge-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "CueBearBridge-Bridging-Header.h"; sourceTree = "<group>"; };
 		AA1112000000000000000000 /* CueBearBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CueBearBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA1112000000000000000001 /* CueBearBridgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueBearBridgeApp.swift; sourceTree = "<group>"; };
 		AA1112000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -159,6 +161,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA1111000000000000000001 /* CueBearBridgeApp.swift in Sources */,
+				ED9704723C234E34BD5561E7 /* OnboardingWindow.swift in Sources */,
 				AA1111000000000000000002 /* ContentView.swift in Sources */,
 				AA1111000000000000000003 /* IProxyManager.swift in Sources */,
 				AA1111000000000000000004 /* MacConnectionManager.swift in Sources */,
@@ -209,6 +212,7 @@
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_OBJC_BRIDGING_HEADER = "CueBearBridge-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

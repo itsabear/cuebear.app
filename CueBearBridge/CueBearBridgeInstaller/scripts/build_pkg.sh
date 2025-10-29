@@ -153,6 +153,8 @@ xcodebuild \
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA" \
     clean build \
+    ARCHS="arm64 x86_64" \
+    ONLY_ACTIVE_ARCH=NO \
     CODE_SIGN_IDENTITY="" \
     CODE_SIGNING_REQUIRED=NO \
     CODE_SIGNING_ALLOWED=NO
@@ -174,6 +176,22 @@ cp -R "$BUILT_APP" "$APP_BUNDLE"
 log_success "App copied to: $APP_BUNDLE"
 
 # ============================================================================
+# Step 2.5: Replace iproxy with universal version
+# ============================================================================
+
+log_info "Replacing iproxy with universal binary..."
+
+UNIVERSAL_IPROXY="$PROJECT_DIR/CueBearBridgeInstaller/build-universal/CueBearBridge.app/Contents/MacOS/iproxy"
+if [ -f "$UNIVERSAL_IPROXY" ]; then
+    rm -f "$APP_BUNDLE/Contents/MacOS/iproxy"
+    cp "$UNIVERSAL_IPROXY" "$APP_BUNDLE/Contents/MacOS/iproxy"
+    chmod +x "$APP_BUNDLE/Contents/MacOS/iproxy"
+    log_success "Universal iproxy installed"
+else
+    log_warning "Universal iproxy not found at: $UNIVERSAL_IPROXY"
+fi
+
+# ============================================================================
 # Step 3: Bundle Required Dylibs
 # ============================================================================
 
@@ -182,7 +200,7 @@ log_step "Step 3: Bundling required dylibs"
 FRAMEWORKS_DIR="$APP_BUNDLE/Contents/Frameworks"
 mkdir -p "$FRAMEWORKS_DIR"
 
-SOURCE_FRAMEWORKS="$PROJECT_DIR/Resources/Frameworks"
+SOURCE_FRAMEWORKS="$PROJECT_DIR/Frameworks"
 
 if [ ! -d "$SOURCE_FRAMEWORKS" ]; then
     log_error "Source frameworks directory not found: $SOURCE_FRAMEWORKS"
@@ -251,14 +269,15 @@ log_success "Helper binaries bundled"
 # ============================================================================
 # Step 5: Bundle iproxy and Dependencies
 # ============================================================================
+# NOTE: Skipping this step because we manually copy universal iproxy in Step 2.5
+# The bundle_iproxy.sh script copies from Homebrew which is ARM64-only
 
-log_step "Step 5: Bundling iproxy and dependencies"
+# log_step "Step 5: Bundling iproxy and dependencies"
+# log_info "Running iproxy bundling script..."
+# "$SCRIPT_DIR/bundle_iproxy.sh" "$APP_BUNDLE"
+# log_success "iproxy and dependencies bundled"
 
-log_info "Running iproxy bundling script..."
-
-"$SCRIPT_DIR/bundle_iproxy.sh" "$APP_BUNDLE"
-
-log_success "iproxy and dependencies bundled"
+log_step "Step 5: Skipped (using universal iproxy from Step 2.5)"
 
 # ============================================================================
 # Step 6: Sign App Bundle

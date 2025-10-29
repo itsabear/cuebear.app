@@ -29,18 +29,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 struct CueBearBridgeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var app = BridgeApp()
+    @StateObject private var onboardingManager = OnboardingManager()
 
     var body: some Scene {
         MenuBarExtra("Cue Bear Bridge", image: "BearPawIcon") {
             MenuBarView()
                 .environmentObject(app)
+                .environmentObject(onboardingManager)
                 .onAppear {
                     // Connect AppDelegate to BridgeApp for cleanup
                     appDelegate.bridgeApp = app
                 }
         }
         .menuBarExtraStyle(.window)
-        
+
         // Keep the window for debugging/logs
         WindowGroup("Bridge Logs") {
             ContentView()
@@ -53,6 +55,7 @@ struct CueBearBridgeApp: App {
 
 struct MenuBarView: View {
     @EnvironmentObject var app: BridgeApp
+    @EnvironmentObject var onboardingManager: OnboardingManager
 
     var body: some View {
         VStack(spacing: 8) {
@@ -132,9 +135,25 @@ struct MenuBarView: View {
                 .padding(.vertical, 6)
             }
 
-            // Quit Menu Item - Simple text only
+            // Getting Started Menu Item
             Divider()
 
+            Button(action: {
+                onboardingManager.showOnboarding()
+            }) {
+                HStack {
+                    Text("Getting Started")
+                        .font(.system(size: 13))
+                        .foregroundColor(.primary)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .background(Color.clear)
+
+            // Quit Menu Item
             Button(action: {
                 NSApplication.shared.terminate(nil)
             }) {
