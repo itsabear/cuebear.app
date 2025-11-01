@@ -168,17 +168,42 @@ struct CBSetlistRow: View {
     let song: Song
     var onTap: () -> Void
 
+    private var midiLabel: String {
+        if song.kind == .cc {
+            return "\(song.channel)•\(song.cc)"
+        } else {
+            let noteName = (song.note ?? 60).midiNoteName
+            return "\(song.channel)•\(noteName)•\(song.velocity)"
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(song.name).font(.body.bold()).foregroundColor(.primary)
+                Text(song.name)
+                    .font(.body.bold())
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 if let sub = song.subtitle, !sub.isEmpty {
-                    Text(sub).font(.caption).foregroundColor(.secondary)
+                    Text(sub)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 } else {
                     Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
             Spacer()
+            // MIDI data label
+            Text(midiLabel)
+                .font(.caption.monospacedDigit())
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(6)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 14)
@@ -458,14 +483,37 @@ struct CBLibraryColumn: View {
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(row.song.name).font(.body.bold()).foregroundColor(.primary)
+                            Text(row.song.name)
+                                .font(.body.bold())
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                             if let sub = row.song.subtitle, !sub.isEmpty {
-                                Text(sub).font(.caption).foregroundColor(.secondary)
+                                Text(sub)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
                             } else {
                                 Text(" ").font(.caption).foregroundColor(.clear)
                             }
                         }
                         Spacer()
+                        // MIDI data label
+                        Text({
+                            if row.song.kind == .cc {
+                                return "\(row.song.channel)•\(row.song.cc)"
+                            } else {
+                                let noteName = (row.song.note ?? 60).midiNoteName
+                                return "\(row.song.channel)•\(noteName)•\(row.song.velocity)"
+                            }
+                        }())
+                            .font(.caption.monospacedDigit())
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.secondary.opacity(0.1))
+                            .cornerRadius(6)
                     }
                     .contentShape(Rectangle())
                     .padding(.vertical, 6)
@@ -961,6 +1009,7 @@ struct CBAddEditCueSheet: View {
     @State private var showDeleteAlert: Bool = false
     @State private var showGlobalModeMaxReachedAlert: Bool = false
     @State private var lastEditingSongID: UUID? = nil  // Track which song we're editing to preserve unsaved changes
+    @State private var hasInitialized: Bool = false  // Track if we've run initial preset
 
     var body: some View {
         NavigationView {
@@ -1050,10 +1099,19 @@ struct CBAddEditCueSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save(andAddAnother: false) } }
             }
+            .task(priority: .userInitiated) {
+                // Run preset with high priority BEFORE view renders to avoid race condition
+                if !hasInitialized {
+                    debugPrint("🚀 [CUE] task(priority: .userInitiated) - Initial preset")
+                    hasInitialized = true
+                    preset()
+                }
+            }
             .onAppear {
                 // Only preset if we're editing a different song (or switching to/from add mode)
                 let currentID = editingSong?.id
-                if currentID != lastEditingSongID {
+                if currentID != lastEditingSongID && hasInitialized {
+                    debugPrint("👁️ [CUE] onAppear - Song changed, re-preset")
                     preset()
                     lastEditingSongID = currentID
                 }
@@ -1063,6 +1121,8 @@ struct CBAddEditCueSheet: View {
                 let oldID = oldValue?.id
                 let newID = newValue?.id
                 if oldID != newID {
+                    debugPrint("🔄 [CUE] onChange(editingSong) - Song changed from \(oldID?.uuidString.prefix(8) ?? "nil") to \(newID?.uuidString.prefix(8) ?? "nil")")
+                    hasInitialized = false  // Reset flag so .task runs again
                     preset()
                     lastEditingSongID = newID
                 }
@@ -1149,6 +1209,13 @@ struct CBAddEditCueSheet: View {
     // New auto-assign function that can increment channel when reaching 127
     private func autoAssignMIDI(for kind: MIDIKind, startChannel: Int, startNumber: Int = 0) -> AutoAssignResult {
         debugPrint("🔍 [CUE] Auto-assigning \(kind) starting from channel \(startChannel), number \(startNumber)")
+        debugPrint("🔍 [CUE] Conflict map has \(conflictFor.count) entries")
+
+        // DEBUG: Print first few conflicts
+        let firstConflicts = conflictFor.prefix(5)
+        for (key, owner) in firstConflicts {
+            debugPrint("  📋 [CUE] Conflict: \(key.kind) ch\(key.channel) #\(key.number) = '\(owner)'")
+        }
 
         // In global mode, we can't increment channel
         if isGlobalChannel {
@@ -1385,5 +1452,4 @@ struct ReorderDropDelegate: DropDelegate {
         return true
     }
 }
-
 

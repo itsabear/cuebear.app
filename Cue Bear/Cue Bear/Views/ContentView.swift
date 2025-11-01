@@ -350,7 +350,7 @@ struct IconPicker: View {
     var body: some View {
         Picker("Icon", selection: $symbol) {
             Text("Text only").tag("")
-            ForEach(icons, id: \.self) { Image(systemName: $0).tag($0) }
+            ForEach(icons.reversed(), id: \.self) { Image(systemName: $0).tag($0) }
         }
     }
 }
@@ -612,12 +612,23 @@ struct CBControlEditorSheet: View {
                             Text("Vertical").tag("vertical")
                             Text("Horizontal").tag("horizontal")
                         }
+                        .onChange(of: draft.faderOrientation) { _, newOrientation in
+                            // Reset direction to default when orientation changes
+                            if newOrientation == "vertical" {
+                                draft.faderDirection = "up"
+                            } else {
+                                draft.faderDirection = "right"
+                            }
+                        }
 
                         Picker("Fader Direction", selection: $draft.faderDirection) {
-                            Text("Up").tag("up")
-                            Text("Down").tag("down")
-                            Text("Left").tag("left")
-                            Text("Right").tag("right")
+                            if draft.faderOrientation == "vertical" {
+                                Text("Up").tag("up")
+                                Text("Down").tag("down")
+                            } else {
+                                Text("Left").tag("left")
+                                Text("Right").tag("right")
+                            }
                         }
                         .id("fader-direction-picker")
 
@@ -1241,12 +1252,23 @@ struct CBEditControlSheet: View {
                             Text("Vertical").tag("vertical")
                             Text("Horizontal").tag("horizontal")
                         }
+                        .onChange(of: faderOrientation) { _, newOrientation in
+                            // Reset direction to default when orientation changes
+                            if newOrientation == "vertical" {
+                                faderDirection = "up"
+                            } else {
+                                faderDirection = "right"
+                            }
+                        }
 
                         Picker("Fader Direction", selection: $faderDirection) {
-                            Text("Up").tag("up")
-                            Text("Down").tag("down")
-                            Text("Left").tag("left")
-                            Text("Right").tag("right")
+                            if faderOrientation == "vertical" {
+                                Text("Up").tag("up")
+                                Text("Down").tag("down")
+                            } else {
+                                Text("Left").tag("left")
+                                Text("Right").tag("right")
+                            }
                         }
                         .id("fader-direction-picker-edit")
                     }
