@@ -8,35 +8,44 @@ import SwiftUI
 // MARK: - Onboarding View
 struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @State private var currentPage = 0
     @State private var dontShowAgain = false
 
-    private let pages: [OnboardingPage] = [
-        OnboardingPage(
-            title: "Welcome to Cue Bear",
-            description: "A MIDI controller built around your set list.",
-            systemIcon: "music.note.list",
-            accentColor: .blue
-        ),
-        OnboardingPage(
-            title: "Connect Your Mac",
-            description: "Go to cuebear.app/bridge to download our companion app and install it on your Mac to connect seamlessly to your iPad over USB or WiFi.",
-            systemIcon: "laptopcomputer",
-            accentColor: .blue
-        ),
-        OnboardingPage(
-            title: "Enable MIDI Device",
-            description: "Enable \"Bear Bridge\" virtual MIDI device in your DAW.",
-            systemIcon: "slider.horizontal.3",
-            accentColor: .blue
-        ),
-        OnboardingPage(
-            title: "We'd Love Your Feedback",
-            description: "This app is in beta. We'd love to hear your take on our app. Hit us up on info@cuebear.app",
-            systemIcon: "envelope.fill",
-            accentColor: .blue
-        )
-    ]
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
+    private var pages: [OnboardingPage] {
+        let themeAccent = selectedTheme.accentColor(for: colorScheme)
+        return [
+            OnboardingPage(
+                title: "Welcome to Cue Bear",
+                description: "A MIDI controller built around your set list.",
+                systemIcon: "music.note.list",
+                accentColor: themeAccent
+            ),
+            OnboardingPage(
+                title: "Connect Your Mac",
+                description: "Go to cuebear.app/bridge to download our companion app and install it on your Mac to connect seamlessly to your iPad over USB or WiFi.",
+                systemIcon: "laptopcomputer",
+                accentColor: themeAccent
+            ),
+            OnboardingPage(
+                title: "Enable MIDI Device",
+                description: "Enable \"Bear Bridge\" virtual MIDI device in your DAW.",
+                systemIcon: "slider.horizontal.3",
+                accentColor: themeAccent
+            ),
+            OnboardingPage(
+                title: "We'd Love Your Feedback",
+                description: "This app is in beta. We'd love to hear your take on our app. Hit us up on info@cuebear.app",
+                systemIcon: "envelope.fill",
+                accentColor: themeAccent
+            )
+        ]
+    }
 
     var body: some View {
         NavigationView {
@@ -62,6 +71,7 @@ struct OnboardingView: View {
             }
             .navigationTitle("Get Started")
             .navigationBarTitleDisplayMode(.inline)
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     if currentPage < pages.count - 1 {
@@ -73,6 +83,7 @@ struct OnboardingView: View {
             }
         }
         .navigationViewStyle(.stack)
+        .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
 }
 

@@ -1,12 +1,40 @@
 import SwiftUI
 @_exported import Foundation
 
+// MARK: - Helper Functions for Contrast Calculation
+private func hexToRGB(_ hex: String) -> (Int, Int, Int) {
+    let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+    var int = UInt64()
+    Scanner(string: hex).scanHexInt64(&int)
+    let r = Int((int >> 16) & 0xFF)
+    let g = Int((int >> 8) & 0xFF)
+    let b = Int(int & 0xFF)
+    return (r, g, b)
+}
+
+private func relativeLuminance(_ rgb: (Int, Int, Int)) -> Double {
+    func adjust(_ c: Double) -> Double {
+        return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+    }
+    let r = adjust(Double(rgb.0) / 255.0)
+    let g = adjust(Double(rgb.1) / 255.0)
+    let b = adjust(Double(rgb.2) / 255.0)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
 // MARK: - Performance List (instant touch-down flash; long-press Change MIDI…)
 struct CBPerformanceList: View {
     let songs: [Song]
     let isCueMode: Bool
     let cuedID: UUID?
     let isEditing: Bool
+    let flashingCueID: UUID?  // ID of cue that should flash
+    let accentColor: Color  // Theme accent color for selection stroke
+    let defaultCueColor: Color  // Theme default cue color
+    let themeFont: (CGFloat, Font.Weight) -> Font  // Theme font function
+    let selectionStrokeColor: (String?) -> Color  // Closure to compute contrasting selection color based on cue color
+    let backgroundColorHex: String  // Theme background color hex for contrast calculation
+    let defaultCueColorHex: String  // Theme default cue color hex for color preview
     var onTapSong: (Song) -> Void
     var onLongPressChangeMIDI: (Song) -> Void
     var onRename: (Song) -> Void
@@ -25,10 +53,17 @@ struct CBPerformanceList: View {
                     let takenBy = conflictFor[key]
                     CBPerformanceRow(
                         song: s,
-                        isCued: isCueMode && cuedID == s.id,
+                        isCued: cuedID == s.id,  // Show stroke in both Cue and Navigator modes
                         isCueMode: isCueMode,
                         isEditing: isEditing,
                         takenBy: (takenBy != nil && takenBy != s.name) ? takenBy : nil,
+                        shouldFlash: flashingCueID == s.id,  // Flash when triggered
+                        accentColor: accentColor,  // Pass theme accent color
+                        defaultCueColor: defaultCueColor,  // Pass theme default cue color
+                        themeFont: themeFont,  // Pass theme font function
+                        selectionStrokeColor: selectionStrokeColor(s.colorHex),  // Compute contrasting selection stroke color
+                        backgroundColorHex: backgroundColorHex,  // Pass background color hex for contrast
+                        defaultCueColorHex: defaultCueColorHex,  // Pass default cue color hex for preview
                         onTap: { onTapSong(s) },
                         onLongPressChangeMIDI: { onLongPressChangeMIDI(s) },
                         onRename: { onRename(s) },
@@ -39,11 +74,13 @@ struct CBPerformanceList: View {
                     }
                     Color.clear.frame(height: 8)
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 36)
+                .padding(.top, 80)
+                .padding(.bottom, 12)
             }
             .onChange(of: cuedID) { _, newID in
-                guard isCueMode, let id = newID else { return }
+                // Scroll to selected cue in both Cue mode and Nav mode
+                guard let id = newID else { return }
                 withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(id, anchor: .center) }
             }
         }
@@ -56,6 +93,13 @@ struct CBPerformanceRow: View {
     let isCueMode: Bool
     let isEditing: Bool
     let takenBy: String?
+    let shouldFlash: Bool  // Trigger from parent to flash the row
+    let accentColor: Color  // Theme accent color for selection stroke
+    let defaultCueColor: Color  // Theme default cue color
+    let themeFont: (CGFloat, Font.Weight) -> Font  // Theme font function
+    let selectionStrokeColor: Color  // Contrasting selection stroke color based on cue background
+    let backgroundColorHex: String  // Theme background color hex for contrast calculation
+    let defaultCueColorHex: String  // Theme default cue color hex for preview
     var onTap: () -> Void
     var onLongPressChangeMIDI: () -> Void
     var onRename: () -> Void
@@ -65,6 +109,7 @@ struct CBPerformanceRow: View {
     @GestureState private var isPressed = false
     @State private var didDrag = false
     @State private var flashOpacity: Double = 0.0
+    @Environment(\.colorScheme) private var colorScheme
     private let corner: CGFloat = 20
 
     var body: some View {
@@ -100,35 +145,66 @@ struct CBPerformanceRow: View {
                 }
             }
 
+        // Use custom color if set, otherwise use theme default cue color
+        let baseColor: Color = {
+            if let hex = song.colorHex {
+                return Color(hex: hex)
+            }
+            return defaultCueColor  // Theme default cue color
+        }()
+
         ZStack(alignment: .center) {
-            // Use accent color from theme for non-cued rows
             RoundedRectangle(cornerRadius: corner)
-                .fill(isCued ? Color.orange : Color.accentColor)
-                .frame(maxWidth: .infinity, minHeight: 86)
+                .fill(baseColor)
+                .frame(maxWidth: .infinity, minHeight: isCued ? 96 : 86)
                 .opacity(takenBy == nil ? 1.0 : 0.55)
+                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
 
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(song.name)
-                        .font(.title3.bold())
+                        .font(themeFont(isCued ? 26 : 22, .bold))  // Larger text when selected
                         .foregroundColor(Color(uiColor: .systemBackground))
                         .lineLimit(1)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
                     if let sub = song.subtitle, !sub.isEmpty {
-                        Text(sub).font(.footnote).foregroundColor(Color(uiColor: .systemBackground).opacity(0.85)).lineLimit(1)
+                        Text(sub)
+                            .font(isCued ? .subheadline : .footnote)  // Larger subtitle when selected
+                            .foregroundColor(Color(uiColor: .systemBackground).opacity(0.85))
+                            .lineLimit(1)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
                     }
                 }
                 Spacer(minLength: 12)
-                let subtitle: String = {
-                    if song.kind == .cc {
-                        return "Ch \(song.channel)  •  CC \(song.cc)"
-                    } else {
-                        let noteName = (song.note ?? 0).midiNoteName
-                        return "Ch \(song.channel)  •  \(noteName)"
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    let subtitle: String = {
+                        if song.kind == .cc {
+                            return "Ch \(song.channel)  •  CC \(song.cc)"
+                        } else {
+                            let noteName = (song.note ?? 0).midiNoteName
+                            return "Ch \(song.channel)  •  \(noteName)"
+                        }
+                    }()
+                    Text(subtitle)
+                        .font(isCued ? .caption : .caption2)  // Larger info when selected
+                        .foregroundColor(Color(uiColor: .systemBackground).opacity(0.9))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
+
+                    // Color indicator circle - only show in edit mode
+                    if isEditing {
+                        let displayColor = song.colorHex ?? defaultCueColorHex
+                        HStack(spacing: 4) {
+                            Text("Color:")
+                                .font(.caption2)
+                                .foregroundColor(Color(uiColor: .systemBackground).opacity(0.7))
+                            Circle()
+                                .fill(Color(hex: displayColor))
+                                .frame(width: 16, height: 16)
+                                .overlay(Circle().stroke(Color(uiColor: .systemBackground).opacity(0.3), lineWidth: 1))
+                        }
                     }
-                }()
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundColor(Color(uiColor: .systemBackground).opacity(0.9))
+                }
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 16)
@@ -146,14 +222,52 @@ struct CBPerformanceRow: View {
                     .foregroundColor(Color(uiColor: .systemBackground))
                     .background(Color.primary.opacity(0.6))
                     .clipShape(Capsule())
+                    .allowsHitTesting(false)  // Allow tap through the chip
             }
         }
         .contentShape(Rectangle())
-        .scaleEffect(isPressed ? 0.985 : 1.0)
+        // Add extra padding when selected to push other cues aside
+        .padding(.vertical, isCued ? 8 : 0)
+        .padding(.horizontal, isCued ? 4 : 0)
+        // Asymmetric scale: slightly wider, more height
+        .scaleEffect(
+            x: isCued ? 1.05 : (isPressed ? 0.985 : 1.0),
+            y: isCued ? 1.20 : (isPressed ? 0.985 : 1.0),
+            anchor: .center
+        )
+        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
         .animation(.spring(response: 0.10, dampingFraction: 0.85), value: isPressed)
+        // Shadow in light themes, colored glow in dark themes
+        .shadow(
+            color: {
+                if !isCued { return Color.clear }
+                // Use background luminance to detect dark theme
+                let bgLuminance = relativeLuminance(hex: backgroundColorHex)
+                if bgLuminance < 0.5 {
+                    // Dark background: use colored glow with cue color
+                    return baseColor.opacity(0.6)
+                } else {
+                    // Light background: use black shadow
+                    return Color.black.opacity(0.3)
+                }
+            }(),
+            radius: isCued ? 12 : 0,
+            x: 0,
+            y: {
+                if !isCued { return 0 }
+                let bgLuminance = relativeLuminance(hex: backgroundColorHex)
+                return bgLuminance < 0.5 ? 0 : 6  // No y-offset for glow, offset for shadow
+            }()
+        )
+        .zIndex(isCued ? 1 : 0)  // Elevate selected cue above others
         .simultaneousGesture(press)
         // No context menu in either mode (Option A: disabled in both normal and edit mode)
         .accessibilityLabel("\(song.name), \(song.kind == .cc ? "CC \(song.cc)" : "Note \(song.note ?? 0)")")
+        .onChange(of: shouldFlash) { _, newValue in
+            if newValue {
+                flash()
+            }
+        }
     }
 
     private func flash() {
@@ -161,32 +275,97 @@ struct CBPerformanceRow: View {
         // v1.0.9: Balanced flash duration - noticeable but snappy
         withAnimation(.easeOut(duration: 0.20)) { flashOpacity = 0.0 }
     }
+
+    // Helper: Calculate relative luminance of a color
+    private func relativeLuminance(hex: String) -> Double {
+        let rgb = hexToRGB(hex)
+        func adjust(_ c: Double) -> Double {
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        let r = adjust(Double(rgb.0) / 255.0)
+        let g = adjust(Double(rgb.1) / 255.0)
+        let b = adjust(Double(rgb.2) / 255.0)
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+
+    // Helper: Convert hex to RGB
+    private func hexToRGB(_ hex: String) -> (Int, Int, Int) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int = UInt64()
+        Scanner(string: hex).scanHexInt64(&int)
+        let r = Int((int >> 16) & 0xFF)
+        let g = Int((int >> 8) & 0xFF)
+        let b = Int(int & 0xFF)
+        return (r, g, b)
+    }
 }
 
 // MARK: - Setlist Row (simple row for swipe gestures)
 struct CBSetlistRow: View {
     let song: Song
+    let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
     var onTap: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(song.name).font(.body.bold()).foregroundColor(.primary)
+                Text(song.name)
+                    .font(themeFont?(18, .bold) ?? .body.bold())
+                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 if let sub = song.subtitle, !sub.isEmpty {
-                    Text(sub).font(.caption).foregroundColor(.secondary)
+                    Text(sub)
+                        .font(.caption)
+                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 } else {
                     Text(" ").font(.caption).foregroundColor(.clear)
                 }
             }
             Spacer()
+
+            // MIDI info and color indicator
+            HStack(spacing: 16) {
+                // MIDI info
+                let midiInfo: String = {
+                    if song.kind == .cc {
+                        return "Ch \(song.channel) • CC \(song.cc)"
+                    } else {
+                        let noteName = (song.note ?? 0).midiNoteName
+                        return "Ch \(song.channel) • \(noteName)"
+                    }
+                }()
+                Text(midiInfo)
+                    .font(.caption2)
+                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+
+                // Color indicator circle (always reserve space for alignment)
+                Group {
+                    if let hex = song.colorHex {
+                        Circle()
+                            .fill(Color(hex: hex))
+                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                    } else {
+                        Circle()
+                            .fill(Color.clear)
+                    }
+                }
+                .frame(width: 20, height: 20)
+            }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(.systemBackground))
-        )
+        .background(Color.clear)
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
@@ -197,13 +376,22 @@ struct CBSetlistRow: View {
 // MARK: - Custom Drag Preview (no white border)
 struct CBSetlistDragPreview: View {
     let song: Song
+    let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
 
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(song.name).font(.body.bold()).foregroundColor(.primary)
+                Text(song.name)
+                    .font(themeFont?(18, .bold) ?? .body.bold())
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 if let sub = song.subtitle, !sub.isEmpty {
-                    Text(sub).font(.caption).foregroundColor(.secondary)
+                    Text(sub)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 } else {
                     Text(" ").font(.caption).foregroundColor(.clear)
                 }
@@ -228,30 +416,54 @@ struct CBSetlistDragPreview: View {
 // MARK: - Editor: Setlist column
 struct CBSetlistColumn: View {
     let songs: [Song]
+    let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
     @Binding var searchText: String
     @Binding var reorderMode: Bool
     var onRename: (Song) -> Void
     var onRemove: (Song) -> Void
     var onMove: (IndexSet, Int) -> Void
+    var onAdd: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Text("Cue List")
-                    .font(.headline)
+                    .font(themeFont?(17, .semibold) ?? .headline)
+                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                 Spacer()
 
+                // Show + button when in reorder mode (edit mode)
+                if reorderMode {
+                    Button {
+                        onAdd()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 17))
+                            .frame(width: 24, height: 24)
+                            .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
+                    }
+                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
+                    .padding(.trailing, 12)
+                }
+
                 Button {
                     withAnimation(.easeInOut) { reorderMode.toggle() }
                 } label: {
-                    Image(systemName: reorderMode ? "checkmark" : "line.3.horizontal")
+                    Image(systemName: reorderMode ? "checkmark" : "list.dash")
                         .font(.system(size: 17))
                         .frame(width: 24, height: 24)
+                        .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
                 }
-                .buttonStyle(WhiteCapsuleButtonStyle())
-                .foregroundColor(.blue)
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
                 .padding(.trailing, 16)
             }
             .frame(height: 44) // Match library column header height
@@ -280,7 +492,7 @@ struct CBSetlistColumn: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(.systemGray6))
+            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
             .cornerRadius(10)
             .padding(.horizontal, 16)
             .padding(.bottom, 4)
@@ -289,6 +501,7 @@ struct CBSetlistColumn: View {
                 ForEach(songs) { s in
                     CBSetlistRow(
                         song: s,
+                        themeFont: themeFont,
                         onTap: {
                             onRename(s)
                         }
@@ -296,6 +509,7 @@ struct CBSetlistColumn: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowSeparator(.visible)
+                    .listRowSeparatorTint(.gray)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         if !reorderMode {
                             Button(role: .destructive) {
@@ -315,7 +529,8 @@ struct CBSetlistColumn: View {
             .environment(\.editMode, .constant(reorderMode && searchText.isEmpty ? .active : .inactive))
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(Color(.systemBackground))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
+            .tint(.gray) // Drag handles same color as search icon
         }
         .frame(maxWidth: .infinity)
     }
@@ -324,6 +539,7 @@ struct CBSetlistColumn: View {
 // MARK: - Editor: Library column
 struct CBLibraryColumn: View {
     let rows: [CBLibraryRow]
+    let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
     @Binding var isEditing: Bool
     @Binding var batchMode: Bool
     @Binding var selected: Set<UUID>
@@ -339,11 +555,19 @@ struct CBLibraryColumn: View {
     var onBatchAddToSetlist: (() -> Void)?
     var onBatchDelete: (() -> Void)?
 
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Text("Song Library")
-                    .font(.headline)
+                    .font(themeFont?(17, .semibold) ?? .headline)
+                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                 Spacer()
@@ -352,13 +576,14 @@ struct CBLibraryColumn: View {
                     Picker("Sort", selection: $sortMode) {
                         ForEach(LibrarySortMode.allCases) { mode in Text(mode.label).tag(mode) }
                     }
+                    .tint(selectedTheme.defaultCueColor(for: colorScheme))
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
                         .font(.system(size: 17))
                         .frame(width: 24, height: 24)
+                        .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
                 }
-                .buttonStyle(WhiteCapsuleButtonStyle())
-                .foregroundColor(.blue)
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
 
                 Button {
                     withAnimation(.easeInOut) { batchMode.toggle() }
@@ -367,9 +592,9 @@ struct CBLibraryColumn: View {
                     Image(systemName: batchMode ? "xmark" : "checkmark.circle")
                         .font(.system(size: 17))
                         .frame(width: 24, height: 24)
+                        .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
                 }
-                .buttonStyle(WhiteCapsuleButtonStyle())
-                .foregroundColor(.blue)
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
                 .padding(.trailing, 16)
             }
             .frame(height: 44) // Match cue list column header height
@@ -430,7 +655,7 @@ struct CBLibraryColumn: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color(.systemGray6))
+                .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
                 .cornerRadius(10)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
@@ -458,14 +683,51 @@ struct CBLibraryColumn: View {
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(row.song.name).font(.body.bold()).foregroundColor(.primary)
+                            Text(row.song.name)
+                                .font(themeFont?(18, .bold) ?? .body.bold())
+                                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                             if let sub = row.song.subtitle, !sub.isEmpty {
-                                Text(sub).font(.caption).foregroundColor(.secondary)
+                                Text(sub)
+                                    .font(.caption)
+                                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
                             } else {
                                 Text(" ").font(.caption).foregroundColor(.clear)
                             }
                         }
                         Spacer()
+
+                        // MIDI info and color indicator
+                        HStack(spacing: 16) {
+                            // MIDI info
+                            let midiInfo: String = {
+                                if row.song.kind == .cc {
+                                    return "Ch \(row.song.channel) • CC \(row.song.cc)"
+                                } else {
+                                    let noteName = (row.song.note ?? 0).midiNoteName
+                                    return "Ch \(row.song.channel) • \(noteName)"
+                                }
+                            }()
+                            Text(midiInfo)
+                                .font(.caption2)
+                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+
+                            // Color indicator circle (always reserve space for alignment)
+                            Group {
+                                if let hex = row.song.colorHex {
+                                    Circle()
+                                        .fill(Color(hex: hex))
+                                        .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                } else {
+                                    Circle()
+                                        .fill(Color.clear)
+                                }
+                            }
+                            .frame(width: 20, height: 20)
+                        }
                     }
                     .contentShape(Rectangle())
                     .padding(.vertical, 6)
@@ -473,6 +735,7 @@ struct CBLibraryColumn: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowSeparator(.visible)
+                    .listRowSeparatorTint(.gray)
                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                         if !row.isInSetlist && !batchMode {
                             Button {
@@ -504,6 +767,8 @@ struct CBLibraryColumn: View {
                 }
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .onReceive(NotificationCenter.default.publisher(for: .init("CBRemoveFromSetlist"))) { _ in }
         }
         .frame(maxWidth: .infinity)
@@ -727,6 +992,12 @@ struct CBConnectionsSheet: View {
     var onConnectWifiItem: (BridgeOutput.Item) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
         NavigationView {
@@ -812,9 +1083,12 @@ struct CBConnectionsSheet: View {
                 }
 
             }
+            .scrollContentBackground(.hidden)
+            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
             .navigationTitle("Connections")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
+        .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
     
     
@@ -844,17 +1118,17 @@ struct CBProjectsSheet: View {
     @Binding var isDirty: Bool
 
     var onTapTitleWhenUnsaved: () -> Void
-    var onSave: () -> Void
-    var onSaveAs: (String) -> Void
-    var onNew: () -> Void
     var onLoad: (String) -> Void
     var onDelete: (String) -> Void
-    var onOpenDocument: () -> Void  // New: Open document picker
-    var onExportProject: () -> Void  // New: Export current project
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @State private var confirmDelete: String? = nil
-    @State private var tempSaveAs: String = ""
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
         NavigationView {
@@ -870,26 +1144,6 @@ struct CBProjectsSheet: View {
                             Text(projectName).foregroundColor(.secondary)
                         }
                     }
-                }
-
-                Section(header: Text("Actions")) {
-                    Button("New Project") { onNew() }
-                    Button("Save") { onSave() }
-                        .disabled(!isDirty && projectName != "Untitled")
-                    Button("Save As…") {
-                        tempSaveAs = (projectName == "Untitled") ? "" : projectName
-                        onSaveAs(tempSaveAs)
-                    }
-                    Button("Open from Files") {
-                        // Simple document picker - will be handled in ContentView
-                        onOpenDocument()
-                    }
-                    .foregroundColor(.blue)
-                    Button("Export Project") {
-                        // Export current project to share/save elsewhere
-                        onExportProject()
-                    }
-                    .foregroundColor(.blue)
                 }
 
                 Section(header: Text("Saved Projects")) {
@@ -913,6 +1167,8 @@ struct CBProjectsSheet: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
             .navigationTitle("Projects")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .alert("Delete Project", isPresented: Binding(get: { confirmDelete != nil }, set: { newVal in if !newVal { confirmDelete = nil } })) {
@@ -934,6 +1190,7 @@ struct CBProjectsSheet: View {
                 }
             }
         }
+        .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
 }
 
@@ -949,6 +1206,7 @@ struct CBAddEditCueSheet: View {
     // Global channel support
     let isGlobalChannel: Bool
     let globalChannel: Int
+    let midiFilter: Set<Int>
 
     @State private var name: String = ""
     @State private var subtitle: String = ""
@@ -957,10 +1215,19 @@ struct CBAddEditCueSheet: View {
     @State private var channel: Int = 1
     @State private var velocity: Int = 127
     @State private var autoAssign: Bool = true
+    @State private var colorHex: String? = nil
+    @State private var showColorPicker: Bool = false
     @State private var error: String? = nil
     @State private var showDeleteAlert: Bool = false
     @State private var showGlobalModeMaxReachedAlert: Bool = false
     @State private var lastEditingSongID: UUID? = nil  // Track which song we're editing to preserve unsaved changes
+
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
         NavigationView {
@@ -972,6 +1239,31 @@ struct CBAddEditCueSheet: View {
                     TextField("Subtitle (Tempo/Key/Notes)", text: $subtitle)
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(false)
+
+                    // Color Picker - Inline Disclosure
+                    DisclosureGroup(
+                        isExpanded: $showColorPicker,
+                        content: {
+                            // Inline color picker
+                            CBColorPickerInline(selectedColorHex: $colorHex)
+                                .padding(.vertical, 8)
+                        },
+                        label: {
+                            HStack {
+                                Text("Color")
+                                Spacer()
+                                if let hex = colorHex {
+                                    Circle()
+                                        .fill(Color(hex: hex))
+                                        .frame(width: 24, height: 24)
+                                        .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                } else {
+                                    Text("Default")
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    )
                 }
                 Section(header: Text("MIDI")) {
                     Toggle(isOn: $autoAssign) {
@@ -1023,6 +1315,8 @@ struct CBAddEditCueSheet: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
             .navigationTitle(editingSong == nil ? "Add Cue" : "Edit Cue")
             .alert("Delete Cue", isPresented: $showDeleteAlert) {
                 Button("Delete", role: .destructive) {
@@ -1048,15 +1342,14 @@ struct CBAddEditCueSheet: View {
                         Button("Save & Add Another") { save(andAddAnother: true) }
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { save(andAddAnother: false) } }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { save(andAddAnother: false) } }
             }
             .onAppear {
-                // Only preset if we're editing a different song (or switching to/from add mode)
-                let currentID = editingSong?.id
-                if currentID != lastEditingSongID {
-                    preset()
-                    lastEditingSongID = currentID
-                }
+                // Always call preset() to ensure form is properly initialized
+                // This handles: editing different songs, switching to/from add mode, and reopening add mode
+                debugPrint("🎬 [CUE] Sheet appeared, editingSong: \(editingSong?.name ?? "nil"), lastEditingSongID: \(lastEditingSongID?.uuidString ?? "nil")")
+                preset()
+                lastEditingSongID = editingSong?.id
             }
             .onChange(of: editingSong) { oldValue, newValue in
                 // When editingSong changes, check if we need to preset
@@ -1104,6 +1397,7 @@ struct CBAddEditCueSheet: View {
                 }
             }
         }
+        .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
 
     private func preset() {
@@ -1115,19 +1409,23 @@ struct CBAddEditCueSheet: View {
             number = (s.kind == .note) ? (s.note ?? 60) : s.cc
             channel = s.channel
             velocity = s.velocity
+            colorHex = s.colorHex
             // For existing songs, disable auto-assign to allow manual editing
             autoAssign = false
         } else {
             name = ""
             subtitle = ""
             kind = .cc
+            colorHex = nil
             // FIX: Use global channel if enabled, otherwise default to 1
             channel = isGlobalChannel ? globalChannel : 1
             velocity = 127
             // For new songs, enable auto-assign and find free MIDI
             autoAssign = true
-            debugPrint("  🆕 [CUE] No editing state, finding free number for \(kind) ch\(channel)")
+            // Always start from 0 to find the lowest available (fill gaps first)
+            debugPrint("  🆕 [CUE] No editing state, finding lowest available \(kind) on ch\(channel)")
             let result = autoAssignMIDI(for: kind, startChannel: channel, startNumber: 0)
+
             if result.reachedLimit {
                 showGlobalModeMaxReachedAlert = true
                 autoAssign = false
@@ -1149,13 +1447,22 @@ struct CBAddEditCueSheet: View {
     // New auto-assign function that can increment channel when reaching 127
     private func autoAssignMIDI(for kind: MIDIKind, startChannel: Int, startNumber: Int = 0) -> AutoAssignResult {
         debugPrint("🔍 [CUE] Auto-assigning \(kind) starting from channel \(startChannel), number \(startNumber)")
+        debugPrint("  📝 [CUE] editingSong: \(editingSong?.name ?? "nil")")
 
         // In global mode, we can't increment channel
         if isGlobalChannel {
             // Search only on the global channel
             for n in startNumber...127 {
+                // Skip filtered CC numbers (only for CC type, not notes)
+                if kind == .cc && midiFilter.contains(n) {
+                    debugPrint("  🚫 [CUE] CC \(n) is filtered, skipping")
+                    continue
+                }
+
                 let key = MIDIKey(kind: kind, channel: globalChannel, number: n)
-                if let owner = currentOwnerName(key) {
+                let owner = currentOwnerName(key)
+                debugPrint("  🔍 [CUE] Checking \(n): owner=\(owner ?? "nil")")
+                if let owner = owner {
                     if owner != editingSong?.name {
                         debugPrint("  ✗ [CUE] \(n) is taken by '\(owner)', skipping")
                         continue
@@ -1178,8 +1485,16 @@ struct CBAddEditCueSheet: View {
         for _ in 0..<16 {
             // Search from currentNumber to 127 on current channel
             for n in currentNumber...127 {
+                // Skip filtered CC numbers (only for CC type, not notes)
+                if kind == .cc && midiFilter.contains(n) {
+                    debugPrint("  🚫 [CUE] CC \(n) is filtered, skipping")
+                    continue
+                }
+
                 let key = MIDIKey(kind: kind, channel: currentChannel, number: n)
-                if let owner = currentOwnerName(key) {
+                let owner = currentOwnerName(key)
+                debugPrint("  🔍 [CUE] Checking \(n) on ch\(currentChannel): owner=\(owner ?? "nil")")
+                if let owner = owner {
                     if owner != editingSong?.name {
                         debugPrint("  ✗ [CUE] \(n) is taken by '\(owner)', skipping")
                         continue
@@ -1245,6 +1560,7 @@ struct CBAddEditCueSheet: View {
         song.kind = kind
         song.channel = channel
         song.velocity = velocity
+        song.colorHex = colorHex
 
         // Set cc or note based on kind
         if kind == .note {
@@ -1262,18 +1578,20 @@ struct CBAddEditCueSheet: View {
 
         if andAddAnother {
             debugPrint("➕ [CUE] Save & Add Another clicked")
-            // CRITICAL FIX: Reset state variables BEFORE setting editingSong = nil
-            // This prevents race condition where preset() uses old values when .onChange fires
+            // CRITICAL FIX: Clear editingSong BEFORE calling autoAssignMIDI
+            // This ensures the MIDI we just assigned is now considered "taken"
+            let savedName = song.name
+            editingSong = nil
 
-            // Calculate next channel and number BEFORE resetting form fields
-            debugPrint("  🔢 [CUE] Calculating next free number BEFORE resetting form")
+            // Calculate next channel and number
+            debugPrint("  🔢 [CUE] Calculating next free number (ignoring previously saved '\(savedName)')")
             let nextChannel = isGlobalChannel ? globalChannel : 1
-            let savedNumber = number
             let savedKind = kind
 
-            // Reset all form fields to defaults FIRST
+            // Reset all form fields to defaults
             name = ""
             subtitle = ""
+            colorHex = nil
             // v1.0.8: Preserve MIDI kind (CC vs Note) for "Add Another"
             // This ensures next cue uses same MIDI type as the one just saved
             kind = savedKind
@@ -1281,9 +1599,9 @@ struct CBAddEditCueSheet: View {
             autoAssign = true
             error = nil
 
-            // Find next free number starting from the one we just saved + 1
+            // Find lowest available number (starting from 0 to fill gaps)
             // Uses savedKind to find next available CC or Note number
-            let result = autoAssignMIDI(for: savedKind, startChannel: nextChannel, startNumber: savedNumber + 1)
+            let result = autoAssignMIDI(for: savedKind, startChannel: nextChannel, startNumber: 0)
             if result.reachedLimit {
                 showGlobalModeMaxReachedAlert = true
                 autoAssign = false
@@ -1294,11 +1612,6 @@ struct CBAddEditCueSheet: View {
                 number = result.number
                 debugPrint("  ✅ [CUE] Set channel=\(result.channel), number=\(result.number)")
             }
-
-            // NOW set editingSong to nil (triggers .onChange which calls preset())
-            // preset() will now see the correct reset values above
-            debugPrint("  🔄 [CUE] Setting editingSong=nil (will trigger .onChange)")
-            editingSong = nil
         }
     }
 }
@@ -1313,6 +1626,13 @@ struct CBMIDIPickerSheet: View {
     var currentOwnerName: (MIDIKey) -> String?
     var onSave: (MIDIKind, Int, Int, Int) -> Void
     var onCancel: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
         NavigationView {
@@ -1332,6 +1652,8 @@ struct CBMIDIPickerSheet: View {
                     Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
             .navigationTitle(title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
@@ -1341,6 +1663,7 @@ struct CBMIDIPickerSheet: View {
                 }
             }
         }
+        .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
 
     private func conflictOwner() -> String? {
@@ -1386,4 +1709,27 @@ struct ReorderDropDelegate: DropDelegate {
     }
 }
 
+// MARK: - Color Extension for Similarity Check
+extension Color {
+    /// Check if this color is similar to another color (for stroke visibility)
+    func isSimilarTo(_ other: Color) -> Bool {
+        // Convert both colors to RGB components
+        guard let selfComponents = self.cgColor?.components,
+              let otherComponents = other.cgColor?.components,
+              selfComponents.count >= 3,
+              otherComponents.count >= 3 else {
+            return false
+        }
+
+        // Calculate color distance using simple Euclidean distance
+        let rDiff = selfComponents[0] - otherComponents[0]
+        let gDiff = selfComponents[1] - otherComponents[1]
+        let bDiff = selfComponents[2] - otherComponents[2]
+        let distance = sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff)
+
+        // Consider colors similar if distance is less than 0.5 (threshold)
+        // Increased from 0.3 to 0.5 to be more liberal in detecting similar colors
+        return distance < 0.5
+    }
+}
 
