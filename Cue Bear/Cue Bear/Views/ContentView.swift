@@ -1881,6 +1881,7 @@ internal struct ContentView: View {
     @State private var controlsPerRow: Int = 4
     @State private var controlAreaHeight: CGFloat = 0
     @State private var canAddMoreControlsToGrid: Bool = true  // Track if grid has space for new controls
+    @State private var controlEditModeTimer: Timer? = nil  // Auto-exit timer for edit mode
     @State private var showControlEditor: Bool = false
     @State private var editingControl: ControlButton? = nil
     @State private var showEditControlSheet: Bool = false
@@ -2186,15 +2187,16 @@ internal struct ContentView: View {
                 onEditButton: { btn in
                     editingControlForEdit = btn
                     showEditControlSheet = true
+                    resetControlEditModeTimer()
                 },
-            onAddButton: { if canAddMoreControlsToGrid { beginAddControlOfType(.button) } },
-            onAddFader: { if canAddMoreControlsToGrid { beginAddControlOfType(.fader) } },
-                onUndo: { undoControls() },
-                onRedo: { redoControls() },
+            onAddButton: { if canAddMoreControlsToGrid { beginAddControlOfType(.button) }; resetControlEditModeTimer() },
+            onAddFader: { if canAddMoreControlsToGrid { beginAddControlOfType(.fader) }; resetControlEditModeTimer() },
+                onUndo: { undoControls(); resetControlEditModeTimer() },
+                onRedo: { redoControls(); resetControlEditModeTimer() },
                 canUndo: !controlUndoStack.isEmpty,
                 canRedo: !controlRedoStack.isEmpty,
-                onDelete: { btn in deleteControl(btn) },
-                onMove: { from, to in pushControlUndo(); controlButtons.move(fromOffsets: from, toOffset: to); markDirty() },
+                onDelete: { btn in deleteControl(btn); resetControlEditModeTimer() },
+                onMove: { from, to in pushControlUndo(); controlButtons.move(fromOffsets: from, toOffset: to); markDirty(); resetControlEditModeTimer() },
                 usbServer: usbServer,
                 wifiClient: wifiClient,
                 connectionCoordinator: connectionCoordinator,
@@ -2206,6 +2208,15 @@ internal struct ContentView: View {
                 markDirty: markDirty,
                 cueListEditMode: isEditing
             )
+            .onChange(of: controlEditMode) { _, newValue in
+                if newValue {
+                    // Entering edit mode - start timer
+                    startControlEditModeTimer()
+                } else {
+                    // Exiting edit mode - cancel timer
+                    cancelControlEditModeTimer()
+                }
+            }
     }
 
     // FIX #1: Setup NotificationCenter subscriptions using Combine to prevent memory leaks
@@ -3855,6 +3866,30 @@ internal struct ContentView: View {
         controlButtons = next
         invalidateConflictCache()
         markDirty()
+    }
+
+    // Control edit mode auto-exit timer
+    private func startControlEditModeTimer() {
+        // Cancel existing timer
+        controlEditModeTimer?.invalidate()
+
+        // Start new 5-second timer
+        controlEditModeTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
+            withAnimation(.easeInOut) {
+                controlEditMode = false
+            }
+        }
+    }
+
+    private func cancelControlEditModeTimer() {
+        controlEditModeTimer?.invalidate()
+        controlEditModeTimer = nil
+    }
+
+    private func resetControlEditModeTimer() {
+        if controlEditMode {
+            startControlEditModeTimer()
+        }
     }
 
     private func saveCurrentProject(overwrite: Bool) {
