@@ -401,6 +401,7 @@ struct CBControlEditorSheet: View {
     var columns: Int = 8  // Grid column count
     let icons: [String]
     var isEditMode: Bool = false  // Explicit flag: true for editing existing control, false for adding new
+    @Binding var canAddMore: Bool  // Whether grid has room for more controls
 
     // v1.0.8: Use ObservedObject draft to preserve edits across sheet dismissals
     @ObservedObject var draft: ControlEditorDraft
@@ -784,7 +785,7 @@ struct CBControlEditorSheet: View {
                         Button("Save & Add Another") {
                             saveControl(andAddAnother: true)
                         }
-                        .disabled(conflictOwner() != nil || showSpaceWarning || isOutOfRoom)
+                        .disabled(conflictOwner() != nil || showSpaceWarning || isOutOfRoom || !canAddMore)
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -1879,6 +1880,7 @@ internal struct ContentView: View {
     @State private var controlEditMode = false
     @State private var controlsPerRow: Int = 4
     @State private var controlAreaHeight: CGFloat = 0
+    @State private var canAddMoreControlsToGrid: Bool = true  // Track if grid has space for new controls
     @State private var showControlEditor: Bool = false
     @State private var editingControl: ControlButton? = nil
     @State private var showEditControlSheet: Bool = false
@@ -2178,14 +2180,15 @@ internal struct ContentView: View {
                 perRow: $controlsPerRow,
             pendingAddIsFader: $pendingAddIsFader,
                 reportedHeight: $controlAreaHeight,
+                canAddMoreControls: $canAddMoreControlsToGrid,
                 conflictFor: conflictLookup(),
                 onTap: { btn in triggerControl(btn) },
                 onEditButton: { btn in
                     editingControlForEdit = btn
                     showEditControlSheet = true
                 },
-            onAddButton: { if canAddMoreControls() { beginAddControlOfType(.button) } },
-            onAddFader: { if canAddMoreControls() { beginAddControlOfType(.fader) } },
+            onAddButton: { if canAddMoreControlsToGrid { beginAddControlOfType(.button) } },
+            onAddFader: { if canAddMoreControlsToGrid { beginAddControlOfType(.fader) } },
                 onUndo: { undoControls() },
                 onRedo: { redoControls() },
                 canUndo: !controlUndoStack.isEmpty,
@@ -2906,6 +2909,7 @@ internal struct ContentView: View {
                 columns: 8,
                 icons: icons,
                 isEditMode: false,
+                canAddMore: $canAddMoreControlsToGrid,
                 draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
         }
@@ -2947,6 +2951,7 @@ internal struct ContentView: View {
                 columns: 8,
                 icons: icons,
                 isEditMode: true,
+                canAddMore: $canAddMoreControlsToGrid,
                 draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
         }
@@ -3835,11 +3840,15 @@ internal struct ContentView: View {
         guard let last = controlUndoStack.popLast() else { return }
         controlRedoStack.append(controlButtons)
         controlButtons = last
+        invalidateConflictCache()
+        markDirty()
     }
     private func redoControls() {
         guard let next = controlRedoStack.popLast() else { return }
         controlUndoStack.append(controlButtons)
         controlButtons = next
+        invalidateConflictCache()
+        markDirty()
     }
 
     private func saveCurrentProject(overwrite: Bool) {
@@ -4601,6 +4610,7 @@ private struct CBControlSection: View {
     @Binding var perRow: Int
     @Binding var pendingAddIsFader: Bool?
     @Binding var reportedHeight: CGFloat
+    @Binding var canAddMoreControls: Bool
     let conflictFor: [MIDIKey: String]
     var onTap: (ControlButton) -> Void
     var onEditButton: (ControlButton) -> Void
@@ -4814,11 +4824,11 @@ private struct CBControlSection: View {
                         Button("+ Button") { onAddButton() }
                     .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
                         .controlSize(.small)
-                        .disabled(!canAddMoreControlsGlobal)
+                        .disabled(!canAddMoreControls)
                         Button("+ Fader") { onAddFader() }
                         .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
                         .controlSize(.small)
-                    .disabled(!canAddMoreControlsGlobal)
+                    .disabled(!canAddMoreControls)
                 }
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.8)).animation(.easeOut(duration: 0.2).delay(0.1)),
@@ -4999,6 +5009,14 @@ private struct CBControlSection: View {
         .onChange(of: isEditing) { _, editing in
             // Reset drag/drop state when toggling edit mode to avoid stale state
             clearDragState(reason: "edit mode toggle")
+        }
+        .onAppear {
+            // Update canAddMoreControls binding on appear
+            canAddMoreControls = canAddMoreControlsGlobal
+        }
+        .onChange(of: buttons.count) { _, _ in
+            // Update canAddMoreControls binding when button count changes
+            canAddMoreControls = canAddMoreControlsGlobal
         }
     }
     
@@ -8797,8 +8815,20 @@ struct DraggableNavigationCapsule: View {
                     }
                 }
             }
-            .onChange(of: controlAreaHeight) { _, _ in
+            .onChange(of: controlAreaHeight) { _, newHeight in
                 if isDragging { return }
+
+                // Control area height changed - adjust Y position to stay above it
+                let maxY = height - newHeight - 50
+                if position.y > maxY {
+                    // Capsule would be below the new control area boundary, move it up
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        position = CGPoint(x: position.x, y: maxY)
+                    }
+                    // Update saved position
+                    UserDefaults.standard.set(position.x, forKey: "navigationCapsule.x")
+                    UserDefaults.standard.set(maxY, forKey: "navigationCapsule.y")
+                }
             }
         }
     }
@@ -8919,10 +8949,12 @@ struct SimpleDraggableTransportDock: View {
                     }
                 }
             }
-            .onChange(of: controlAreaHeight) { _, _ in
+            .onChange(of: controlAreaHeight) { _, newHeight in
                 if isDragging { return }
-                guard position != .zero else {
-                    let bottomCenterY = max(upperLimit, height - controlAreaHeight - 50)
+
+                // If position is zero, initialize it
+                if position == .zero {
+                    let bottomCenterY = max(upperLimit, height - newHeight - 50)
                     let bottomRightX = maxX
 
                     var transaction = Transaction()
@@ -8931,6 +8963,15 @@ struct SimpleDraggableTransportDock: View {
                         position = CGPoint(x: bottomRightX, y: bottomCenterY)
                     }
                     return
+                }
+
+                // Control area height changed - adjust Y position to stay above it
+                let maxY = height - newHeight - 50
+                if position.y > maxY {
+                    // Capsule would be below the new control area boundary, move it up
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        position = CGPoint(x: position.x, y: maxY)
+                    }
                 }
             }
         }
