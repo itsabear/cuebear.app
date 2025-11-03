@@ -2838,11 +2838,15 @@ internal struct ContentView: View {
                 midiFilter: midiFilter,
                 onSave: { updated, andAddAnother in
                     if let idx = controlButtons.firstIndex(where: { $0.id == updated.id }) {
+                        // Editing existing control
+                        pushControlUndo()
                         // Force SwiftUI to detect the change by creating a new array
                         var updatedButtons = controlButtons
                         updatedButtons[idx] = updated
                         controlButtons = updatedButtons
                     } else {
+                        // Adding new control
+                        pushControlUndo()
                         // Assign grid position immediately when adding new control
                         var newControl = updated
                         if newControl.gridCol == nil || newControl.gridRow == nil {
@@ -2924,6 +2928,8 @@ internal struct ContentView: View {
                 midiFilter: midiFilter,
                 onSave: { updated, andAddAnother in
                     if let idx = controlButtons.firstIndex(where: { $0.id == updated.id }) {
+                        // Editing existing control
+                        pushControlUndo()
                         // Force SwiftUI to detect the change by creating a new array
                         var updatedButtons = controlButtons
                         updatedButtons[idx] = updated
@@ -8649,9 +8655,9 @@ struct DraggableNavigationCapsule: View {
             let width = geo.size.width
             let height = geo.size.height
 
-            // Upper limit: flush with menu bar (no padding)
+            // Upper limit: allow pill to go much higher (just keep top edge below safe area)
             let safeTop = max(geo.safeAreaInsets.top, 20)
-            let upperLimit = safeTop + (pillSize.height / 2)
+            let upperLimit = safeTop + 20  // Just 20pt below safe area instead of half pill height
 
             VStack(spacing: 0) {
                 // Top button: Up arrow (PREVIOUS)
