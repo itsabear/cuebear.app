@@ -11,23 +11,26 @@ import UIKit
 public struct SetlistHeader: View {
     public let title: String
     public let count: Int
+    public let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
 
     /// Back-compat init: pass your Setlist; title defaults to "Setlist"
-    public init(setlist: Setlist, title: String? = nil) {
+    public init(setlist: Setlist, title: String? = nil, themeFont: ((CGFloat, Font.Weight) -> Font)? = nil) {
         self.count = setlist.songs.count
         self.title = title ?? "Setlist"
+        self.themeFont = themeFont
     }
 
     /// Direct init: pass a title and an item count
-    public init(title: String, count: Int) {
+    public init(title: String, count: Int, themeFont: ((CGFloat, Font.Weight) -> Font)? = nil) {
         self.title = title
         self.count = count
+        self.themeFont = themeFont
     }
 
     public var body: some View {
         HStack(spacing: 10) {
             Text(title.isEmpty ? "Setlist" : title)
-                .font(.headline)
+                .font(themeFont?(18, .semibold) ?? .headline)
             Spacer()
             Text("\(count) item\(count == 1 ? "" : "s")")
                 .font(.subheadline)
@@ -239,11 +242,85 @@ struct WhiteCapsuleButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Draggable transport dock with snap-to-bottom-center
+struct ThemedCapsuleButtonStyle: ButtonStyle {
+    let backgroundColor: Color
+    let strokeColor: Color
+    var cornerRadius: CGFloat = 10
+
+    // Helper to check if a color is too light/bright for good visibility
+    private func isColorTooLight(_ color: Color) -> Bool {
+        guard let components = UIColor(color).cgColor.components else { return false }
+
+        // Calculate relative luminance using sRGB formula
+        let red = components.count > 0 ? components[0] : 0
+        let green = components.count > 1 ? components[1] : 0
+        let blue = components.count > 2 ? components[2] : 0
+
+        // Weighted luminance calculation (human eye is more sensitive to green)
+        let luminance = 0.299 * red + 0.587 * green + 0.114 * blue
+
+        // If luminance > 0.7, it's too light for good visibility on light background
+        return luminance > 0.7
+    }
+
+    // Create a darker version of the color for better visibility
+    private func darkenColor(_ color: Color) -> Color {
+        guard let components = UIColor(color).cgColor.components else { return color }
+
+        let red = (components.count > 0 ? components[0] : 0) * 0.5
+        let green = (components.count > 1 ? components[1] : 0) * 0.5
+        let blue = (components.count > 2 ? components[2] : 0) * 0.5
+        let alpha = components.count > 3 ? components[3] : 1.0
+
+        return Color(red: red, green: green, blue: blue, opacity: alpha)
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        ButtonStyleBody(
+            configuration: configuration,
+            backgroundColor: backgroundColor,
+            strokeColor: strokeColor,
+            cornerRadius: cornerRadius,
+            isColorTooLight: isColorTooLight,
+            darkenColor: darkenColor
+        )
+    }
+
+    private struct ButtonStyleBody: View {
+        let configuration: Configuration
+        let backgroundColor: Color
+        let strokeColor: Color
+        let cornerRadius: CGFloat
+        let isColorTooLight: (Color) -> Bool
+        let darkenColor: (Color) -> Color
+
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            // Use darker text color if stroke color is too light
+            let textColor = isColorTooLight(strokeColor) ? darkenColor(strokeColor) : strokeColor
+
+            configuration.label
+                .foregroundColor(textColor)
+                .frame(minHeight: 28)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(backgroundColor)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(strokeColor, lineWidth: 1.5))
+                .shadow(color: strokeColor.opacity(0.2), radius: 2, x: 0, y: 1)
+                .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+                .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+                .opacity(isEnabled ? 1.0 : 0.4)  // Grey out when disabled
+        }
+    }
+}
+
+// MARK: - Draggable transport dock with snap-to-bottom-center (SIMPLIFIED)
 struct DraggableTransportDock: View {
     let width: CGFloat
     let height: CGFloat
-    @Binding var controlAreaHeight: CGFloat
+    let controlAreaHeight: CGFloat
     let cuedName: String?
     let canPrev: Bool
     let canNext: Bool
@@ -254,117 +331,57 @@ struct DraggableTransportDock: View {
     let onClear: () -> Void
     let isControlEditing: Bool
 
-    // Simplified state for drag handling
-    @State private var position: CGPoint = .zero
-    @State private var isTrackingDrag: Bool = false
-    @State private var isDragging: Bool = false
-
-    // Visual size of the transport capsule (20% larger than baseline)
-    private var dockSize: CGSize { CGSize(width: 320 * 1.20, height: 150 * 1.20) }
-
-    // Calculate proper upper limit to be flush with menu bar (small padding)
-    private var upperLimit: CGFloat {
-        return 64 + 10 // Menu bar height + small padding
-    }
+    @State private var dragOffset: CGSize = .zero
 
     var body: some View {
-        ZStack {
-            CBTransportDock(
-                cuedName: cuedName,
-                canPrev: canPrev,
-                canNext: canNext,
-                isGoEnabled: isGoEnabled,
-                onPrev: onPrev,
-                onGo: onGo,
-                onNext: onNext,
-                onClear: onClear
-            )
-            // Render 20% larger for better hit targets as requested
-            .scaleEffect(1.20)
-            // While dragging, prevent internal buttons from handling touches to avoid gesture competition
-            .allowsHitTesting(!isDragging)
-        }
-        .frame(width: dockSize.width, height: dockSize.height)
-        .contentShape(RoundedRectangle(cornerRadius: 32))
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 3, coordinateSpace: .local)
+        let scale: CGFloat = 1.20
+
+        // Pill is HORIZONTAL (wider than tall)
+        // Based on actual layout: HStack with 3 buttons + padding in a capsule
+        let basePillWidth: CGFloat = 271.5   // Horizontal: 57 + 24 + 82.5 + 24 + 57 + 27 padding
+        let basePillHeight: CGFloat = 110    // Vertical: chip(28) + spacing(6) + buttons(82.5) + padding(18)
+
+        let scaledPillWidth = basePillWidth * scale   // ~326pts wide
+        let scaledPillHeight = basePillHeight * scale // ~132pts tall
+
+        // .position() uses CENTER coordinates
+        // Boundaries for pill center to keep entire pill on screen
+        let minCenterX = scaledPillWidth / 2
+        let maxCenterX = width - (scaledPillWidth / 2)
+        let minCenterY = scaledPillHeight / 2
+        let maxCenterY = height - controlAreaHeight - (scaledPillHeight / 2) - 8
+
+        // Default: centered horizontally, almost touching control area vertically
+        let defaultCenterX = width / 2
+        let defaultCenterY = maxCenterY
+
+        // Apply drag and constrain
+        let targetCenterX = defaultCenterX + dragOffset.width
+        let targetCenterY = defaultCenterY + dragOffset.height
+        let constrainedX = min(max(targetCenterX, minCenterX), maxCenterX)
+        let constrainedY = min(max(targetCenterY, minCenterY), maxCenterY)
+
+        CBTransportDock(
+            cuedName: cuedName,
+            canPrev: canPrev,
+            canNext: canNext,
+            isGoEnabled: isGoEnabled,
+            onPrev: onPrev,
+            onGo: onGo,
+            onNext: onNext,
+            onClear: onClear
+        )
+        .scaleEffect(scale)
+        .position(x: constrainedX, y: constrainedY)
+        .gesture(
+            DragGesture()
                 .onChanged { value in
-                    if !isTrackingDrag {
-                        isTrackingDrag = true
-                        isDragging = true
-                        if position == .zero {
-                            let bottomCenterY = max(upperLimit, height - controlAreaHeight - 20)
-                            let bottomCenterX = max(50, min(width - 50, width / 2))
-                            position = CGPoint(x: bottomCenterX, y: bottomCenterY)
-                        }
-                    }
-
-                    // Update position directly during drag for smooth 1:1 movement
-                    let newX = max(50, min(width - 50, position.x + value.translation.width))
-                    let newY = max(upperLimit, min(height - 100, position.y + value.translation.height))
-
-                    position = CGPoint(x: newX, y: newY)
+                    dragOffset = value.translation
                 }
                 .onEnded { value in
-                    defer {
-                        isTrackingDrag = false
-                        isDragging = false
-                    }
-
-                    // Final position update
-                    let newX = max(50, min(width - 50, position.x + value.translation.width))
-                    let newY = max(upperLimit, min(height - 100, position.y + value.translation.height))
-
-                    position = CGPoint(x: newX, y: newY)
+                    dragOffset = value.translation
                 }
         )
-        .position(
-            x: max(50, min(width - 50, position.x)),
-            y: max(upperLimit, min(height - 100, position.y))
-        )
-        // Ensure default position snaps once control area height is known
-        .task(id: "\(width)-\(height)") {
-            // Only initialize if we have valid dimensions
-            guard width > 0 && height > 0 else { return }
-
-            if position == .zero {
-                // Initialize to bottom center position (not middle of screen)
-                let bottomCenterY = max(upperLimit, height - controlAreaHeight - 20) // 20 points above control area
-                let bottomCenterX = max(50, min(width - 50, width / 2))
-
-                // FIX: Disable animation for initial positioning to prevent "flying in" from (0,0)
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    position = CGPoint(x: bottomCenterX, y: bottomCenterY)
-                }
-            }
-        }
-        .onChange(of: controlAreaHeight) { _, _ in
-            // Avoid any position adjustments mid-drag to prevent jitter
-            if isDragging { return }
-            guard position != .zero else {
-                // Initialize to bottom center position (not middle of screen)
-                let bottomCenterY = max(upperLimit, height - controlAreaHeight - 20) // 20 points above control area
-                let bottomCenterX = max(50, min(width - 50, width / 2))
-
-                // FIX: Disable animation for initial positioning
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    position = CGPoint(x: bottomCenterX, y: bottomCenterY)
-                }
-                return
-            }
-
-            // NO AUTO-SNAPPING - leave capsule exactly where user placed it
-            // CONSTRAINED MOVEMENT - prevent dragging onto menu bar or control area
-        }
-        .onChange(of: isControlEditing) { _, _ in
-            guard !isDragging else { return }
-            // NO AUTO-SNAPPING - leave capsule exactly where user placed it
-            // CONSTRAINED MOVEMENT - prevent dragging onto menu bar or control area
-        }
     }
 }
 
@@ -372,15 +389,18 @@ struct DraggableTransportDock: View {
 public struct RowLike<Leading: View, Trailing: View>: View {
     public let title: String
     public let subtitle: String?
+    public let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
     public var leading: () -> Leading
     public var trailing: () -> Trailing
 
     public init(title: String,
                 subtitle: String? = nil,
+                themeFont: ((CGFloat, Font.Weight) -> Font)? = nil,
                 @ViewBuilder leading: @escaping () -> Leading = { EmptyView() },
                 @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }) {
         self.title = title
         self.subtitle = subtitle
+        self.themeFont = themeFont
         self.leading = leading
         self.trailing = trailing
     }
@@ -389,7 +409,9 @@ public struct RowLike<Leading: View, Trailing: View>: View {
         HStack(spacing: 12) {
             leading()
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.body.bold()).foregroundStyle(.primary)
+                Text(title)
+                    .font(themeFont?(17, .bold) ?? .body.bold())
+                    .foregroundStyle(.primary)
                 if let sub = subtitle, !sub.isEmpty {
                     Text(sub).font(.caption).foregroundStyle(.secondary)
                 }
@@ -410,12 +432,12 @@ struct Components_Previews: PreviewProvider {
             // Your Setlist may not have a name; pass a title explicitly:
             SetlistHeader(setlist: Setlist(songs: []), title: "My Show")
             CBTransportBar { _ in }
-            RowLike(title: "Row Title", subtitle: "Subtitle") {
+            RowLike(title: "Row Title", subtitle: "Subtitle", themeFont: nil, leading: {
                 Image(systemName: "bolt.fill")
-            } trailing: {
+            }, trailing: {
                 Image(systemName: "chevron.right")
                     .foregroundStyle(.secondary)
-            }
+            })
         }
         .padding()
         .previewLayout(.sizeThatFits)

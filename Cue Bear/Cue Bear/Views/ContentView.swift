@@ -8757,7 +8757,7 @@ struct DraggableNavigationCapsule: View {
                             isDragging = true
                             if position == .zero {
                                 // Initialize to bottom-right, respecting control area
-                                let bottomY = max(upperLimit, height - controlAreaHeight - 50)
+                                let bottomY = max(upperLimit, height - controlAreaHeight - 10)
                                 let rightX = width - 50
                                 position = CGPoint(x: rightX, y: bottomY)
                             }
@@ -8765,7 +8765,7 @@ struct DraggableNavigationCapsule: View {
 
                         // Update position directly during drag (increased horizontal padding)
                         let horizontalPadding = pillSize.width / 2 + 20
-                        let maxY = height - controlAreaHeight - 50
+                        let maxY = height - controlAreaHeight - 10
                         let newX = max(horizontalPadding, min(width - horizontalPadding, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
 
@@ -8777,7 +8777,7 @@ struct DraggableNavigationCapsule: View {
                             isDragging = false
                         }
                         let horizontalPadding = pillSize.width / 2 + 20
-                        let maxY = height - controlAreaHeight - 50
+                        let maxY = height - controlAreaHeight - 10
                         let newX = max(horizontalPadding, min(width - horizontalPadding, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
                         position = CGPoint(x: newX, y: newY)
@@ -8792,7 +8792,7 @@ struct DraggableNavigationCapsule: View {
                     let horizontalPadding = pillSize.width / 2 + 20
                     return max(horizontalPadding, min(width - horizontalPadding, position.x))
                 }(),
-                y: max(upperLimit, min(height - controlAreaHeight - 50, position.y))
+                y: max(upperLimit, min(height - controlAreaHeight - 10, position.y))
             )
             // Initialize position from UserDefaults or default to bottom-right
             .task(id: "\(width)-\(height)") {
@@ -8802,7 +8802,7 @@ struct DraggableNavigationCapsule: View {
                     let savedX = UserDefaults.standard.object(forKey: "navigationCapsule.x") as? CGFloat
                     let savedY = UserDefaults.standard.object(forKey: "navigationCapsule.y") as? CGFloat
 
-                    let bottomY = max(upperLimit, height - controlAreaHeight - 50)
+                    let bottomY = max(upperLimit, height - controlAreaHeight - 10)
                     let rightX = width - 50
 
                     let finalX = savedX ?? rightX
@@ -8819,7 +8819,7 @@ struct DraggableNavigationCapsule: View {
                 if isDragging { return }
 
                 // Control area height changed - adjust Y position to stay above it
-                let maxY = height - newHeight - 50
+                let maxY = height - newHeight - 10
                 if position.y > maxY {
                     // Capsule would be below the new control area boundary, move it up
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -8906,14 +8906,14 @@ struct SimpleDraggableTransportDock: View {
                             isDragging = true
                             if position == .zero {
                                 // Initialize to bottom-right, respecting control area
-                                let bottomCenterY = max(upperLimit, height - controlAreaHeight - 50)
+                                let bottomCenterY = max(upperLimit, height - controlAreaHeight - 10)
                                 let bottomRightX = maxX
                                 position = CGPoint(x: bottomRightX, y: bottomCenterY)
                             }
                         }
 
                         // Update position directly during drag for smooth 1:1 movement
-                        let maxY = height - controlAreaHeight - 50
+                        let maxY = height - controlAreaHeight - 10
                         let newX = max(minX, min(maxX, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
 
@@ -8924,7 +8924,7 @@ struct SimpleDraggableTransportDock: View {
                             isTrackingDrag = false
                             isDragging = false
                         }
-                        let maxY = height - controlAreaHeight - 50
+                        let maxY = height - controlAreaHeight - 10
                         let newX = max(minX, min(maxX, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
                         position = CGPoint(x: newX, y: newY)
@@ -8932,14 +8932,14 @@ struct SimpleDraggableTransportDock: View {
             )
             .position(
                 x: max(minX, min(maxX, position.x)),
-                y: max(upperLimit, min(height - controlAreaHeight - 50, position.y))
+                y: max(upperLimit, min(height - controlAreaHeight - 10, position.y))
             )
             // Ensure default position snaps once control area height is known
             .task(id: "\(width)-\(height)") {
                 guard width > 0 && height > 0 else { return }
 
                 if position == .zero {
-                    let bottomCenterY = max(upperLimit, height - controlAreaHeight - 50)
+                    let bottomCenterY = max(upperLimit, height - controlAreaHeight - 10)
                     let bottomRightX = maxX
 
                     var transaction = Transaction()
@@ -8954,7 +8954,7 @@ struct SimpleDraggableTransportDock: View {
 
                 // If position is zero, initialize it
                 if position == .zero {
-                    let bottomCenterY = max(upperLimit, height - newHeight - 50)
+                    let bottomCenterY = max(upperLimit, height - newHeight - 10)
                     let bottomRightX = maxX
 
                     var transaction = Transaction()
@@ -8966,7 +8966,7 @@ struct SimpleDraggableTransportDock: View {
                 }
 
                 // Control area height changed - adjust Y position to stay above it
-                let maxY = height - newHeight - 50
+                let maxY = height - newHeight - 10
                 if position.y > maxY {
                     // Capsule would be below the new control area boundary, move it up
                     withAnimation(.easeInOut(duration: 0.2)) {
