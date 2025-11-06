@@ -895,9 +895,10 @@ class ConnectionManager: ObservableObject {
                     self.connectedComputerName = nil
                     self.connectionQuality = .disconnected
 
-                    // Stop listening since Bridge app has quit
-                    self.isListening = false
-                    debugPrint("🔗 ConnectionManager: 🛑 Stopped listening - Bridge app has quit")
+                    // v1.0.11 FIX: Keep listening so new Bridge instances can connect
+                    // Don't set isListening = false - the listener is still running and should
+                    // accept new connections when Bridge starts again
+                    debugPrint("🔗 ConnectionManager: 🔄 Bridge disconnected - listener remains active for reconnection")
 
                     // Update USB bridge availability to hide chip
                     self.checkUSBBridgeAvailability()
@@ -938,9 +939,10 @@ class ConnectionManager: ObservableObject {
                     self.connectedComputerName = nil
                     self.connectionQuality = .disconnected
 
-                    // Stop listening since Bridge app has quit
-                    self.isListening = false
-                    debugPrint("🔗 ConnectionManager: 🛑 Stopped listening - Bridge app has quit")
+                    // v1.0.11 FIX: Keep listening so new Bridge instances can connect
+                    // Don't set isListening = false - the listener is still running and should
+                    // accept new connections when Bridge starts again
+                    debugPrint("🔗 ConnectionManager: 🔄 Bridge disconnected - listener remains active for reconnection")
 
                     // Update USB bridge availability to hide chip
                     self.checkUSBBridgeAvailability()
