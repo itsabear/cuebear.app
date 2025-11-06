@@ -1033,8 +1033,16 @@ extension WifiServer {
     
     private func startHeartbeat() {
         log("Starting WiFi heartbeat")
-        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.sendHeartbeat()
+        // Ensure timer runs on main RunLoop for reliable firing
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+                self?.sendHeartbeat()
+            }
+            // Add to main RunLoop to ensure it fires reliably
+            if let timer = self.heartbeatTimer {
+                RunLoop.main.add(timer, forMode: .common)
+            }
         }
     }
     
@@ -1045,7 +1053,10 @@ extension WifiServer {
     }
     
     private func sendHeartbeat() {
-        guard let connection = connection else { return }
+        guard let connection = connection else {
+            log("⚠️ Heartbeat skipped - no connection")
+            return
+        }
 
         let heartbeat: [String: Any] = [
             "type": "heartbeat",
@@ -1053,12 +1064,17 @@ extension WifiServer {
             "timestamp": Int(Date().timeIntervalSince1970)
         ]
 
-        guard let data = try? JSONSerialization.data(withJSONObject: heartbeat) else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: heartbeat) else {
+            log("❌ Heartbeat JSON serialization failed")
+            return
+        }
         let framed = data + Data([0x0A])
 
-        connection.send(content: framed, completion: .contentProcessed { error in
+        connection.send(content: framed, completion: .contentProcessed { [weak self] error in
             if let error = error {
-                print("📡 WiFi Server: Heartbeat send error: \(error)")
+                self?.log("❌ Heartbeat send error: \(error)")
+            } else {
+                self?.log("💓 Heartbeat sent successfully")
             }
         })
     }
