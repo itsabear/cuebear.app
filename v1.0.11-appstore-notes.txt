@@ -1,0 +1,9 @@
+Version 1.0.11 - USB Bridge Connection Fix
+
+FIXED: USB Bridge Detection Issue
+• Bridge now connects instantly when started after iPad app is open
+• No more 30-second delays or needing to restart the iPad app
+• Seamless reconnection when Bridge app is restarted
+
+Technical Details:
+Fixed critical bug where iPad wouldn't detect USB Bridge if Bridge started after iPad app was already running. Connection now establishes within 1-2 seconds instead of 30+ seconds.
