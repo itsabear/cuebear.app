@@ -713,12 +713,15 @@ final class BridgeOutput: ObservableObject {
     private func parseResponse(_ data: Data) {
         guard let string = String(data: data, encoding: .utf8) else { return }
         let lines = string.components(separatedBy: .newlines).filter { !$0.isEmpty }
-        
+
         for line in lines {
             guard let lineData = line.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
                   let type = json["type"] as? String else { continue }
-            
+
+            // Reset stale timer on ANY valid message received (including heartbeats)
+            self.lastSuccessfulMessage = Date()
+
             if type == "pair_response", let token = json["token"] as? String {
                 debugPrint("BridgeOutput: Received pairing token, storing and reconnecting")
                 setPairToken(token)
