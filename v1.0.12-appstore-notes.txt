@@ -1,0 +1,9 @@
+Version 1.0.12 - WiFi Connection Stability Fix
+
+FIXED: WiFi Connection Disconnection Issue
+• WiFi connections now stay alive indefinitely during shows
+• No more unexpected disconnections after a few minutes of idle time
+• Improved reliability for live performance scenarios
+
+Technical Details:
+Fixed critical bug where WiFi connections would disconnect after 60 seconds of inactivity. The iPad app now properly receives and processes heartbeat messages from the Bridge, keeping the connection alive during idle periods. This fix requires Bridge v1.2.0.2 or later for full functionality.
