@@ -4,6 +4,7 @@ import SwiftUI
 /// Always shows big drag handles; no distractions.
 struct ReorderView: View {
     @Binding var songs: [Song]
+    let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
     var onDone: () -> Void
 
     @State private var editMode: EditMode = .active
@@ -17,7 +18,7 @@ struct ReorderView: View {
                             .foregroundColor(.secondary)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(song.name)
-                                .font(.headline)
+                                .font(themeFont?(18, .semibold) ?? .headline)
                                 .lineLimit(1)
                             if let sub = song.subtitle, !sub.isEmpty {
                                 Text(sub)

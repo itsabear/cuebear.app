@@ -75,6 +75,21 @@
 	<key>UISupportsMultipleScenes</key>
 	<false/>
 
+	<!-- Custom Fonts -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>Montserrat-Bold.ttf</string>
+		<string>BebasNeue-Regular.ttf</string>
+		<string>Oswald-Regular.ttf</string>
+		<string>Exo2-ExtraBold.ttf</string>
+		<string>PlayfairDisplay-Regular.ttf</string>
+		<string>Bitter-Regular.ttf</string>
+		<string>FredokaOne-Regular.ttf</string>
+		<string>NunitoSans-Black.ttf</string>
+		<string>CormorantGaramond-Italic.ttf</string>
+		<string>SpaceGrotesk-Medium.ttf</string>
+	</array>
+
 	<!-- Scene Configuration for proper window management on iPadOS 18+ -->
 	<key>UIApplicationSceneManifest</key>
 	<dict>

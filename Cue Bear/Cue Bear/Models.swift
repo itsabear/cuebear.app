@@ -4,7 +4,9 @@ import Foundation
 
 // MARK: - App Mode
 public enum AppMode: String, Codable {
-    case regular, cue
+    case regular          // No remote pill
+    case regularPlusRemote // Regular mode + navigation capsule
+    case cue              // Cue mode with GO capsule
 }
 
 // MARK: - Transport actions (legacy names kept)
@@ -24,6 +26,9 @@ public struct Song: Identifiable, Codable, Equatable {
     public var kind: MIDIKind = .cc
     public var note: Int? = nil
     public var velocity: Int = 127
+
+    // Custom color (hex string, e.g. "#FF5733")
+    public var colorHex: String? = nil
 
     public init(id: UUID = UUID(), name: String, subtitle: String? = nil, cc: Int, channel: Int) {
         self.id = id

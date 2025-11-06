@@ -17,6 +17,9 @@ struct CueBearApp: App {
                 .task {
                     debugPrint("📱 iPad: starting connection coordinator")
 
+                    // Debug: Check if custom fonts are loaded
+                    FontDebugHelper.checkCustomFonts()
+
                     // Install demo projects on first launch
                     installDemoProjectsIfNeeded()
 

@@ -7,7 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		064AEC8646F040C2930F9388 /* Exo2-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5ECAF08DA4434539986E7CD4 /* Exo2-ExtraBold.ttf */; };
+		46C5739D6D204A428CDD0131 /* BebasNeue-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 6DEF277169FC48E0ADB7EC4F /* BebasNeue-Regular.ttf */; };
+		4B7021CA8FF44BD58F85C42B /* Oswald-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A9E4A56FAF8549C38763FD75 /* Oswald-Regular.ttf */; };
+		68A090B4DB5647DD878CF90A /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A02A5B62A15E4491A6E0F731 /* SpaceGrotesk-Medium.ttf */; };
+		AF9747708AB943C39B682FA3 /* FredokaOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B73DB1B32D4D432A848D043E /* FredokaOne-Regular.ttf */; };
+		C7AC6E304534475791674BB4 /* CormorantGaramond-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5C39010D092941898D6AEB9F /* CormorantGaramond-Italic.ttf */; };
+		D6A18A6F12A44AF0BCAF3821 /* PlayfairDisplay-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C5D3285D55234465A9156631 /* PlayfairDisplay-Regular.ttf */; };
+		D6CDA721E14E40F78F621DC0 /* Montserrat-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 74B5560052C643E280EC4D5B /* Montserrat-Bold.ttf */; };
 		E8B7F0DBD2BB523BA2EFF77D /* Beethoven Live.cuebearproj in Resources */ = {isa = PBXBuildFile; fileRef = 8F648AF8B7D3374861610AC1 /* Beethoven Live.cuebearproj */; };
+		F707A5ADB7EE4CCEB6676DCD /* NunitoSans-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B354EF2E6F234BBD930BC3B4 /* NunitoSans-Black.ttf */; };
+		FF63E1F53E6C4FEC9AD6D138 /* Bitter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FE4A4377B37942C3BE42DDFF /* Bitter-Regular.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,10 +38,20 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5C39010D092941898D6AEB9F /* CormorantGaramond-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "CormorantGaramond-Italic.ttf"; path = "Fonts/CormorantGaramond-Italic.ttf"; sourceTree = "<group>"; };
+		5ECAF08DA4434539986E7CD4 /* Exo2-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Exo2-ExtraBold.ttf"; path = "Fonts/Exo2-ExtraBold.ttf"; sourceTree = "<group>"; };
+		6DEF277169FC48E0ADB7EC4F /* BebasNeue-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "BebasNeue-Regular.ttf"; path = "Fonts/BebasNeue-Regular.ttf"; sourceTree = "<group>"; };
+		74B5560052C643E280EC4D5B /* Montserrat-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Montserrat-Bold.ttf"; path = "Fonts/Montserrat-Bold.ttf"; sourceTree = "<group>"; };
 		8F648AF8B7D3374861610AC1 /* Beethoven Live.cuebearproj */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = "Beethoven Live.cuebearproj"; path = "Cue Bear/Beethoven Live.cuebearproj"; sourceTree = "<group>"; };
 		9E6AA9E42E50EE4A00F22798 /* Cue Bear.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cue Bear.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E6AA9F42E50EE4B00F22798 /* Cue BearTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cue BearTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E6AA9FE2E50EE4B00F22798 /* Cue BearUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cue BearUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A02A5B62A15E4491A6E0F731 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "SpaceGrotesk-Medium.ttf"; path = "Fonts/SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
+		A9E4A56FAF8549C38763FD75 /* Oswald-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Oswald-Regular.ttf"; path = "Fonts/Oswald-Regular.ttf"; sourceTree = "<group>"; };
+		B354EF2E6F234BBD930BC3B4 /* NunitoSans-Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "NunitoSans-Black.ttf"; path = "Fonts/NunitoSans-Black.ttf"; sourceTree = "<group>"; };
+		B73DB1B32D4D432A848D043E /* FredokaOne-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "FredokaOne-Regular.ttf"; path = "Fonts/FredokaOne-Regular.ttf"; sourceTree = "<group>"; };
+		C5D3285D55234465A9156631 /* PlayfairDisplay-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "PlayfairDisplay-Regular.ttf"; path = "Fonts/PlayfairDisplay-Regular.ttf"; sourceTree = "<group>"; };
+		FE4A4377B37942C3BE42DDFF /* Bitter-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Bitter-Regular.ttf"; path = "Fonts/Bitter-Regular.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -86,6 +106,7 @@
 				9E6AA9E62E50EE4A00F22798 /* Cue Bear */,
 				9E6AA9E52E50EE4A00F22798 /* Products */,
 				8F648AF8B7D3374861610AC1 /* Beethoven Live.cuebearproj */,
+				9EFCDE542EB4B113009331D3 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -97,6 +118,23 @@
 				9E6AA9FE2E50EE4B00F22798 /* Cue BearUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		9EFCDE542EB4B113009331D3 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				74B5560052C643E280EC4D5B /* Montserrat-Bold.ttf */,
+				6DEF277169FC48E0ADB7EC4F /* BebasNeue-Regular.ttf */,
+				A9E4A56FAF8549C38763FD75 /* Oswald-Regular.ttf */,
+				5ECAF08DA4434539986E7CD4 /* Exo2-ExtraBold.ttf */,
+				C5D3285D55234465A9156631 /* PlayfairDisplay-Regular.ttf */,
+				FE4A4377B37942C3BE42DDFF /* Bitter-Regular.ttf */,
+				B73DB1B32D4D432A848D043E /* FredokaOne-Regular.ttf */,
+				B354EF2E6F234BBD930BC3B4 /* NunitoSans-Black.ttf */,
+				5C39010D092941898D6AEB9F /* CormorantGaramond-Italic.ttf */,
+				A02A5B62A15E4491A6E0F731 /* SpaceGrotesk-Medium.ttf */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -207,6 +245,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				E8B7F0DBD2BB523BA2EFF77D /* Beethoven Live.cuebearproj in Resources */,
+				D6CDA721E14E40F78F621DC0 /* Montserrat-Bold.ttf in Resources */,
+				46C5739D6D204A428CDD0131 /* BebasNeue-Regular.ttf in Resources */,
+				4B7021CA8FF44BD58F85C42B /* Oswald-Regular.ttf in Resources */,
+				064AEC8646F040C2930F9388 /* Exo2-ExtraBold.ttf in Resources */,
+				D6A18A6F12A44AF0BCAF3821 /* PlayfairDisplay-Regular.ttf in Resources */,
+				FF63E1F53E6C4FEC9AD6D138 /* Bitter-Regular.ttf in Resources */,
+				AF9747708AB943C39B682FA3 /* FredokaOne-Regular.ttf in Resources */,
+				F707A5ADB7EE4CCEB6676DCD /* NunitoSans-Black.ttf in Resources */,
+				C7AC6E304534475791674BB4 /* CormorantGaramond-Italic.ttf in Resources */,
+				68A090B4DB5647DD878CF90A /* SpaceGrotesk-Medium.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
