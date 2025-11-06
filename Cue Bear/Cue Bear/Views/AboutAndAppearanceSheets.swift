@@ -81,10 +81,10 @@ struct AboutSheet: View {
                         .padding(.bottom, 40)
                 }
             }
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("About")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(selectedTheme.lightButtonBackgroundColor(for: colorScheme), for: .navigationBar)
+            .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -93,6 +93,7 @@ struct AboutSheet: View {
                     }
                 }
             }
+            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
@@ -168,12 +169,13 @@ struct AppearanceSheet: View {
                     .padding(.bottom, 40)
                 }
             }
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .id(selectedThemeID) // Force view recreation when theme changes
             .navigationTitle("Appearance")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(selectedTheme.lightButtonBackgroundColor(for: colorScheme), for: .navigationBar)
+            .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

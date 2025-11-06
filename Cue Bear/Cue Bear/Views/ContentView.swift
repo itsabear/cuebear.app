@@ -580,6 +580,7 @@ struct CBControlEditorSheet: View {
                                 .foregroundColor(.red)
                         }
                         .padding(.vertical, 4)
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 }
 
@@ -595,6 +596,7 @@ struct CBControlEditorSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                     // Button Type picker - only show for buttons (not faders)
                     if !draft.isFader {
@@ -605,6 +607,7 @@ struct CBControlEditorSheet: View {
                             Text("Button").tag(ButtonType.regular)
                             Text("Small Button").tag(ButtonType.small)
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                         // Show space warning if button type change won't fit
                         if showSpaceWarning {
@@ -612,16 +615,19 @@ struct CBControlEditorSheet: View {
                                 .font(.caption)
                                 .foregroundColor(.red)
                                 .padding(.top, 4)
+                                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         }
                     }
 
                     if !draft.isFader {
                         IconPicker(symbol: $draft.symbol, icons: icons)
                             .equatable()
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         Picker("Behavior", selection: $draft.isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
 
                     // Fader orientation and direction (only for faders)
@@ -630,6 +636,7 @@ struct CBControlEditorSheet: View {
                             Text("Vertical").tag("vertical")
                             Text("Horizontal").tag("horizontal")
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                         Picker("Fader Direction", selection: $draft.faderDirection) {
                             // Vertical faders: only up/down
@@ -644,6 +651,7 @@ struct CBControlEditorSheet: View {
                             }
                         }
                         .id("fader-direction-picker")
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                         // Show space warning if orientation change won't fit
                         if showSpaceWarning {
@@ -651,6 +659,7 @@ struct CBControlEditorSheet: View {
                                 .font(.caption)
                                 .foregroundColor(.red)
                                 .padding(.top, 4)
+                                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         }
                     }
 
@@ -678,6 +687,7 @@ struct CBControlEditorSheet: View {
                             }
                         }
                     )
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 // Live Preview
                 Section(header: Text("Preview")) {
@@ -693,16 +703,19 @@ struct CBControlEditorSheet: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.vertical, 6)
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 Section(header: Text("MIDI")) {
                     Toggle(isOn: $draft.autoAssign) {
                         Text("Assign MIDI automatically")
                     }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !draft.isFader {
                         Picker("Type", selection: $draft.kind) {
                             Text("Control Change").tag(MIDIKind.cc)
                             Text("Note").tag(MIDIKind.note)
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     if isGlobalChannel {
                         HStack {
@@ -711,12 +724,14 @@ struct CBControlEditorSheet: View {
                             Text("\(globalChannel) (Global Channel)")
                                 .foregroundColor(.secondary)
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     } else {
                         Picker("Channel", selection: $draft.channel) {
                             ForEach(1...16, id: \.self) { ch in
                                 Text("\(ch)").tag(ch)
                             }
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     MIDINumberPicker(
                         kind: draft.kind,
@@ -727,12 +742,15 @@ struct CBControlEditorSheet: View {
                         editingControl: editing
                     )
                     .id(draft.kind == .note ? "note-picker" : "cc-picker")
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     // Show conflict warning below picker (not inside picker items)
                     if let owner = conflictOwner() {
                         Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     if !draft.isFader && draft.kind == .note {
                         VelocityPicker(velocity: $draft.velocity, disabled: false)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 }
 
@@ -748,13 +766,15 @@ struct CBControlEditorSheet: View {
                                 Spacer()
                             }
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle(titleForSheet())
             .navigationBarBackButtonHidden(true)
+            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
             .alert("Delete Control", isPresented: $showDeleteAlert) {
                 Button("Delete", role: .destructive) {
                     if let control = editing {
@@ -1288,8 +1308,10 @@ struct CBEditControlSheet: View {
                             .foregroundColor(.secondary)
                     }
                     .contentShape(Rectangle())
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !isFaderUI {
                         Toggle("Small Button", isOn: $isSmall)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     HStack {
                         TextField("Control Name", text: $title, prompt: Text("Control Name").foregroundColor(.secondary))
@@ -1301,13 +1323,16 @@ struct CBEditControlSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !isFaderUI {
                         IconPicker(symbol: $symbol, icons: icons)
                             .equatable()
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         Picker("Behavior", selection: $isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
 
                     // Fader orientation and direction (only for faders)
@@ -1316,6 +1341,7 @@ struct CBEditControlSheet: View {
                             Text("Vertical").tag("vertical")
                             Text("Horizontal").tag("horizontal")
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                         Picker("Fader Direction", selection: $faderDirection) {
                             // Vertical faders: only up/down
@@ -1330,6 +1356,7 @@ struct CBEditControlSheet: View {
                             }
                         }
                         .id("fader-direction-picker-edit")
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
 
                     // Color Picker - Inline Disclosure
@@ -1356,6 +1383,7 @@ struct CBEditControlSheet: View {
                             }
                         }
                     )
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 // Live Preview
                 Section(header: Text("Preview")) {
@@ -1369,22 +1397,26 @@ struct CBEditControlSheet: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.vertical, 6)
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 Section(header: Text("MIDI")) {
                     Toggle(isOn: $autoAssign) {
                         Text("Assign MIDI automatically")
                     }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !isFaderUI {
                         Picker("Type", selection: $kind) {
                             Text("Control Change").tag(MIDIKind.cc)
                             Text("Note").tag(MIDIKind.note)
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     Picker("Channel", selection: $channel) {
                         ForEach(1...16, id: \.self) { ch in
                             Text("\(ch)").tag(ch)
                         }
                     }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     MIDINumberPicker(
                         kind: kind,
                         number: $number,
@@ -1394,11 +1426,14 @@ struct CBEditControlSheet: View {
                         editingControl: editing
                     )
                     .id(kind == .note ? "note-picker-edit" : "cc-picker-edit")
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !isFaderUI && kind == .note {
                         VelocityPicker(velocity: $velocity, disabled: false)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     if let owner = conflictOwner() {
                         Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 }
 
@@ -1414,6 +1449,7 @@ struct CBEditControlSheet: View {
                                 Spacer()
                             }
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 }
             }
@@ -1421,7 +1457,8 @@ struct CBEditControlSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .scrollContentBackground(.hidden)
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
+            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
             .alert("Delete Control", isPresented: $showDeleteAlert) {
                 Button("Delete", role: .destructive) {
                     if let control = editing {
@@ -4432,6 +4469,8 @@ private struct CBTopBar: View {
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
             .padding(.trailing, 16)
+            .offset(x: showSideMenu ? 300 : 0)
+            .animation(.easeInOut(duration: 0.3), value: showSideMenu)
         }
     }
 
@@ -6240,10 +6279,10 @@ private struct ControlButtonTile: View {
         let isToggle = button.isToggle ?? false
 
         // Clear visual distinction between on/off states:
-        // OFF state = subtle, semi-transparent background
+        // OFF state = control area background color (same as title bar)
         // ON state = solid, full opacity with theme accent color
         let onColor = selectedTheme.defaultCueColor(for: colorScheme)
-        let offColor = selectedTheme.lightButtonBackgroundColor(for: colorScheme).opacity(0.5)
+        let offColor = selectedTheme.titleBarColor(for: colorScheme)
 
         // Determine if button should show as "on" (pressed/active)
         let isOn = isToggle ? button.toggleState : down
@@ -6453,8 +6492,8 @@ private struct ControlButtonTile: View {
             let isHorizontal = (button.faderOrientation == "horizontal")
             let direction = button.faderDirection ?? (isHorizontal ? "right" : "up")
 
-            // Use lightButtonBackgroundColor as base (like buttons off state)
-            let faderColor = selectedTheme.lightButtonBackgroundColor(for: colorScheme)
+            // Use defaultCueColor for fader (accent color)
+            let faderColor = selectedTheme.defaultCueColor(for: colorScheme)
             let textColor = selectedTheme.primaryTextColor(for: colorScheme)
 
             ZStack(alignment: .topTrailing) {
@@ -7208,6 +7247,14 @@ private struct iPadControlTile: View {
     @ObservedObject private var wobbleAnimator = WobbleAnimator.shared
     @State private var wobbleID = UUID()
         @State private var flashOpacity: Double = 0.0
+
+    // Theme access
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
     
     // MARK: - iPhone-style wobble implementation (using shared animator)
     private func startWobble() {
@@ -7384,9 +7431,9 @@ private struct iPadControlTile: View {
         if isPressed {
             return customButtonColor
         } else if button.isToggle == true && button.toggleState {
-            return customButtonColor.opacity(0.3) // Light color for toggle ON
+            return customButtonColor // Full color for toggle ON
         } else {
-            return Color(uiColor: .systemBackground) // White interior
+            return selectedTheme.titleBarColor(for: colorScheme) // Control area color
         }
     }
 
@@ -7475,7 +7522,7 @@ private struct iPadControlTile: View {
                 ZStack(alignment: fillAlignment) {
                     // Main fader track background
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(uiColor: .systemBackground))
+                        .fill(selectedTheme.titleBarColor(for: colorScheme))
                         .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(customButtonColor, lineWidth: 2)
@@ -7579,7 +7626,7 @@ private struct iPadControlTile: View {
                 ZStack(alignment: fillAlignment) {
                     // Main fader track background
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(uiColor: .systemBackground))
+                        .fill(selectedTheme.titleBarColor(for: colorScheme))
                         .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(customButtonColor, lineWidth: 2)
@@ -8012,6 +8059,7 @@ struct MidiTableSheet: View {
                 // Section 1: Global MIDI Channel
                 Section {
                     Toggle("Global MIDI Channel", isOn: $isGlobalChannel)
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                     if isGlobalChannel {
                         Picker("Channel", selection: $globalChannel) {
@@ -8019,6 +8067,7 @@ struct MidiTableSheet: View {
                                 Text("Channel \(ch)").tag(ch)
                             }
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 } footer: {
                     Text("When enabled, all cues and controls will be assigned to the same MIDI channel. When disabled, each item can use any of the 16 MIDI channels.")
@@ -8030,6 +8079,8 @@ struct MidiTableSheet: View {
                     NavigationLink(destination: MidiFilterView(midiFilter: $midiFilter, customMidiFilters: $customMidiFilters)) {
                         Text("MIDI Filter")
                     }
+                    .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 } header: {
                     Text("Auto-Assignment")
                 } footer: {
@@ -8047,12 +8098,14 @@ struct MidiTableSheet: View {
                     )) {
                         Text("MIDI Assignments")
                     }
+                    .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 } footer: {
                     Text("View and edit MIDI assignments for all cues and controls")
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("MIDI Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -8060,6 +8113,7 @@ struct MidiTableSheet: View {
                     Button("Done", action: onDismiss)
                 }
             }
+            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
@@ -8182,9 +8236,10 @@ struct MidiAssignmentsView: View {
         }
         .navigationTitle("MIDI Assignments")
         .navigationBarTitleDisplayMode(.inline)
-        .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
-        .toolbarBackground(selectedTheme.lightButtonBackgroundColor(for: colorScheme), for: .navigationBar)
+        .background(selectedTheme.backgroundColor(for: colorScheme))
+        .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
     }
     
     private func buildMidiTableItems() {
@@ -8534,6 +8589,7 @@ struct MidiFilterView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
+            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
             // Add Custom Filter Button
             Section {
@@ -8547,6 +8603,8 @@ struct MidiFilterView: View {
                         Text("Add Custom Filter")
                     }
                 }
+                .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
             }
 
             // Custom Filters Section
@@ -8583,6 +8641,7 @@ struct MidiFilterView: View {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     .onDelete { indexSet in
                         for index in indexSet {
@@ -8615,11 +8674,22 @@ struct MidiFilterView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(selectedTheme.backgroundColor(for: colorScheme))
         .navigationTitle("MIDI Filter")
         .navigationBarTitleDisplayMode(.inline)
+        .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 }
 
@@ -8640,15 +8710,19 @@ struct AddCustomFilterView: View {
                         Text("CC \(cc)").tag(cc)
                     }
                 }
+                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                 TextField("Description", text: $customDescription)
                     .textInputAutocapitalization(.words)
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
             } header: {
                 Text("Custom MIDI Filter")
             } footer: {
                 Text("Add a MIDI CC number with a custom description to exclude from auto-assignment")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(selectedTheme.backgroundColor(for: colorScheme))
         .navigationTitle("Add Custom Filter")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -8663,6 +8737,14 @@ struct AddCustomFilterView: View {
                 .disabled(customDescription.isEmpty)
             }
         }
+        .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 }
 
@@ -8690,9 +8772,9 @@ struct DraggableNavigationCapsule: View {
             let width = geo.size.width
             let height = geo.size.height
 
-            // Upper limit: allow pill to go much higher (just keep top edge below safe area)
+            // Upper limit: position() uses CENTER, so add half height to keep top edge below safe area
             let safeTop = max(geo.safeAreaInsets.top, 20)
-            let upperLimit = safeTop + 20  // Just 20pt below safe area instead of half pill height
+            let upperLimit = safeTop + 20 + (pillSize.height / 2)  // Center position that keeps top edge at safeTop + 20
 
             VStack(spacing: 0) {
                 // Top button: Up arrow (PREVIOUS)
@@ -8798,15 +8880,15 @@ struct DraggableNavigationCapsule: View {
                             isDragging = true
                             if position == .zero {
                                 // Initialize to bottom-right, respecting control area
-                                let bottomY = max(upperLimit, height - controlAreaHeight - 10)
+                                let bottomY = max(upperLimit, height - (pillSize.height / 2) - 8)
                                 let rightX = width - 50
                                 position = CGPoint(x: rightX, y: bottomY)
                             }
                         }
 
                         // Update position directly during drag (increased horizontal padding)
-                        let horizontalPadding = pillSize.width / 2 + 20
-                        let maxY = height - controlAreaHeight - 10
+                        let horizontalPadding = pillSize.width / 2 + 10
+                        let maxY = height - (pillSize.height / 2) - 8  // Position capsule at bottom of cue list view with 8pt gap
                         let newX = max(horizontalPadding, min(width - horizontalPadding, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
 
@@ -8817,8 +8899,8 @@ struct DraggableNavigationCapsule: View {
                             isTrackingDrag = false
                             isDragging = false
                         }
-                        let horizontalPadding = pillSize.width / 2 + 20
-                        let maxY = height - controlAreaHeight - 10
+                        let horizontalPadding = pillSize.width / 2 + 10
+                        let maxY = height - (pillSize.height / 2) - 8  // Position capsule at bottom of cue list view with 8pt gap
                         let newX = max(horizontalPadding, min(width - horizontalPadding, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
                         position = CGPoint(x: newX, y: newY)
@@ -8830,10 +8912,10 @@ struct DraggableNavigationCapsule: View {
             )
             .position(
                 x: {
-                    let horizontalPadding = pillSize.width / 2 + 20
+                    let horizontalPadding = pillSize.width / 2 + 5
                     return max(horizontalPadding, min(width - horizontalPadding, position.x))
                 }(),
-                y: max(upperLimit, min(height - controlAreaHeight - 10, position.y))
+                y: max(upperLimit, min(height - (pillSize.height / 2) - 8, position.y))
             )
             // Initialize position from UserDefaults or default to bottom-right
             .task(id: "\(width)-\(height)") {
@@ -8843,7 +8925,7 @@ struct DraggableNavigationCapsule: View {
                     let savedX = UserDefaults.standard.object(forKey: "navigationCapsule.x") as? CGFloat
                     let savedY = UserDefaults.standard.object(forKey: "navigationCapsule.y") as? CGFloat
 
-                    let bottomY = max(upperLimit, height - controlAreaHeight - 10)
+                    let bottomY = max(upperLimit, height - (pillSize.height / 2) - 8)
                     let rightX = width - 50
 
                     let finalX = savedX ?? rightX
@@ -8860,7 +8942,7 @@ struct DraggableNavigationCapsule: View {
                 if isDragging { return }
 
                 // Control area height changed - adjust Y position to stay above it
-                let maxY = height - newHeight - 10
+                let maxY = height - (pillSize.height / 2) - 8
                 if position.y > maxY {
                     // Capsule would be below the new control area boundary, move it up
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -8913,13 +8995,12 @@ struct SimpleDraggableTransportDock: View {
             let width = geo.size.width
             let height = geo.size.height
 
-            // Upper limit: menu bar + 20pt padding (matches bottom padding)
-            // Since .position() uses CENTER, capsule top edge will be at upperLimit - halfHeight
+            // Upper limit: position() uses CENTER, so add half height to keep top edge below safe area
             let safeTop = max(geo.safeAreaInsets.top, 20) // Minimum 20pt if no safe area
-            let upperLimit = safeTop + 20
+            let upperLimit = safeTop + 20 + (dockSize.height / 2)  // Center position that keeps top edge at safeTop + 20
 
             // Calculate proper boundaries based on actual dock size
-            let padding: CGFloat = 8
+            let padding: CGFloat = 0
             let minX = dockSize.width / 2 + padding
             let maxX = width - dockSize.width / 2 - padding
 
@@ -8947,14 +9028,14 @@ struct SimpleDraggableTransportDock: View {
                             isDragging = true
                             if position == .zero {
                                 // Initialize to bottom-right, respecting control area
-                                let bottomCenterY = max(upperLimit, height - controlAreaHeight - 10)
+                                let bottomCenterY = max(upperLimit, height - (dockSize.height / 2) - 8)
                                 let bottomRightX = maxX
                                 position = CGPoint(x: bottomRightX, y: bottomCenterY)
                             }
                         }
 
                         // Update position directly during drag for smooth 1:1 movement
-                        let maxY = height - controlAreaHeight - 10
+                        let maxY = height - (dockSize.height / 2) - 8  // Position dock at bottom of cue list view with 8pt gap
                         let newX = max(minX, min(maxX, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
 
@@ -8965,7 +9046,7 @@ struct SimpleDraggableTransportDock: View {
                             isTrackingDrag = false
                             isDragging = false
                         }
-                        let maxY = height - controlAreaHeight - 10
+                        let maxY = height - (dockSize.height / 2) - 8  // Position dock at bottom of cue list view with 8pt gap
                         let newX = max(minX, min(maxX, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
                         position = CGPoint(x: newX, y: newY)
@@ -8973,14 +9054,14 @@ struct SimpleDraggableTransportDock: View {
             )
             .position(
                 x: max(minX, min(maxX, position.x)),
-                y: max(upperLimit, min(height - controlAreaHeight - 10, position.y))
+                y: max(upperLimit, min(height - (dockSize.height / 2) - 8, position.y))
             )
             // Ensure default position snaps once control area height is known
             .task(id: "\(width)-\(height)") {
                 guard width > 0 && height > 0 else { return }
 
                 if position == .zero {
-                    let bottomCenterY = max(upperLimit, height - controlAreaHeight - 10)
+                    let bottomCenterY = max(upperLimit, height - (dockSize.height / 2) - 8)
                     let bottomRightX = maxX
 
                     var transaction = Transaction()
@@ -8995,7 +9076,7 @@ struct SimpleDraggableTransportDock: View {
 
                 // If position is zero, initialize it
                 if position == .zero {
-                    let bottomCenterY = max(upperLimit, height - newHeight - 10)
+                    let bottomCenterY = max(upperLimit, height - newHeight - 10 - (dockSize.height / 2))
                     let bottomRightX = maxX
 
                     var transaction = Transaction()
@@ -9007,7 +9088,7 @@ struct SimpleDraggableTransportDock: View {
                 }
 
                 // Control area height changed - adjust Y position to stay above it
-                let maxY = height - newHeight - 10
+                let maxY = height - (dockSize.height / 2) - 8
                 if position.y > maxY {
                     // Capsule would be below the new control area boundary, move it up
                     withAnimation(.easeInOut(duration: 0.2)) {

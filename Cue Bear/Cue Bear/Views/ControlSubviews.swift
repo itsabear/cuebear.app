@@ -157,7 +157,7 @@ struct CBPerformanceRow: View {
             RoundedRectangle(cornerRadius: corner)
                 .fill(baseColor)
                 .frame(maxWidth: .infinity, minHeight: isCued ? 96 : 86)
-                .opacity(takenBy == nil ? 1.0 : 0.55)
+                .opacity(takenBy == nil ? (isCued ? 1.0 : 0.90) : 0.55)
                 .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
 
             HStack(spacing: 14) {
@@ -492,7 +492,7 @@ struct CBSetlistColumn: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.buttonBackgroundColor(for: colorScheme).opacity(0.5))
             .cornerRadius(10)
             .padding(.horizontal, 16)
             .padding(.bottom, 4)
@@ -655,7 +655,7 @@ struct CBLibraryColumn: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+                .background(selectedTheme.buttonBackgroundColor(for: colorScheme).opacity(0.5))
                 .cornerRadius(10)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
@@ -1004,10 +1004,12 @@ struct CBConnectionsSheet: View {
             Form {
                 Section(header: Text("USB")) {
                     KeyValueRow("Status", connectionCoordinator.activeConnection == .usb ? "Connected" : "Waiting")
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if connectionCoordinator.activeConnection == .usb {
                         Button("Disconnect USB", role: .destructive) {
                             connectionCoordinator.disconnectUSB()
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
 
 
@@ -1028,24 +1030,29 @@ struct CBConnectionsSheet: View {
                         )
                         .transition(.scale.combined(with: .opacity))
                         .animation(.easeInOut(duration: 0.2), value: usbServer.usbBridgeAvailable)
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     } else {
                         Text("Bridge app not running")
                             .foregroundColor(.secondary)
                             .font(.caption)
                             .transition(.opacity)
                             .animation(.easeInOut(duration: 0.2), value: usbServer.usbBridgeAvailable)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 }
 
                 Section(header: Text("Wi-Fi")) {
                     KeyValueRow("Status", connectionCoordinator.activeConnection == .wifi ? "Connected" : "Not Connected")
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if connectionCoordinator.activeConnection == .wifi {
                         Button("Disconnect Wi-Fi", role: .destructive) { onDisconnectWifi() }
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
-                    
-                    
+
+
                     if wifiClient.discovered.isEmpty {
                         Text("Searching on local network…").foregroundColor(.secondary)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     } else {
                         ForEach(wifiClient.discovered, id: \.id) { item in
                             BridgeDeviceCard(
@@ -1062,6 +1069,7 @@ struct CBConnectionsSheet: View {
                                     connectionCoordinator.connectToWiFi(bridge: item)
                                 }
                             )
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         }
                     }
                 }
@@ -1084,9 +1092,10 @@ struct CBConnectionsSheet: View {
 
             }
             .scrollContentBackground(.hidden)
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("Connections")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
@@ -1168,9 +1177,10 @@ struct CBProjectsSheet: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("Projects")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
             .alert("Delete Project", isPresented: Binding(get: { confirmDelete != nil }, set: { newVal in if !newVal { confirmDelete = nil } })) {
                 Button("Delete", role: .destructive) {
                     debugPrint("🗑️ Delete confirmed for project: \(confirmDelete ?? "nil")")
@@ -1236,9 +1246,11 @@ struct CBAddEditCueSheet: View {
                     TextField("Name", text: $name, prompt: Text(defaultName).foregroundColor(.secondary))
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(false)
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     TextField("Subtitle (Tempo/Key/Notes)", text: $subtitle)
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(false)
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                     // Color Picker - Inline Disclosure
                     DisclosureGroup(
@@ -1264,20 +1276,24 @@ struct CBAddEditCueSheet: View {
                             }
                         }
                     )
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 Section(header: Text("MIDI")) {
                     Toggle(isOn: $autoAssign) {
                         Text("Assign MIDI automatically")
                     }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     Picker("Type", selection: $kind) {
                         Text("Control Change").tag(MIDIKind.cc)
                         Text("Note").tag(MIDIKind.note)
                     }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     Picker("Channel", selection: $channel) {
                         ForEach(1...16, id: \.self) { ch in
                             Text("\(ch)").tag(ch)
                         }
                     }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     Picker(kind == .cc ? "CC Number" : "Note Number", selection: $number) {
                         ForEach(0...127, id: \.self) { n in
                             let owner = ownerFor(kind: kind, number: n, channel: channel)
@@ -1291,14 +1307,20 @@ struct CBAddEditCueSheet: View {
                         }
                     }
                     .disabled(autoAssign)
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if kind == .note {
                         Stepper(value: $velocity, in: 1...127) { Text("Velocity: \(velocity)") }
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     if let owner = conflictOwner() {
                         Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 }
-                if let err = error { Text(err).foregroundColor(.red) }
+                if let err = error {
+                    Text(err).foregroundColor(.red)
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                }
 
                 // Delete section - only show when editing existing cue
                 if editingSong != nil, onDelete != nil {
@@ -1312,12 +1334,14 @@ struct CBAddEditCueSheet: View {
                                 Spacer()
                             }
                         }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle(editingSong == nil ? "Add Cue" : "Edit Cue")
+            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
             .alert("Delete Cue", isPresented: $showDeleteAlert) {
                 Button("Delete", role: .destructive) {
                     if let song = editingSong {
@@ -1641,19 +1665,24 @@ struct CBMIDIPickerSheet: View {
                     Text("Control Change").tag(MIDIKind.cc)
                     Text("Note").tag(MIDIKind.note)
                 }
+                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 Stepper(value: $number, in: 0...127) {
                     Text(kind == .cc ? "CC Number: \(number)" : "Note Number: \(number)")
                 }
+                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 Stepper(value: $channel, in: 1...16) { Text("Channel: \(channel)") }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 if kind == .note {
                     Stepper(value: $velocity, in: 1...127) { Text("Velocity: \(velocity)") }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 if let owner = conflictOwner() {
                     Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle(title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
@@ -1662,6 +1691,7 @@ struct CBMIDIPickerSheet: View {
                         .disabled(conflictOwner() != nil)
                 }
             }
+            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
