@@ -884,6 +884,12 @@ class ConnectionManager: ObservableObject {
             if isComplete {
                 debugPrint("🔗 ConnectionManager: Connection completed by remote")
 
+                // v1.0.11 FIX: Clear activeUSB so new connections can be accepted immediately
+                if let activeConn = self?.activeUSB, connection === activeConn {
+                    self?.logMain("🔗 Clearing activeUSB for clean disconnect - ready for new Bridge")
+                    self?.activeUSB = nil
+                }
+
                 // Update connection state when connection is completed
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
@@ -928,6 +934,12 @@ class ConnectionManager: ObservableObject {
             }
             
             if isComplete {
+                // v1.0.11 FIX: Clear activeUSB so new connections can be accepted immediately
+                if let activeConn = self?.activeUSB, connection === activeConn {
+                    self?.logMain("🔗 Clearing activeUSB for clean disconnect - ready for new Bridge")
+                    self?.activeUSB = nil
+                }
+
                 // Update connection state when connection is completed
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
