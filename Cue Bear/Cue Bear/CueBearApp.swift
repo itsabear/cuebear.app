@@ -7,14 +7,40 @@ struct CueBearApp: App {
     @StateObject private var wifiClient = BridgeOutput()
     @StateObject private var connectionCoordinator = ConnectionCoordinator()
 
+    @State private var showingCrashAlert = false
+    @State private var crashAlertWasDismissed = false
+
+    init() {
+        // Setup crash handlers as early as possible
+        CrashReporter.shared.setupCrashHandlers()
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(crashAlertActive: $showingCrashAlert)
                 .environmentObject(store)
                 .environmentObject(usbServer)
                 .environmentObject(wifiClient)
                 .environmentObject(connectionCoordinator)
+                .sheet(isPresented: $showingCrashAlert) {
+                    CrashAlertView()
+                        .interactiveDismissDisabled() // Prevent dismissing by swiping down
+                        .onDisappear {
+                            crashAlertWasDismissed = true
+                        }
+                }
                 .task {
+                    // Check if previous session crashed BEFORE marking as launched
+                    if CrashReporter.shared.checkForCrash() {
+                        // Show crash alert after UI is initialized
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            showingCrashAlert = true
+                        }
+                    }
+
+                    // Mark app as launched successfully (clears crash flag if no crash occurred)
+                    CrashReporter.shared.markAppLaunched()
+
                     debugPrint("📱 iPad: starting connection coordinator")
 
                     // Debug: Check if custom fonts are loaded

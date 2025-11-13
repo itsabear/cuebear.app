@@ -97,12 +97,13 @@ struct CBColorPickerInline: View {
 
     private var allColors: [(String?, String)] {
         var colors: [(String?, String)] = [(nil, "Default")]
-        colors.append(contentsOf: pastelColors)
-        colors.append(contentsOf: neonColors)
+        // Sorted alphabetically: Basic, Desaturated, Grayscale, Modern, Neon, Pastel
         colors.append(contentsOf: basicColors)
         colors.append(contentsOf: desaturatedColors)
         colors.append(contentsOf: grayscaleColors)
         colors.append(contentsOf: modernColors)
+        colors.append(contentsOf: neonColors)
+        colors.append(contentsOf: pastelColors)
         return colors
     }
 
@@ -146,7 +147,7 @@ private struct ColorTile: View {
 
             if isSelected {
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.blue, lineWidth: 3)
+                    .stroke(Color(hex: "0A84FF"), lineWidth: 3)  // Default cue color
             }
         }
     }

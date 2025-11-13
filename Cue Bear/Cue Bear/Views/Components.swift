@@ -183,11 +183,12 @@ struct CBTransportDock: View {
                     onGo()
                 }) {
                     Text("GO")
-                        .font(.system(size: 27, weight: .heavy, design: .rounded))
+                        .font(.system(size: 30, weight: .heavy, design: .rounded))
                         .foregroundColor(.white)
-                        .frame(width: 82.5, height: 82.5)
+                        .frame(width: 95, height: 95)
                         .background(isGoEnabled ? Color.accentColor : Color.gray)
                         .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
                 }
                 .buttonStyle(.plain)
                 .disabled(!isGoEnabled)
@@ -205,6 +206,7 @@ struct CBTransportDock: View {
                             isGoPressed = false
                         }
                 )
+                .zIndex(1)  // Layer GO button above capsule background
 
                 Button(action: onNext) {
                     Image(systemName: "forward.fill")
@@ -305,7 +307,14 @@ struct ThemedCapsuleButtonStyle: ButtonStyle {
                 .frame(minHeight: 28)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(backgroundColor)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .fill(.ultraThinMaterial)
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .fill(backgroundColor.opacity(0.2))
+                    }
+                )
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                 .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(strokeColor, lineWidth: 1.5))
                 .shadow(color: strokeColor.opacity(0.2), radius: 2, x: 0, y: 1)

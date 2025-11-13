@@ -9,12 +9,18 @@ import UIKit
 struct ThemeAdminPanel: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
     @State private var selectedThemeIndex = 0
     @State private var editingMode: EditMode = .light
     @State private var showContrastCheck = false
 
     enum EditMode {
         case light, dark
+    }
+
+    private var currentTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 
     private var selectedTheme: AppTheme {
@@ -29,9 +35,10 @@ struct ThemeAdminPanel: View {
                     VStack(spacing: 8) {
                         Image(systemName: "paintpalette.fill")
                             .font(.system(size: 48))
-                            .foregroundColor(.blue)
+                            .foregroundColor(currentTheme.accentColor(for: colorScheme))
                         Text("Theme Admin Panel")
                             .font(.title.bold())
+                            .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                         Text("🔒 Debug Mode Only")
                             .font(.caption)
                             .foregroundColor(.orange)
@@ -44,6 +51,7 @@ struct ThemeAdminPanel: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Select Theme")
                             .font(.headline)
+                            .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
 
                         Picker("Theme", selection: $selectedThemeIndex) {
                             ForEach(0..<AppTheme.allThemes.count, id: \.self) { index in
@@ -63,8 +71,9 @@ struct ThemeAdminPanel: View {
                             Text("Dark Mode: \(selectedTheme.darkModeBehavior.rawValue)")
                                 .font(.system(size: 12, design: .monospaced))
                         }
+                        .foregroundColor(currentTheme.secondaryTextColor(for: colorScheme))
                         .padding()
-                        .background(Color.gray.opacity(0.1))
+                        .background(currentTheme.titleBarColor(for: colorScheme))
                         .cornerRadius(8)
                     }
                     .padding(.horizontal)
@@ -96,16 +105,22 @@ struct ThemeAdminPanel: View {
                     Spacer().frame(height: 50)
                 }
             }
+            .background(currentTheme.backgroundColor(for: colorScheme))
             .navigationTitle("Admin")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(currentTheme.backgroundColor(for: colorScheme), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
                 }
             }
+            .tint(currentTheme.buttonBackgroundColor(for: colorScheme, customAccentHex: customDefaultCueColorStorage))
         }
+        .preferredColorScheme(currentTheme.preferredColorScheme(for: colorScheme))
     }
 }
 
@@ -114,18 +129,27 @@ struct ColorDisplaySection: View {
     let theme: AppTheme
     let mode: ThemeAdminPanel.EditMode
     let systemColorScheme: ColorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var currentTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     private var colors: [(String, String, Bool)] {
         let colorScheme: ColorScheme = mode == .light ? .light : .dark
 
         if mode == .light {
             return [
-                // Base colors
+                // Base UI colors
                 ("Background", theme.backgroundColorHex, false),
                 ("Accent", theme.accentColorHex, false),
                 ("Default Cue", theme.defaultCueColorHex, false),
                 ("Title Bar / Control / Menu", theme.titleBarColorHex, false),
                 ("Button BG", theme.buttonBackgroundColorHex, false),
+                // Semantic colors
+                ("Warning", theme.warningColorHex, false),
+                ("Error", theme.errorColorHex, false),
+                ("Success", theme.successColorHex, false),
                 // Derived colors (computed)
                 ("Light Button BG (derived)", theme.lightButtonBackgroundColor(for: colorScheme).toHex() ?? "N/A", true),
                 ("Navigation Link (derived)", theme.navigationLinkColor(for: colorScheme).toHex() ?? "N/A", true),
@@ -134,12 +158,16 @@ struct ColorDisplaySection: View {
             ]
         } else {
             return [
-                // Base colors
+                // Base UI colors
                 ("Background", theme.darkBackgroundColorHex, false),
                 ("Accent", theme.darkAccentColorHex, false),
                 ("Default Cue", theme.darkDefaultCueColorHex, false),
                 ("Title Bar / Control / Menu", theme.darkTitleBarColorHex, false),
                 ("Button BG", theme.darkButtonBackgroundColorHex, false),
+                // Semantic colors
+                ("Warning", theme.darkWarningColorHex, false),
+                ("Error", theme.darkErrorColorHex, false),
+                ("Success", theme.darkSuccessColorHex, false),
                 // Derived colors (computed)
                 ("Light Button BG (derived)", theme.lightButtonBackgroundColor(for: colorScheme).toHex() ?? "N/A", true),
                 ("Navigation Link (derived)", theme.navigationLinkColor(for: colorScheme).toHex() ?? "N/A", true),
@@ -153,6 +181,7 @@ struct ColorDisplaySection: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Colors")
                 .font(.headline)
+                .foregroundColor(currentTheme.primaryTextColor(for: systemColorScheme))
                 .padding(.horizontal)
 
             ForEach(colors, id: \.0) { name, hex, isDerived in

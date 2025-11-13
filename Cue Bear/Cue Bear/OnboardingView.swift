@@ -18,7 +18,7 @@ struct OnboardingView: View {
     }
 
     private var pages: [OnboardingPage] {
-        let themeAccent = selectedTheme.accentColor(for: colorScheme)
+        let themeAccent = selectedTheme.defaultCueColor(for: colorScheme)
         return [
             OnboardingPage(
                 title: "Welcome to Cue Bear",
@@ -177,9 +177,15 @@ struct OnboardingPageView: View {
 /// Alternative compact design that uses a card-based layout similar to the connection sheets
 struct OnboardingViewCompact: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @State private var currentPage = 0
 
     private let totalPages = 3
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
         NavigationView {
@@ -191,7 +197,7 @@ struct OnboardingViewCompact: View {
                     // Icon
                     Image(systemName: pageIcon)
                         .font(.system(size: 70, weight: .light))
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
 
                     // Title & Description
                     VStack(spacing: 16) {
@@ -214,7 +220,7 @@ struct OnboardingViewCompact: View {
                 HStack(spacing: 10) {
                     ForEach(0..<totalPages, id: \.self) { index in
                         Circle()
-                            .fill(index == currentPage ? Color.accentColor : Color.gray.opacity(0.3))
+                            .fill(index == currentPage ? selectedTheme.defaultCueColor(for: colorScheme) : Color.gray.opacity(0.3))
                             .frame(width: 8, height: 8)
                             .animation(.easeInOut(duration: 0.2), value: currentPage)
                     }
@@ -227,10 +233,10 @@ struct OnboardingViewCompact: View {
                         Button(action: previousPage) {
                             Text("Back")
                                 .font(.system(size: 17, weight: .semibold))
-                                .foregroundColor(.accentColor)
+                                .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 50)
-                                .background(Color.accentColor.opacity(0.1))
+                                .background(selectedTheme.defaultCueColor(for: colorScheme).opacity(0.1))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                     }
@@ -241,7 +247,7 @@ struct OnboardingViewCompact: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(Color.accentColor)
+                            .background(selectedTheme.defaultCueColor(for: colorScheme))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }

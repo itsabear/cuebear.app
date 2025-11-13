@@ -15,19 +15,29 @@ struct AppTheme: Identifiable, Codable, Equatable {
     let fontName: String
     let darkModeBehavior: DarkModeBehavior  // NEW: Controls dark mode response
 
-    // Light mode colors
+    // Light mode colors - Base UI
     let accentColorHex: String           // Selection stroke color
     let backgroundColorHex: String       // Main app background
     let defaultCueColorHex: String       // Default color for new cues
     let titleBarColorHex: String         // Title bar background (also used for control area and side menu)
     let buttonBackgroundColorHex: String // Control button background
 
-    // Dark mode colors
+    // Light mode colors - Semantic
+    let warningColorHex: String          // Warning messages and indicators
+    let errorColorHex: String            // Error messages and destructive actions
+    let successColorHex: String          // Success messages and positive indicators
+
+    // Dark mode colors - Base UI
     let darkAccentColorHex: String
     let darkBackgroundColorHex: String
     let darkDefaultCueColorHex: String
     let darkTitleBarColorHex: String
     let darkButtonBackgroundColorHex: String
+
+    // Dark mode colors - Semantic
+    let darkWarningColorHex: String
+    let darkErrorColorHex: String
+    let darkSuccessColorHex: String
 
     let isDefault: Bool
 
@@ -60,8 +70,29 @@ struct AppTheme: Identifiable, Codable, Equatable {
         return Color(hex: hex)
     }
 
-    func buttonBackgroundColor(for colorScheme: ColorScheme) -> Color {
+    func buttonBackgroundColor(for colorScheme: ColorScheme, customAccentHex: String? = nil) -> Color {
+        // If custom accent color is set, use it for button background too
+        if let customHex = customAccentHex, !customHex.isEmpty {
+            return Color(hex: customHex)
+        }
+
         let hex = shouldUseDarkMode(for: colorScheme) ? darkButtonBackgroundColorHex : buttonBackgroundColorHex
+        return Color(hex: hex)
+    }
+
+    // Semantic colors
+    func warningColor(for colorScheme: ColorScheme) -> Color {
+        let hex = shouldUseDarkMode(for: colorScheme) ? darkWarningColorHex : warningColorHex
+        return Color(hex: hex)
+    }
+
+    func errorColor(for colorScheme: ColorScheme) -> Color {
+        let hex = shouldUseDarkMode(for: colorScheme) ? darkErrorColorHex : errorColorHex
+        return Color(hex: hex)
+    }
+
+    func successColor(for colorScheme: ColorScheme) -> Color {
+        let hex = shouldUseDarkMode(for: colorScheme) ? darkSuccessColorHex : successColorHex
         return Color(hex: hex)
     }
 
@@ -223,12 +254,18 @@ extension AppTheme {
             defaultCueColorHex: "0A84FF",  // Original v1.0.9 blue
             titleBarColorHex: "E5E5EA",
             buttonBackgroundColorHex: "D1D1D6",
+            warningColorHex: "FF9500",  // Standard iOS orange
+            errorColorHex: "FF3B30",    // Standard iOS red
+            successColorHex: "34C759",  // Standard iOS green
             // Dark mode
             darkAccentColorHex: "FFFFFF",  // White for consistency
             darkBackgroundColorHex: "000000",
             darkDefaultCueColorHex: "0A84FF",
             darkTitleBarColorHex: "1C1C1E",
             darkButtonBackgroundColorHex: "2C2C2E",
+            darkWarningColorHex: "FF9F0A",  // Standard iOS dark mode orange
+            darkErrorColorHex: "FF453A",    // Standard iOS dark mode red
+            darkSuccessColorHex: "32D74B",  // Standard iOS dark mode green
             isDefault: true
         ),
 
@@ -245,12 +282,18 @@ extension AppTheme {
             defaultCueColorHex: "FF66B2",
             titleBarColorHex: "2D1524",
             buttonBackgroundColorHex: "3D2034",
+            warningColorHex: "FFCC00",  // Neon yellow
+            errorColorHex: "FF3366",    // Neon red/pink
+            successColorHex: "00FF99",  // Neon mint
             // Dark mode
             darkAccentColorHex: "000000",  // Same black
             darkBackgroundColorHex: "1A0A14",
             darkDefaultCueColorHex: "FF66B2",
             darkTitleBarColorHex: "2D1524",
             darkButtonBackgroundColorHex: "3D2034",
+            darkWarningColorHex: "FFCC00",  // Same neon yellow (fixed behavior)
+            darkErrorColorHex: "FF3366",    // Same neon red/pink (fixed behavior)
+            darkSuccessColorHex: "00FF99",  // Same neon mint (fixed behavior)
             isDefault: false
         ),
 
@@ -267,12 +310,18 @@ extension AppTheme {
             defaultCueColorHex: "997000",
             titleBarColorHex: "FFF0CC",
             buttonBackgroundColorHex: "FFDC99",
+            warningColorHex: "CC8800",  // Darker gold/orange
+            errorColorHex: "CC3300",    // Dark red
+            successColorHex: "669900",  // Olive green
             // Dark mode
             darkAccentColorHex: "FFFFFF",  // White for dark mode
             darkBackgroundColorHex: "1A1508",
             darkDefaultCueColorHex: "FFD93D",
             darkTitleBarColorHex: "2A2210",
             darkButtonBackgroundColorHex: "3A3220",
+            darkWarningColorHex: "FFAA00",  // Brighter gold/orange
+            darkErrorColorHex: "FF4400",    // Bright red
+            darkSuccessColorHex: "88CC00",  // Bright olive green
             isDefault: false
         ),
 
@@ -289,12 +338,18 @@ extension AppTheme {
             defaultCueColorHex: "990000",
             titleBarColorHex: "FFCCCC",
             buttonBackgroundColorHex: "FF9999",
+            warningColorHex: "CC6600",  // Dark orange
+            errorColorHex: "CC0000",    // Deep red
+            successColorHex: "009933",  // Dark green
             // Dark mode
             darkAccentColorHex: "FFFFFF",  // White for dark mode
             darkBackgroundColorHex: "1A0505",
             darkDefaultCueColorHex: "FF3333",
             darkTitleBarColorHex: "2A0F0F",
             darkButtonBackgroundColorHex: "3A1F1F",
+            darkWarningColorHex: "FF9933",  // Bright orange
+            darkErrorColorHex: "FF3333",    // Bright red (same as default cue)
+            darkSuccessColorHex: "33CC66",  // Bright green
             isDefault: false
         ),
 
@@ -311,12 +366,18 @@ extension AppTheme {
             defaultCueColorHex: "33E0FF",
             titleBarColorHex: "0A2A32",
             buttonBackgroundColorHex: "1A3A42",
+            warningColorHex: "FFAA00",  // Cyber orange
+            errorColorHex: "FF0066",    // Cyber magenta
+            successColorHex: "00FF66",  // Cyber green
             // Dark mode
             darkAccentColorHex: "000000",  // Same black
             darkBackgroundColorHex: "001A1F",
             darkDefaultCueColorHex: "33E0FF",
             darkTitleBarColorHex: "0A2A32",
             darkButtonBackgroundColorHex: "1A3A42",
+            darkWarningColorHex: "FFAA00",  // Same cyber orange (fixed behavior)
+            darkErrorColorHex: "FF0066",    // Same cyber magenta (fixed behavior)
+            darkSuccessColorHex: "00FF66",  // Same cyber green (fixed behavior)
             isDefault: false
         ),
 
@@ -333,12 +394,18 @@ extension AppTheme {
             defaultCueColorHex: "5F1B87",
             titleBarColorHex: "E8CCFF",
             buttonBackgroundColorHex: "D099FF",
+            warningColorHex: "996600",  // Dark amber
+            errorColorHex: "990033",    // Deep wine red
+            successColorHex: "336600",  // Dark sage green
             // Dark mode
             darkAccentColorHex: "FFFFFF",  // White for dark mode
             darkBackgroundColorHex: "120A16",
             darkDefaultCueColorHex: "B366E0",
             darkTitleBarColorHex: "22152A",
             darkButtonBackgroundColorHex: "32253A",
+            darkWarningColorHex: "FFCC66",  // Light amber
+            darkErrorColorHex: "FF6699",    // Light pink/rose
+            darkSuccessColorHex: "99CC66",  // Light sage green
             isDefault: false
         ),
 
@@ -355,12 +422,18 @@ extension AppTheme {
             defaultCueColorHex: "8B5615",
             titleBarColorHex: "FFEACC",
             buttonBackgroundColorHex: "FFD499",
+            warningColorHex: "CC7700",  // Burnt orange
+            errorColorHex: "990000",    // Barn red
+            successColorHex: "447700",  // Prairie green
             // Dark mode
             darkAccentColorHex: "FFFFFF",  // White for dark mode
             darkBackgroundColorHex: "1A120A",
             darkDefaultCueColorHex: "E6A85C",
             darkTitleBarColorHex: "2A1F14",
             darkButtonBackgroundColorHex: "3A2F24",
+            darkWarningColorHex: "FFAA44",  // Light burnt orange
+            darkErrorColorHex: "FF4444",    // Light barn red
+            darkSuccessColorHex: "88CC44",  // Light prairie green
             isDefault: false
         ),
 
@@ -377,12 +450,18 @@ extension AppTheme {
             defaultCueColorHex: "B34700",
             titleBarColorHex: "FFE4CC",
             buttonBackgroundColorHex: "FFCC99",
+            warningColorHex: "CC6600",  // Darker sunset orange
+            errorColorHex: "CC0033",    // Fiery red
+            successColorHex: "339966",  // Tropical green
             // Dark mode
             darkAccentColorHex: "FFFFFF",  // White for dark mode
             darkBackgroundColorHex: "1F0F00",
             darkDefaultCueColorHex: "FF8533",
             darkTitleBarColorHex: "331A0A",
             darkButtonBackgroundColorHex: "432A1A",
+            darkWarningColorHex: "FFAA33",  // Bright sunset orange
+            darkErrorColorHex: "FF4466",    // Bright fiery red
+            darkSuccessColorHex: "66DD99",  // Bright tropical green
             isDefault: false
         ),
 
@@ -399,12 +478,18 @@ extension AppTheme {
             defaultCueColorHex: "FF85E0",
             titleBarColorHex: "33152A",
             buttonBackgroundColorHex: "43253A",
+            warningColorHex: "FFDD66",  // K-Pop yellow
+            errorColorHex: "FF3399",    // Hot pink
+            successColorHex: "66FFCC",  // Mint blue
             // Dark mode
             darkAccentColorHex: "000000",  // Black for dark mode
             darkBackgroundColorHex: "1F0A1A",
             darkDefaultCueColorHex: "FF85E0",
             darkTitleBarColorHex: "33152A",
             darkButtonBackgroundColorHex: "43253A",
+            darkWarningColorHex: "FFDD66",  // Same K-Pop yellow (fixed behavior)
+            darkErrorColorHex: "FF3399",    // Same hot pink (fixed behavior)
+            darkSuccessColorHex: "66FFCC",  // Same mint blue (fixed behavior)
             isDefault: false
         ),
 
@@ -421,12 +506,18 @@ extension AppTheme {
             defaultCueColorHex: "7A1929",
             titleBarColorHex: "FFCCD6",
             buttonBackgroundColorHex: "FF99AD",
+            warningColorHex: "996600",  // Bourbon amber
+            errorColorHex: "990000",    // Deep burgundy
+            successColorHex: "336633",  // Smoky green
             // Dark mode
             darkAccentColorHex: "FFFFFF",  // White for dark mode
             darkBackgroundColorHex: "14050A",
             darkDefaultCueColorHex: "E6687F",
             darkTitleBarColorHex: "240F18",
             darkButtonBackgroundColorHex: "341F28",
+            darkWarningColorHex: "FFCC66",  // Light bourbon amber
+            darkErrorColorHex: "FF6666",    // Light burgundy
+            darkSuccessColorHex: "99CC99",  // Light smoky green
             isDefault: false
         ),
 
@@ -443,12 +534,18 @@ extension AppTheme {
             defaultCueColorHex: "1A6B56",
             titleBarColorHex: "CCF0E6",
             buttonBackgroundColorHex: "99E0CC",
+            warningColorHex: "997733",  // Muted orange
+            errorColorHex: "993333",    // Muted red
+            successColorHex: "447755",  // Muted green
             // Dark mode
             darkAccentColorHex: "FFFFFF",  // White for dark mode
             darkBackgroundColorHex: "0A1512",
             darkDefaultCueColorHex: "52D9B8",
             darkTitleBarColorHex: "14251F",
             darkButtonBackgroundColorHex: "24352F",
+            darkWarningColorHex: "DDAA66",  // Soft orange
+            darkErrorColorHex: "DD7777",    // Soft red
+            darkSuccessColorHex: "77BB99",  // Soft green
             isDefault: false
         ),
 

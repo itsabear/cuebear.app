@@ -102,7 +102,7 @@ class WobbleAnimator: ObservableObject {
     // Track which controls are wobbling and their parameters
     @Published private(set) var wobbles: [UUID: WobbleConfig] = [:]
 
-    struct WobbleConfig {
+    struct WobbleConfig: Equatable {
         let amplitude: Double
         let scaleDelta: Double
         let phaseOffset: Double  // Randomized phase for organic look
@@ -132,8 +132,8 @@ class WobbleAnimator: ObservableObject {
 
     // Calculate wobble transforms for a given time and config
     func calculateWobble(time: TimeInterval, config: WobbleConfig) -> (rotation: Double, scale: Double) {
-        // Frequency: 2.5 Hz (iPhone home screen speed - about 2-3 wobbles per second)
-        let frequency = 15.7  // 2.5 * 2π ≈ 15.7 radians per second
+        // Frequency: 3.0 Hz (slightly quicker than iPhone - about 3 wobbles per second)
+        let frequency = 18.8  // 3.0 * 2π ≈ 18.8 radians per second
         let angle = time * frequency + config.phaseOffset
 
         let rotation = sin(angle) * config.amplitude
@@ -152,18 +152,20 @@ struct TimeBasedWobbleModifier: ViewModifier {
     func body(content: Content) -> some View {
         if let config = wobbleAnimator.wobbles[wobbleID] {
             // Debug print removed - was causing 60fps console spam during wobble animation
-            return AnyView(
-                TimelineView(.animation) { timeline in
-                    let time = timeline.date.timeIntervalSinceReferenceDate
-                    let wobble = wobbleAnimator.calculateWobble(time: time, config: config)
+            TimelineView(.animation) { timeline in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                let wobble = wobbleAnimator.calculateWobble(time: time, config: config)
 
-                    content
-                        .rotationEffect(.degrees(wobble.rotation))
-                        .scaleEffect(wobble.scale)
-                }
-            )
+                content
+                    .rotationEffect(.degrees(wobble.rotation))
+                    .scaleEffect(wobble.scale)
+            }
         } else {
-            return AnyView(content)
+            // When wobble is stopped, animate back to normal with spring
+            content
+                .rotationEffect(.degrees(0))
+                .scaleEffect(1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: wobbleAnimator.wobbles[wobbleID])
         }
     }
 }
@@ -297,39 +299,123 @@ internal enum LibrarySortMode: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Isolated Number Picker Component
-// This component is isolated to prevent scroll position reset when other state changes
+// MARK: - Stepper + TextField MIDI Number Picker
 struct MIDINumberPicker: View {
     let kind: MIDIKind
     @Binding var number: Int
     let disabled: Bool
     let channel: Int
     var currentOwnerName: ((MIDIKey) -> String?)?
-    var editingControl: ControlButton?  // Full control being edited (to exclude from ownership check)
+    var editingControl: ControlButton?
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @State private var textValue: String = ""
+    @FocusState private var isFocused: Bool
 
-    var body: some View {
-        Picker(kind == .cc ? "CC Number" : "Note Number", selection: $number) {
-            ForEach(0...127, id: \.self) { n in
-                let owner = ownerFor(kind: kind, number: n, channel: channel)
-                let displayText = displayTextFor(kind: kind, number: n, owner: owner)
-
-                Text(displayText)
-                    .foregroundColor(owner == nil ? .primary : .secondary)
-                    .tag(n)
-            }
-        }
-        .disabled(disabled)
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 
-    private func displayTextFor(kind: MIDIKind, number: Int, owner: String?) -> String {
-        if kind == .note {
-            return owner == nil
-                ? "\(number) - \(number.midiNoteName)"
-                : "\(number) - \(number.midiNoteName) (Used by: \(owner!))"
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                Text(kind == .cc ? "CC Number" : "Note Number")
+                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+
+                Spacer()
+
+                // Note name (for MIDI notes only)
+                if kind == .note {
+                    Text(number.midiNoteName)
+                        .font(.system(size: 14))
+                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                }
+
+                // Minus button
+                Button(action: {
+                    if number > 0 {
+                        number -= 1
+                    }
+                }) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(number > 0 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                        .frame(width: 28, height: 28)
+                        .background(selectedTheme.titleBarColor(for: colorScheme))
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                .disabled(disabled || number <= 0)
+
+                // Text field
+                TextField("", text: $textValue)
+                    .focused($isFocused)
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 50)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(selectedTheme.backgroundColor(for: colorScheme))
+                    .cornerRadius(6)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(isFocused ? selectedTheme.defaultCueColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
+                    )
+                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                    .disabled(disabled)
+                    .keyboardType(.numberPad)
+                    .onAppear {
+                        textValue = "\(number)"
+                    }
+                    .onChange(of: number) { _, newValue in
+                        if !isFocused {
+                            textValue = "\(newValue)"
+                        }
+                    }
+                    .onSubmit {
+                        validateAndUpdate()
+                    }
+                    .onChange(of: isFocused) { _, focused in
+                        if !focused {
+                            validateAndUpdate()
+                        }
+                    }
+                    .onTapGesture {
+                        isFocused = true
+                    }
+
+                // Plus button
+                Button(action: {
+                    if number < 127 {
+                        number += 1
+                    }
+                }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(number < 127 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                        .frame(width: 28, height: 28)
+                        .background(selectedTheme.titleBarColor(for: colorScheme))
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                .disabled(disabled || number >= 127)
+            }
+
+            // Show "MIDI taken by" warning if number is taken
+            if let owner = ownerFor(kind: kind, number: number, channel: channel) {
+                Text("⚠️ MIDI taken by: \(owner)")
+                    .font(.caption)
+                    .foregroundColor(selectedTheme.warningColor(for: colorScheme))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func validateAndUpdate() {
+        if let value = Int(textValue), value >= 0, value <= 127 {
+            number = value
         } else {
-            return owner == nil
-                ? "\(number)"
-                : "\(number) (Used by: \(owner!))"
+            textValue = "\(number)"
         }
     }
 
@@ -344,44 +430,490 @@ struct MIDINumberPicker: View {
         }
 
         let key = MIDIKey(kind: kind, channel: channel, number: number)
-        return currentOwnerName(key)
+        guard let ownersString = currentOwnerName(key) else { return nil }
+
+        // Filter out the current control's name from the conflict list
+        if let edit = editingControl {
+            let editDisplayName: String
+            if edit.isFader == true {
+                editDisplayName = edit.title.isEmpty ? "Fader" : "Fader: \(edit.title)"
+            } else {
+                editDisplayName = edit.title.isEmpty ? "Button" : "Button: \(edit.title)"
+            }
+            // Check if the owners string contains the separator (multiple owners)
+            if ownersString.contains("|||") {
+                // Multiple owners - need to filter
+                let owners = ownersString.split(separator: "|||").map(String.init).filter { $0 != editDisplayName }
+                guard !owners.isEmpty else { return nil }
+                if owners.count == 1 {
+                    return owners[0]
+                } else if owners.count == 2 {
+                    return "\(owners[0]) and \(owners[1])"
+                } else {
+                    return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+                }
+            } else if ownersString == editDisplayName {
+                // Single owner and it's us
+                return nil
+            }
+        }
+
+        return ownersString
     }
 }
 
-// MARK: - Isolated Icon Picker Component
-// This component is isolated to prevent scroll position reset when other state changes
+// MARK: - Grid-Based Icon Picker
 struct IconPicker: View {
     @Binding var symbol: String
     let icons: [String]
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @State private var showingPopover = false
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
-        Picker("Icon", selection: $symbol) {
-            Text("Text only").tag("")
-            ForEach(icons, id: \.self) { Image(systemName: $0).tag($0) }
+        Button(action: { showingPopover = true }) {
+            HStack {
+                Text("Icon")
+                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                Spacer()
+                if symbol.isEmpty {
+                    Text("Text only")
+                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                } else {
+                    Image(systemName: symbol)
+                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                }
+            }
         }
+        .popover(isPresented: $showingPopover) {
+            IconGridView(symbol: $symbol, icons: icons, showingPopover: $showingPopover)
+        }
+    }
+}
+
+// MARK: - Icon Grid View (Popover Content)
+struct IconGridView: View {
+    @Binding var symbol: String
+    let icons: [String]
+    @Binding var showingPopover: Bool
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Icon")
+                    .font(.headline)
+                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                Spacer()
+                Button(action: { showingPopover = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                }
+            }
+            .padding()
+            .background(selectedTheme.titleBarColor(for: colorScheme))
+
+            Divider()
+
+            // Grid
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
+                        // Text only option
+                        Button(action: {
+                            symbol = ""
+                            showingPopover = false
+                        }) {
+                            VStack(spacing: 4) {
+                                Text("Aa")
+                                    .font(.system(size: 20, weight: .medium))
+                                Text("Text only")
+                                    .font(.system(size: 10))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 60)
+                            .background(
+                                symbol.isEmpty
+                                    ? selectedTheme.defaultCueColor(for: colorScheme)
+                                    : selectedTheme.titleBarColor(for: colorScheme)
+                            )
+                            .foregroundColor(
+                                symbol.isEmpty ? .white : selectedTheme.primaryTextColor(for: colorScheme)
+                            )
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(
+                                        symbol.isEmpty ? selectedTheme.defaultCueColor(for: colorScheme) : Color.clear,
+                                        lineWidth: 2
+                                    )
+                            )
+                        }
+                        .id("text-only")
+
+                        // Icon options
+                        ForEach(icons, id: \.self) { icon in
+                            let isSelected = icon == symbol
+
+                            Button(action: {
+                                symbol = icon
+                                showingPopover = false
+                            }) {
+                                Image(systemName: icon)
+                                    .font(.system(size: 24))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 60)
+                                    .background(
+                                        isSelected
+                                            ? selectedTheme.defaultCueColor(for: colorScheme)
+                                            : selectedTheme.titleBarColor(for: colorScheme)
+                                    )
+                                    .foregroundColor(
+                                        isSelected ? .white : selectedTheme.primaryTextColor(for: colorScheme)
+                                    )
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(
+                                                isSelected ? selectedTheme.defaultCueColor(for: colorScheme) : Color.clear,
+                                                lineWidth: 2
+                                            )
+                                    )
+                            }
+                            .id(icon)
+                        }
+                    }
+                    .padding()
+                }
+                .onAppear {
+                    if !symbol.isEmpty {
+                        proxy.scrollTo(symbol, anchor: .center)
+                    } else {
+                        proxy.scrollTo("text-only", anchor: .top)
+                    }
+                }
+            }
+        }
+        .frame(width: 450, height: 500)
+        .background(selectedTheme.backgroundColor(for: colorScheme))
     }
 }
 
 extension IconPicker: Equatable {
     static func == (lhs: IconPicker, rhs: IconPicker) -> Bool {
-        // Only re-render if symbol binding actually changed
         lhs.symbol == rhs.symbol && lhs.icons == rhs.icons
     }
 }
 
-// MARK: - Isolated Velocity Picker Component
-// This component is isolated to prevent scroll position reset when other state changes
+// MARK: - Stepper + TextField Velocity Picker
 struct VelocityPicker: View {
     @Binding var velocity: Int
     let disabled: Bool
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @State private var textValue: String = ""
+    @FocusState private var isFocused: Bool
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
-        Picker("Velocity", selection: $velocity) {
-            ForEach(0...127, id: \.self) { v in
-                Text("\(v)").tag(v)
+        HStack(spacing: 12) {
+            Text("Velocity")
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+
+            Spacer()
+
+            // Minus button
+            Button(action: {
+                if velocity > 0 {
+                    velocity -= 1
+                }
+            }) {
+                Image(systemName: "minus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(velocity > 0 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                    .frame(width: 28, height: 28)
+                    .background(selectedTheme.titleBarColor(for: colorScheme))
+                    .cornerRadius(6)
             }
+            .buttonStyle(.plain)
+            .disabled(disabled || velocity <= 0)
+
+            // Text field
+            TextField("", text: $textValue)
+                .focused($isFocused)
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.center)
+                .frame(width: 50)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(selectedTheme.backgroundColor(for: colorScheme))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isFocused ? selectedTheme.defaultCueColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
+                )
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                .disabled(disabled)
+                .keyboardType(.numberPad)
+                .onAppear {
+                    textValue = "\(velocity)"
+                }
+                .onChange(of: velocity) { _, newValue in
+                    if !isFocused {
+                        textValue = "\(newValue)"
+                    }
+                }
+                .onSubmit {
+                    validateAndUpdate()
+                }
+                .onChange(of: isFocused) { _, focused in
+                    if !focused {
+                        validateAndUpdate()
+                    }
+                }
+                .onTapGesture {
+                    isFocused = true
+                }
+
+            // Plus button
+            Button(action: {
+                if velocity < 127 {
+                    velocity += 1
+                }
+            }) {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(velocity < 127 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                    .frame(width: 28, height: 28)
+                    .background(selectedTheme.titleBarColor(for: colorScheme))
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .disabled(disabled || velocity >= 127)
         }
-        .disabled(disabled)
+    }
+
+    private func validateAndUpdate() {
+        if let value = Int(textValue), value >= 0, value <= 127 {
+            velocity = value
+        } else {
+            textValue = "\(velocity)"
+        }
+    }
+}
+
+// MARK: - Channel Picker (Stepper + TextField)
+struct ChannelPicker: View {
+    let title: String
+    @Binding var channel: Int
+    let disabled: Bool
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @State private var textValue: String = ""
+    @FocusState private var isFocused: Bool
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+
+            Spacer()
+
+            // Minus button
+            Button(action: {
+                if channel > 1 {
+                    channel -= 1
+                }
+            }) {
+                Image(systemName: "minus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(channel > 1 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                    .frame(width: 28, height: 28)
+                    .background(selectedTheme.titleBarColor(for: colorScheme))
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .disabled(disabled || channel <= 1)
+
+            // Text field
+            TextField("", text: $textValue)
+                .focused($isFocused)
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.center)
+                .frame(width: 50)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(selectedTheme.backgroundColor(for: colorScheme))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isFocused ? selectedTheme.defaultCueColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
+                )
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                .disabled(disabled)
+                .keyboardType(.numberPad)
+                .onAppear {
+                    textValue = "\(channel)"
+                }
+                .onChange(of: channel) { _, newValue in
+                    if !isFocused {
+                        textValue = "\(newValue)"
+                    }
+                }
+                .onSubmit {
+                    validateAndUpdate()
+                }
+                .onChange(of: isFocused) { _, focused in
+                    if !focused {
+                        validateAndUpdate()
+                    }
+                }
+                .onTapGesture {
+                    isFocused = true
+                }
+
+            // Plus button
+            Button(action: {
+                if channel < 16 {
+                    channel += 1
+                }
+            }) {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(channel < 16 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                    .frame(width: 28, height: 28)
+                    .background(selectedTheme.titleBarColor(for: colorScheme))
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .disabled(disabled || channel >= 16)
+        }
+    }
+
+    private func validateAndUpdate() {
+        if let value = Int(textValue), value >= 1, value <= 16 {
+            channel = value
+        } else {
+            textValue = "\(channel)"
+        }
+    }
+}
+
+// MARK: - CC Number Picker (Stepper + TextField)
+struct CCNumberPicker: View {
+    let title: String
+    @Binding var ccNumber: Int
+    let disabled: Bool
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @State private var textValue: String = ""
+    @FocusState private var isFocused: Bool
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+
+            Spacer()
+
+            // Minus button
+            Button(action: {
+                if ccNumber > 0 {
+                    ccNumber -= 1
+                }
+            }) {
+                Image(systemName: "minus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(ccNumber > 0 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                    .frame(width: 28, height: 28)
+                    .background(selectedTheme.titleBarColor(for: colorScheme))
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .disabled(disabled || ccNumber <= 0)
+
+            // Text field
+            TextField("", text: $textValue)
+                .focused($isFocused)
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.center)
+                .frame(width: 50)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(selectedTheme.backgroundColor(for: colorScheme))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isFocused ? selectedTheme.defaultCueColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
+                )
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                .disabled(disabled)
+                .keyboardType(.numberPad)
+                .onAppear {
+                    textValue = "\(ccNumber)"
+                }
+                .onChange(of: ccNumber) { _, newValue in
+                    if !isFocused {
+                        textValue = "\(newValue)"
+                    }
+                }
+                .onSubmit {
+                    validateAndUpdate()
+                }
+                .onChange(of: isFocused) { _, focused in
+                    if !focused {
+                        validateAndUpdate()
+                    }
+                }
+                .onTapGesture {
+                    isFocused = true
+                }
+
+            // Plus button
+            Button(action: {
+                if ccNumber < 127 {
+                    ccNumber += 1
+                }
+            }) {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(ccNumber < 127 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                    .frame(width: 28, height: 28)
+                    .background(selectedTheme.titleBarColor(for: colorScheme))
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .disabled(disabled || ccNumber >= 127)
+        }
+    }
+
+    private func validateAndUpdate() {
+        if let value = Int(textValue), value >= 0, value <= 127 {
+            ccNumber = value
+        } else {
+            textValue = "\(ccNumber)"
+        }
     }
 }
 
@@ -422,6 +954,7 @@ struct CBControlEditorSheet: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -574,10 +1107,10 @@ struct CBControlEditorSheet: View {
                     Section {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.red)
+                                .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                             Text(outOfRoomMessage())
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                         }
                         .padding(.vertical, 4)
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
@@ -608,12 +1141,14 @@ struct CBControlEditorSheet: View {
                             Text("Small Button").tag(ButtonType.small)
                         }
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
                         // Show space warning if button type change won't fit
                         if showSpaceWarning {
                             Text("You're out of room! Try removing other controllers to change button size")
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 .padding(.top, 4)
                                 .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         }
@@ -621,13 +1156,14 @@ struct CBControlEditorSheet: View {
 
                     if !draft.isFader {
                         IconPicker(symbol: $draft.symbol, icons: icons)
-                            .equatable()
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         Picker("Behavior", selection: $draft.isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
                         }
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
 
                     // Fader orientation and direction (only for faders)
@@ -637,6 +1173,8 @@ struct CBControlEditorSheet: View {
                             Text("Horizontal").tag("horizontal")
                         }
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
                         Picker("Fader Direction", selection: $draft.faderDirection) {
                             // Vertical faders: only up/down
@@ -652,12 +1190,14 @@ struct CBControlEditorSheet: View {
                         }
                         .id("fader-direction-picker")
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
                         // Show space warning if orientation change won't fit
                         if showSpaceWarning {
                             Text("You're out of room! Try removing other controllers to add this one")
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 .padding(.top, 4)
                                 .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         }
@@ -682,7 +1222,7 @@ struct CBControlEditorSheet: View {
                                         .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                                 } else {
                                     Text("Default")
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                                 }
                             }
                         }
@@ -709,6 +1249,7 @@ struct CBControlEditorSheet: View {
                     Toggle(isOn: $draft.autoAssign) {
                         Text("Assign MIDI automatically")
                     }
+                    .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !draft.isFader {
                         Picker("Type", selection: $draft.kind) {
@@ -716,6 +1257,8 @@ struct CBControlEditorSheet: View {
                             Text("Note").tag(MIDIKind.note)
                         }
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
                     if isGlobalChannel {
                         HStack {
@@ -726,12 +1269,8 @@ struct CBControlEditorSheet: View {
                         }
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     } else {
-                        Picker("Channel", selection: $draft.channel) {
-                            ForEach(1...16, id: \.self) { ch in
-                                Text("\(ch)").tag(ch)
-                            }
-                        }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        ChannelPicker(title: "Channel", channel: $draft.channel, disabled: false)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     MIDINumberPicker(
                         kind: draft.kind,
@@ -741,13 +1280,7 @@ struct CBControlEditorSheet: View {
                         currentOwnerName: currentOwnerName,
                         editingControl: editing
                     )
-                    .id(draft.kind == .note ? "note-picker" : "cc-picker")
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    // Show conflict warning below picker (not inside picker items)
-                    if let owner = conflictOwner() {
-                        Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    }
                     if !draft.isFader && draft.kind == .note {
                         VelocityPicker(velocity: $draft.velocity, disabled: false)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
@@ -774,7 +1307,7 @@ struct CBControlEditorSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle(titleForSheet())
             .navigationBarBackButtonHidden(true)
-            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+            .tint(selectedTheme.defaultCueColor(for: colorScheme))
             .alert("Delete Control", isPresented: $showDeleteAlert) {
                 Button("Delete", role: .destructive) {
                     if let control = editing {
@@ -805,6 +1338,7 @@ struct CBControlEditorSheet: View {
                         Button("Save & Add Another") {
                             saveControl(andAddAnother: true)
                         }
+                        .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
                         .disabled(conflictOwner() != nil || showSpaceWarning || isOutOfRoom || !canAddMore)
                     }
                 }
@@ -812,6 +1346,7 @@ struct CBControlEditorSheet: View {
                     Button(isEditMode ? "Save" : "Add") {
                         saveControl(andAddAnother: false)
                     }
+                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
                     .disabled(conflictOwner() != nil || showSpaceWarning || isOutOfRoom)
                 }
             }
@@ -1002,7 +1537,20 @@ struct CBControlEditorSheet: View {
             return nil
         }
         let key = MIDIKey(kind: draft.kind, channel: draft.channel, number: draft.number)
-        return currentOwnerName(key)
+        guard let ownersString = currentOwnerName(key) else { return nil }
+
+        // Filter out the current control's name if editing
+        if let edit = editing {
+            let editDisplayName: String
+            if edit.isFader == true {
+                editDisplayName = edit.title.isEmpty ? "Fader" : "Fader: \(edit.title)"
+            } else {
+                editDisplayName = edit.title.isEmpty ? "Button" : "Button: \(edit.title)"
+            }
+            return filterOwnerName(ownersString, excluding: editDisplayName)
+        }
+
+        return ownersString
     }
 
     private func ownerFor(kind: MIDIKind, number: Int, channel: Int) -> String? {
@@ -1011,7 +1559,40 @@ struct CBControlEditorSheet: View {
             return nil
         }
         let key = MIDIKey(kind: kind, channel: channel, number: number)
-        return currentOwnerName(key)
+        guard let ownersString = currentOwnerName(key) else { return nil }
+
+        // Filter out the current control's name if editing
+        if let edit = editing {
+            let editDisplayName: String
+            if edit.isFader == true {
+                editDisplayName = edit.title.isEmpty ? "Fader" : "Fader: \(edit.title)"
+            } else {
+                editDisplayName = edit.title.isEmpty ? "Button" : "Button: \(edit.title)"
+            }
+            return filterOwnerName(ownersString, excluding: editDisplayName)
+        }
+
+        return ownersString
+    }
+
+    private func filterOwnerName(_ ownersString: String, excluding excludeName: String) -> String? {
+        // Check if the owners string contains the separator (multiple owners)
+        if ownersString.contains("|||") {
+            // Multiple owners - need to filter
+            let owners = ownersString.split(separator: "|||").map(String.init).filter { $0 != excludeName }
+            guard !owners.isEmpty else { return nil }
+            if owners.count == 1 {
+                return owners[0]
+            } else if owners.count == 2 {
+                return "\(owners[0]) and \(owners[1])"
+            } else {
+                return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+            }
+        } else if ownersString == excludeName {
+            // Single owner and it's us
+            return nil
+        }
+        return ownersString
     }
 
     private func assignFreeNumber() {
@@ -1273,6 +1854,7 @@ struct CBEditControlSheet: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -1311,6 +1893,7 @@ struct CBEditControlSheet: View {
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !isFaderUI {
                         Toggle("Small Button", isOn: $isSmall)
+                            .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                     HStack {
@@ -1326,13 +1909,14 @@ struct CBEditControlSheet: View {
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !isFaderUI {
                         IconPicker(symbol: $symbol, icons: icons)
-                            .equatable()
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         Picker("Behavior", selection: $isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
                         }
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
 
                     // Fader orientation and direction (only for faders)
@@ -1342,6 +1926,8 @@ struct CBEditControlSheet: View {
                             Text("Horizontal").tag("horizontal")
                         }
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
                         Picker("Fader Direction", selection: $faderDirection) {
                             // Vertical faders: only up/down
@@ -1357,6 +1943,8 @@ struct CBEditControlSheet: View {
                         }
                         .id("fader-direction-picker-edit")
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
 
                     // Color Picker - Inline Disclosure
@@ -1383,6 +1971,7 @@ struct CBEditControlSheet: View {
                             }
                         }
                     )
+                    .tint(.secondary)
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 // Live Preview
@@ -1403,6 +1992,7 @@ struct CBEditControlSheet: View {
                     Toggle(isOn: $autoAssign) {
                         Text("Assign MIDI automatically")
                     }
+                    .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !isFaderUI {
                         Picker("Type", selection: $kind) {
@@ -1410,13 +2000,11 @@ struct CBEditControlSheet: View {
                             Text("Note").tag(MIDIKind.note)
                         }
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
-                    Picker("Channel", selection: $channel) {
-                        ForEach(1...16, id: \.self) { ch in
-                            Text("\(ch)").tag(ch)
-                        }
-                    }
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    ChannelPicker(title: "Channel", channel: $channel, disabled: false)
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     MIDINumberPicker(
                         kind: kind,
                         number: $number,
@@ -1425,14 +2013,9 @@ struct CBEditControlSheet: View {
                         currentOwnerName: currentOwnerName,
                         editingControl: editing
                     )
-                    .id(kind == .note ? "note-picker-edit" : "cc-picker-edit")
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !isFaderUI && kind == .note {
                         VelocityPicker(velocity: $velocity, disabled: false)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    }
-                    if let owner = conflictOwner() {
-                        Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 }
@@ -1458,7 +2041,7 @@ struct CBEditControlSheet: View {
             .navigationBarBackButtonHidden(true)
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
-            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+            .tint(selectedTheme.defaultCueColor(for: colorScheme))
             .alert("Delete Control", isPresented: $showDeleteAlert) {
                 Button("Delete", role: .destructive) {
                     if let control = editing {
@@ -1583,7 +2166,36 @@ struct CBEditControlSheet: View {
             return nil
         }
         let key = MIDIKey(kind: kind, channel: channel, number: number)
-        return currentOwnerName(key)
+        guard let ownersString = currentOwnerName(key) else { return nil }
+
+        // Filter out the current control's name if editing
+        if let edit = editing {
+            let editDisplayName: String
+            if edit.isFader == true {
+                editDisplayName = edit.title.isEmpty ? "Fader" : "Fader: \(edit.title)"
+            } else {
+                editDisplayName = edit.title.isEmpty ? "Button" : "Button: \(edit.title)"
+            }
+
+            // Check if the owners string contains the separator (multiple owners)
+            if ownersString.contains("|||") {
+                // Multiple owners - need to filter
+                let owners = ownersString.split(separator: "|||").map(String.init).filter { $0 != editDisplayName }
+                guard !owners.isEmpty else { return nil }
+                if owners.count == 1 {
+                    return owners[0]
+                } else if owners.count == 2 {
+                    return "\(owners[0]) and \(owners[1])"
+                } else {
+                    return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+                }
+            } else if ownersString == editDisplayName {
+                // Single owner and it's us
+                return nil
+            }
+        }
+
+        return ownersString
     }
 
     private func firstFreeNumber(for kind: MIDIKind, channel: Int) -> Int {
@@ -1614,6 +2226,14 @@ struct ControlButtonPreview: View {
     var isSmall: Bool = false
     var colorHex: String? = nil
 
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
     private var midiLabel: String {
         kind == .cc ? "\(channel)•\(number)" : "\(channel)•\(number)•\(velocity)"
     }
@@ -1622,7 +2242,11 @@ struct ControlButtonPreview: View {
         if let hex = colorHex, !hex.isEmpty {
             return Color(hex: hex)
         }
-        return Color.blue
+        // Use custom accent color if set, otherwise theme default
+        if !customDefaultCueColorStorage.isEmpty {
+            return Color(hex: customDefaultCueColorStorage)
+        }
+        return selectedTheme.defaultCueColor(for: colorScheme)
     }
 
     var body: some View {
@@ -1684,11 +2308,23 @@ struct ControlFaderPreview: View {
     var direction: String = "up"
     var colorHex: String? = nil
 
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
     private var faderColor: Color {
         if let hex = colorHex, !hex.isEmpty {
             return Color(hex: hex)
         }
-        return Color.blue
+        // Use custom accent color if set, otherwise theme default
+        if !customDefaultCueColorStorage.isEmpty {
+            return Color(hex: customDefaultCueColorStorage)
+        }
+        return selectedTheme.defaultCueColor(for: colorScheme)
     }
 
     var body: some View {
@@ -1785,12 +2421,33 @@ internal struct ContentView: View {
         "record.circle.fill",
         "stop.circle.fill", "stop.fill",
 
-        // Music & Performance
-        "figure.disc.sports",
+        // Music & Performance - Strings & Keys
         "guitars.fill",
+        "pianokeys", "pianokeys.inverse",
+
+        // Music & Performance - Brass & Winds
+        "horn", "horn.fill",
+        "trumpet", "trumpet.fill",
+
+        // Music & Performance - Vocals & Microphones
+        "music.mic",
+        "mic.fill",
+
+        // Music & Performance - Rhythm & Tempo
         "metronome", "metronome.fill",
+        "figure.disc.sports",
+
+        // Music & Performance - Notes & Notation
         "music.note", "music.note.list", "music.quarternote.3",
-        "pianokeys.inverse",
+
+        // Music & Performance - Audio Equipment
+        "radio", "radio.fill",
+        "hifispeaker", "hifispeaker.fill",
+        "hifispeaker.2", "hifispeaker.2.fill",
+        "amplifier",
+        "beats.headphones",
+        "beats.earphones",
+        "beats.powerbeatspro.left",
 
         // Audio & Mixing
         "dial.max",
@@ -1866,6 +2523,8 @@ internal struct ContentView: View {
     @State private var editingSong: Song? = nil
     @State private var isEditing = false
     @State private var reorderMode = false  // v1.0.9: Reorder mode for cue list
+    @State private var setlistBatchMode = false  // Batch select mode for cue list
+    @State private var setlistSelected: Set<UUID> = []  // Selected cues in batch mode
 
     // Library state
     @State private var songLibrary: [Song] = []
@@ -1893,6 +2552,7 @@ internal struct ContentView: View {
     // Projects
     @State private var showProjects = false
     @State private var showOnboarding = false
+    @Binding var crashAlertActive: Bool  // Prevents onboarding from showing while crash alert is active
     @AppStorage("lastProjectName") private var projectName: String = "Untitled"
     @State private var projectsList: [String] = []
     @State private var isDirty: Bool = false
@@ -1903,6 +2563,9 @@ internal struct ContentView: View {
 
     // Navigation capsule (Regular + Remote mode)
     @State private var lastTriggeredSongIndex: Int = 0
+
+    // Last played cue (for play icon indicator)
+    @State private var lastPlayedCueID: UUID? = nil
 
     // Song deletion confirmation
     @State private var showDeleteConfirmation: Bool = false
@@ -1963,6 +2626,8 @@ internal struct ContentView: View {
     @State private var modeChangeWorkItem: DispatchWorkItem?
     @State private var showAboutSheet = false
     @State private var showAppearanceSheet = false
+    @State private var showAppearanceSettingsSheet = false
+    @State private var showDesignPreview = false  // Design preview for cue appearance testing
     #if DEBUG
     @State private var showAdminPanel = false
     @State private var adminPanelPressTimer: Timer? = nil
@@ -1975,6 +2640,19 @@ internal struct ContentView: View {
     private var currentTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
+
+    // Effective default cue color (custom overrides theme default)
+    private var effectiveDefaultCueColorHex: String {
+        customDefaultCueColorStorage.isEmpty ? currentTheme.defaultCueColorHexValue(for: colorScheme) : customDefaultCueColorStorage
+    }
+
+    // Appearance Settings
+    @AppStorage("showMIDIData") private var showMIDIData: Bool = true
+    @AppStorage("cueHeight") private var cueHeight: Double = 86
+    @AppStorage("navigationPillSize") private var navigationPillSize: Double = 1.0
+    @AppStorage("cueCapsuleSize") private var cueCapsuleSize: Double = 1.0
+    @AppStorage("fontSize") private var fontSize: Double = 1.0
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     // Performance caches
     @State private var cachedConflictLookup: [MIDIKey: String] = [:]
@@ -2036,7 +2714,7 @@ internal struct ContentView: View {
                 },
                 onNewProject: {
                     if isEditing { isEditing = false }
-                    createNewProject()
+                    newProjectFlow()
                 },
                 onSave: {
                     if isEditing { isEditing = false }
@@ -2073,7 +2751,10 @@ internal struct ContentView: View {
                 },
                 onShowOnboarding: {
                     if isEditing { isEditing = false }
-                    showOnboarding = true
+                    // Only show onboarding if crash alert is not active
+                    if !crashAlertActive {
+                        showOnboarding = true
+                    }
                 },
                 onShowAbout: {
                     if isEditing { isEditing = false }
@@ -2092,6 +2773,7 @@ internal struct ContentView: View {
                     CBLibraryColumn(
                         rows: filteredLibraryRows(),
                         themeFont: currentTheme.font,
+                        conflictFor: conflictLookup(),
                         isEditing: $isEditing,
                         batchMode: $libBatchMode,
                         selected: $libSelected,
@@ -2113,15 +2795,23 @@ internal struct ContentView: View {
                     CBSetlistColumn(
                         songs: filteredSetlistSongs(),
                         themeFont: currentTheme.font,
+                        conflictFor: conflictLookup(),
                         searchText: $setlistQuery,
                         reorderMode: $reorderMode,
+                        batchMode: $setlistBatchMode,
+                        selected: $setlistSelected,
                         onRename: { s in editingSong = s; showAddEdit = true },
                         onRemove: { s in removeFromSetlist(s) },
                         onMove: { inds, newOffset in
                             pushSetlistUndo()
                             store.setlist.songs.move(fromOffsets: inds, toOffset: newOffset)
                         },
-                        onAdd: { editingSong = nil; showAddEdit = true }
+                        onAdd: { editingSong = nil; showAddEdit = true },
+                        onToggleSelect: { id in toggleSetlistSelection(id) },
+                        onSelectAll: selectAllSetlist,
+                        onClearSelection: { setlistSelected.removeAll() },
+                        onBatchRemove: removeSelectedFromSetlist,
+                        onDuplicate: { s in duplicateSong(s) }
                     )
                     .padding(.top, 88)
                     }
@@ -2133,16 +2823,21 @@ internal struct ContentView: View {
                 VStack(spacing: 0) {
                     CBPerformanceList(
                     songs: store.setlist.songs,
+                    songLibrary: songLibrary,  // Pass full song library for alias resolution
                     isCueMode: store.mode == .cue,
                     cuedID: store.mode == .cue ? store.cuedSong?.id : (store.mode == .regularPlusRemote && !store.setlist.songs.isEmpty ? store.setlist.songs[currentSongIndex()].id : nil),
                     isEditing: isEditing,
                     flashingCueID: flashingCueID,  // Pass flash trigger down to rows
+                    lastPlayedID: lastPlayedCueID,  // Pass last played cue ID for play icon
                     accentColor: currentTheme.accentColor(for: colorScheme),  // Pass theme accent color
-                    defaultCueColor: currentTheme.defaultCueColor(for: colorScheme),  // Pass theme default cue color
+                    defaultCueColor: Color(hex: effectiveDefaultCueColorHex),  // Pass theme default cue color (custom or theme default)
                     themeFont: currentTheme.font,  // Pass theme font function
                     selectionStrokeColor: { cueColorHex in currentTheme.selectionStrokeColor(for: cueColorHex, colorScheme: colorScheme) },  // Compute contrasting selection stroke color
                     backgroundColorHex: currentTheme.backgroundColorHexValue(for: colorScheme),  // Pass background color hex
-                    defaultCueColorHex: currentTheme.defaultCueColorHexValue(for: colorScheme),  // Pass default cue color hex
+                    defaultCueColorHex: effectiveDefaultCueColorHex,  // Pass default cue color hex (custom or theme default)
+                    showMIDIData: showMIDIData,  // Pass MIDI data visibility setting
+                    cueHeight: cueHeight,  // Pass customizable cue height
+                    fontSize: fontSize,  // Pass font size multiplier
                     onTapSong: { song in
                         if store.mode == .regular || store.mode == .regularPlusRemote {
                             // In Navigator mode, update the index to match the tapped song
@@ -2186,7 +2881,8 @@ internal struct ContentView: View {
                             onGo: { cueGo() },
                             onNext: { selectNextCued() },
                             onClear: { store.cuedSong = nil },
-                            controlAreaHeight: $controlAreaHeight
+                            controlAreaHeight: $controlAreaHeight,
+                            sizeMultiplier: cueCapsuleSize
                         )
                     }
 
@@ -2202,9 +2898,24 @@ internal struct ContentView: View {
                             canNext: canNext,
                             onPrev: { triggerPrevious() },
                             onNext: { triggerNext() },
-                            controlAreaHeight: $controlAreaHeight
+                            controlAreaHeight: $controlAreaHeight,
+                            sizeMultiplier: navigationPillSize
                         )
                     }
+                }
+                .overlay(alignment: .top) {
+                    // Gradient from top of screen to make cues fade underneath the top bar
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            (colorScheme == .dark ? Color.black : Color.white).opacity(0.5),
+                            (colorScheme == .dark ? Color.black : Color.white).opacity(0.0)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: 150, alignment: .top)  // Extended height to cover top bar area
+                    .ignoresSafeArea(edges: .top)
+                    .allowsHitTesting(false)
                 }
                 }
             )
@@ -2220,6 +2931,7 @@ internal struct ContentView: View {
                 reportedHeight: $controlAreaHeight,
                 canAddMoreControls: $canAddMoreControlsToGrid,
                 conflictFor: conflictLookup(),
+                showMIDIData: showMIDIData,
                 onTap: { btn in triggerControl(btn) },
                 onEditButton: { btn in
                     editingControlForEdit = btn
@@ -2238,9 +2950,10 @@ internal struct ContentView: View {
                 wifiClient: wifiClient,
                 connectionCoordinator: connectionCoordinator,
                 controlAreaColor: currentTheme.titleBarColor(for: colorScheme),
-                buttonBackgroundColor: currentTheme.buttonBackgroundColor(for: colorScheme),
+                buttonBackgroundColor: currentTheme.buttonBackgroundColor(for: colorScheme, customAccentHex: customDefaultCueColorStorage),
                 lightButtonBackgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme),
-                defaultCueColor: currentTheme.defaultCueColor(for: colorScheme),
+                defaultCueColor: Color(hex: effectiveDefaultCueColorHex),
+                standardButtonColor: currentTheme.defaultCueColor(for: colorScheme),
                 textColor: currentTheme.primaryTextColor(for: colorScheme),
                 markDirty: markDirty,
                 cueListEditMode: isEditing
@@ -2252,6 +2965,28 @@ internal struct ContentView: View {
                 } else {
                     // Exiting edit mode - cancel timer
                     cancelControlEditModeTimer()
+                }
+            }
+            .onChange(of: showControlEditor) { _, isShowing in
+                if isShowing {
+                    // Sheet opened - pause timer
+                    cancelControlEditModeTimer()
+                } else {
+                    // Sheet dismissed - restart timer if still in edit mode
+                    if controlEditMode {
+                        startControlEditModeTimer()
+                    }
+                }
+            }
+            .onChange(of: showEditControlSheet) { _, isShowing in
+                if isShowing {
+                    // Sheet opened - pause timer
+                    cancelControlEditModeTimer()
+                } else {
+                    // Sheet dismissed - restart timer if still in edit mode
+                    if controlEditMode {
+                        startControlEditModeTimer()
+                    }
                 }
             }
     }
@@ -2413,7 +3148,7 @@ internal struct ContentView: View {
                     sideMenuSection(title: "Project") {
                         sideMenuButton("New Project", icon: "doc.badge.plus", action: {
                             if isEditing { isEditing = false }
-                            createNewProject()
+                            newProjectFlow()
                             closeMenu()
                         })
                         sideMenuButton("Save", icon: "square.and.arrow.down", action: {
@@ -2458,7 +3193,7 @@ internal struct ContentView: View {
                         })
                         sideMenuButton("Appearance...", icon: "paintbrush", action: {
                             if isEditing { isEditing = false }
-                            showAppearanceSheet = true
+                            showAppearanceSettingsSheet = true
                             closeMenu()
                         })
                     }
@@ -2470,7 +3205,10 @@ internal struct ContentView: View {
                     sideMenuSection(title: "Help") {
                         sideMenuButton("Getting Started", icon: "questionmark.circle", action: {
                             if isEditing { isEditing = false }
-                            showOnboarding = true
+                            // Only show onboarding if crash alert is not active
+                            if !crashAlertActive {
+                                showOnboarding = true
+                            }
                             closeMenu()
                         })
                         #if DEBUG
@@ -2732,7 +3470,31 @@ internal struct ContentView: View {
         if showSplash {
             SplashScreen().transition(.opacity)
         } else {
-            mainStack().ignoresSafeArea(.keyboard, edges: .bottom)
+            mainStack()
+                .ignoresSafeArea(.keyboard, edges: .bottom)
+                .focusable()  // Required to receive keyboard input from Bluetooth pedals
+                .focusEffectDisabled()  // Hide the blue focus indicator lines
+                // Bluetooth pedal support (Airturn BT500 and similar devices)
+                .onKeyPress(.upArrow) {
+                    debugPrint("🎹 Up Arrow pressed")
+                    handlePedalPrevious()
+                    return .handled
+                }
+                .onKeyPress(.downArrow) {
+                    debugPrint("🎹 Down Arrow pressed")
+                    handlePedalNext()
+                    return .handled
+                }
+                .onKeyPress(.pageUp) {
+                    debugPrint("🎹 Page Up pressed")
+                    handlePedalPrevious()
+                    return .handled
+                }
+                .onKeyPress(.pageDown) {
+                    debugPrint("🎹 Page Down pressed")
+                    handlePedalNext()
+                    return .handled
+                }
         }
     }
 
@@ -2849,6 +3611,16 @@ internal struct ContentView: View {
                     deleteFromLibrary(song)
                     showAddEdit = false
                 },
+                onDuplicate: { song in
+                    // Create an alias cue
+                    var aliasCue = song
+                    aliasCue.id = UUID()  // New ID for the alias
+                    aliasCue.aliasedCueID = song.id  // Reference to original cue
+
+                    // Add to setlist
+                    store.setlist.songs.append(aliasCue)
+                    showAddEdit = false
+                },
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
                 midiFilter: midiFilter
@@ -2872,7 +3644,8 @@ internal struct ContentView: View {
                     saveSong(s)
                     showAddEditMIDIOnly = false
                 },
-                onCancel: { showAddEditMIDIOnly = false }
+                onCancel: { showAddEditMIDIOnly = false },
+                editingSongName: editingSong?.name
             )
         }
         .sheet(isPresented: $showControlEditor) {
@@ -3053,11 +3826,21 @@ internal struct ContentView: View {
         .sheet(isPresented: $showAppearanceSheet) {
             AppearanceSheet()
         }
+        .sheet(isPresented: $showAppearanceSettingsSheet) {
+            AppearanceSettingsSheet()
+        }
+        .sheet(isPresented: $showDesignPreview) {
+            DesignPreviewSheet()
+        }
         #if DEBUG
         .sheet(isPresented: $showAdminPanel) {
             ThemeAdminPanel()
         }
         #endif
+        // Force default theme on every app launch
+        .task {
+            selectedThemeID = "default"
+        }
         // TODO: Integrate tutorial overlay when ready
         // .overlay {
         //     TutorialOverlay(coordinator: tutorialCoordinator)
@@ -3159,7 +3942,7 @@ internal struct ContentView: View {
                 }
 
                 // NEW: Check onboarding even for returning users (for testing/debugging)
-                if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+                if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") && !crashAlertActive {
                     debugPrint("📖 Onboarding not seen yet - showing after short delay")
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     showOnboarding = true
@@ -3206,8 +3989,8 @@ internal struct ContentView: View {
                 showSplash = false
             }
 
-            // Show onboarding after splash screen if user hasn't seen it
-            if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+            // Show onboarding after splash screen if user hasn't seen it and crash alert is not active
+            if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") && !crashAlertActive {
                 debugPrint("📖 First launch - showing onboarding after splash")
                 try? await Task.sleep(nanoseconds: 500_000_000) // Wait 0.5s after splash
                 showOnboarding = true
@@ -3288,10 +4071,13 @@ internal struct ContentView: View {
             }
             .onChange(of: isEditing) { _, newValue in
                 if !newValue {
-                libBatchMode = false
-                libSelected.removeAll()
+                    libBatchMode = false
+                    libSelected.removeAll()
+                    setlistBatchMode = false
+                    setlistSelected.removeAll()
+                    reorderMode = false
+                }
             }
-        }
             .onChange(of: libraryQuery) { _, newQuery in
                 // Set typing state for performance optimization
                 isTyping = !newQuery.isEmpty
@@ -3326,14 +4112,21 @@ internal struct ContentView: View {
     }
 
     private func computeConflictLookup() -> [MIDIKey: String] {
-        var map: [MIDIKey: String] = [:]
-        // Songs in setlist + library
+        var multiMap: [MIDIKey: [String]] = [:]
+
+        // Songs in setlist + library (deduplicate by ID to avoid counting same song twice)
+        var seenSongIDs = Set<UUID>()
         for s in (store.setlist.songs + songLibrary) {
+            // Skip if we've already processed this song ID
+            guard !seenSongIDs.contains(s.id) else { continue }
+            seenSongIDs.insert(s.id)
+
             let key = (s.kind == .note)
                 ? MIDIKey(kind: .note, channel: s.channel, number: s.note ?? 0)
                 : MIDIKey(kind: .cc,   channel: s.channel, number: s.cc)
-            map[key] = s.name
+            multiMap[key, default: []].append(s.name)
         }
+
         // Control buttons - add type prefix for clarity
         for b in controlButtons {
             let typePrefix: String
@@ -3343,9 +4136,47 @@ internal struct ContentView: View {
                 typePrefix = "Button"
             }
             let displayName = b.title.isEmpty ? typePrefix : "\(typePrefix): \(b.title)"
-            map[MIDIKey(kind: b.kind, channel: b.channel, number: b.number)] = displayName
+            multiMap[MIDIKey(kind: b.kind, channel: b.channel, number: b.number), default: []].append(displayName)
         }
+
+        // Convert to single string per key, joining multiple owners (deduplicate names)
+        var map: [MIDIKey: String] = [:]
+        for (key, owners) in multiMap {
+            // Deduplicate owner names
+            let uniqueOwners = Array(Set(owners)).sorted()
+
+            // Only store if there are multiple owners (conflict)
+            if uniqueOwners.count >= 2 {
+                // Format list with separator
+                map[key] = uniqueOwners.joined(separator: "|||")
+            } else if uniqueOwners.count == 1 {
+                map[key] = uniqueOwners[0]
+            }
+        }
+
         return map
+    }
+
+    // Helper function to format conflict owners, excluding a specific name
+    private func formatConflictOwners(_ ownersString: String, excluding excludeName: String? = nil) -> String? {
+        // Split by our separator
+        let owners = ownersString.split(separator: "|||").map(String.init)
+
+        // Filter out excluded name if provided
+        let filteredOwners = excludeName != nil ? owners.filter { $0 != excludeName } : owners
+
+        guard !filteredOwners.isEmpty else { return nil }
+
+        if filteredOwners.count == 1 {
+            return filteredOwners[0]
+        } else if filteredOwners.count == 2 {
+            return "\(filteredOwners[0]) and \(filteredOwners[1])"
+        } else if filteredOwners.count <= 4 {
+            return filteredOwners.dropLast().joined(separator: ", ") + ", and " + filteredOwners.last!
+        } else {
+            let shown = filteredOwners.prefix(3).joined(separator: ", ")
+            return "\(shown), and \(filteredOwners.count - 3) more"
+        }
     }
 
     private func invalidateConflictCache() {
@@ -3479,6 +4310,9 @@ internal struct ContentView: View {
             flashingCueID = nil
         }
 
+        // Update last played cue for play icon indicator
+        lastPlayedCueID = song.id
+
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
@@ -3570,6 +4404,29 @@ internal struct ContentView: View {
         lastTriggeredSongIndex = prevIndex
         let song = store.setlist.songs[prevIndex]
         trigger(song)
+    }
+
+    // MARK: - Bluetooth Pedal Handlers
+    // These functions handle pedal input intelligently based on the current mode
+
+    private func handlePedalNext() {
+        if store.mode == .cue {
+            // In Cue mode: move the chosen cue down the list
+            selectNextCued()
+        } else {
+            // In Regular/Navigator mode: trigger next song
+            triggerNext()
+        }
+    }
+
+    private func handlePedalPrevious() {
+        if store.mode == .cue {
+            // In Cue mode: move the chosen cue up the list
+            selectPreviousCued()
+        } else {
+            // In Regular/Navigator mode: trigger previous song
+            triggerPrevious()
+        }
     }
 
     // MARK: - Library helpers
@@ -3677,6 +4534,36 @@ internal struct ContentView: View {
         UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
     }
 
+    // MARK: - Setlist Batch Operations
+
+    private func toggleSetlistSelection(_ id: UUID) {
+        let songName = store.setlist.songs.first(where: { $0.id == id })?.name ?? "Unknown"
+        let wasSelected = setlistSelected.contains(id)
+        debugPrint("🔵 toggleSetlistSelection called for: \(songName) (ID: \(id)), wasSelected: \(wasSelected)")
+        if setlistSelected.contains(id) { setlistSelected.remove(id) } else { setlistSelected.insert(id) }
+        let nowSelected = setlistSelected.contains(id)
+        debugPrint("🔵 toggleSetlistSelection completed for: \(songName), nowSelected: \(nowSelected)")
+    }
+
+    private func selectAllSetlist() {
+        let candidates = filteredSetlistSongs()
+        setlistSelected = Set(candidates.map { $0.id })
+    }
+
+    private func removeSelectedFromSetlist() {
+        guard !setlistSelected.isEmpty else { return }
+        pushSetlistUndo()
+
+        // Remove from cue list only
+        store.setlist.songs.removeAll { setlistSelected.contains($0.id) }
+
+        invalidateConflictCache()
+        isDirty = true
+
+        setlistSelected.removeAll()
+        UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
+    }
+
     private func addToSetlist(_ s: Song) {
         debugPrint("➕ addToSetlist called for: \(s.name) (ID: \(s.id))")
         pushSetlistUndo()
@@ -3760,11 +4647,23 @@ internal struct ContentView: View {
     private func duplicateSong(_ s: Song) {
         pushSetlistUndo()
         pushLibraryUndo()
-        
-        var copy = Song(name: s.name + " (Copy)", subtitle: s.subtitle, cc: s.cc, channel: s.channel)
-        copy.kind = s.kind
-        copy.note = s.note
-        copy.velocity = s.velocity
+
+        // If this is an alias cue, duplicate the original cue instead
+        let sourceSong: Song
+        if let aliasedID = s.aliasedCueID,
+           let originalCue = songLibrary.first(where: { $0.id == aliasedID }) {
+            sourceSong = originalCue
+        } else {
+            sourceSong = s
+        }
+
+        var copy = Song(name: sourceSong.name + " (Copy)", subtitle: sourceSong.subtitle, cc: sourceSong.cc, channel: sourceSong.channel)
+        copy.kind = sourceSong.kind
+        copy.note = sourceSong.note
+        copy.velocity = sourceSong.velocity
+        copy.colorHex = sourceSong.colorHex
+        copy.midiEnabled = sourceSong.midiEnabled
+        // Don't copy aliasedCueID - this is a real duplicate, not an alias
         songLibrary.append(copy)
         libAddedAt[copy.id] = Date()
         UIImpactFeedbackGenerator().impactOccurred(intensity: 0.5)
@@ -4692,6 +5591,7 @@ private struct CBControlSection: View {
     @Binding var reportedHeight: CGFloat
     @Binding var canAddMoreControls: Bool
     let conflictFor: [MIDIKey: String]
+    let showMIDIData: Bool  // Toggle for showing MIDI data
     var onTap: (ControlButton) -> Void
     var onEditButton: (ControlButton) -> Void
     var onAddButton: () -> Void
@@ -4708,7 +5608,8 @@ private struct CBControlSection: View {
     let controlAreaColor: Color  // Theme control area color
     let buttonBackgroundColor: Color  // Theme button background color
     let lightButtonBackgroundColor: Color  // Slightly lighter version of title bar for button backgrounds
-    let defaultCueColor: Color  // Theme default cue color for buttons/faders
+    let defaultCueColor: Color  // Theme default cue color for buttons/faders (includes custom accent)
+    let standardButtonColor: Color  // Standard button color for UI controls (no custom accent)
     let textColor: Color  // Theme text color
     var markDirty: () -> Void
     var cueListEditMode: Bool = false  // When true, force collapse
@@ -4799,10 +5700,39 @@ private struct CBControlSection: View {
         // Check if there's space for either a button (2x1) or fader (1x2)
         let testButton = ControlButton(title: "Test", symbol: "square", kind: .cc, number: 0, channel: 1, isFader: false)
         let testFader = ControlButton(title: "Test", symbol: "square", kind: .cc, number: 0, channel: 1, isFader: true)
-        
+
         // Return true if we can fit either a button OR a fader
-        return findFirstAvailablePosition(for: testButton) != nil || 
+        return findFirstAvailablePosition(for: testButton) != nil ||
                findFirstAvailablePosition(for: testFader) != nil
+    }
+
+    private var canAddFader: Bool {
+        // Check if there's space for EITHER a horizontal (2x1) OR vertical (1x2) fader
+        // Horizontal fader
+        let horizontalFader = ControlButton(
+            title: "Test",
+            symbol: "square",
+            kind: .cc,
+            number: 0,
+            channel: 1,
+            isFader: true,
+            faderOrientation: "horizontal"
+        )
+
+        // Vertical fader
+        let verticalFader = ControlButton(
+            title: "Test",
+            symbol: "square",
+            kind: .cc,
+            number: 0,
+            channel: 1,
+            isFader: true,
+            faderOrientation: "vertical"
+        )
+
+        // Return true if we can fit EITHER orientation
+        return findFirstAvailablePosition(for: horizontalFader) != nil ||
+               findFirstAvailablePosition(for: verticalFader) != nil
     }
     
     private func controlRowCount() -> Int {
@@ -4813,11 +5743,13 @@ private struct CBControlSection: View {
 
     private var headerView: some View {
         VStack(spacing: 0) {
-            if !effectivelyCollapsed {
-            mainHeader
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
-            } else {
-                // Show title when collapsed - use same styling as main header for consistency
+            ZStack {
+                // Expanded header (fades out when collapsing)
+                mainHeader
+                    .opacity(effectivelyCollapsed ? 0 : 1)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: effectivelyCollapsed)
+
+                // Collapsed header (fades in when collapsed) - use same styling as main header for consistency
                 HStack {
                     Text("Control Area")
                         .font(.subheadline)
@@ -4838,7 +5770,7 @@ private struct CBControlSection: View {
                             }
                         }
                     }
-                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
+                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                     .controlSize(.small)
                     // Expand button (only show when collapsed and has buttons)
                     if !buttons.isEmpty {
@@ -4851,14 +5783,15 @@ private struct CBControlSection: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .frame(minWidth: 28)  // Make it square
                         }
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
+                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                         .controlSize(.small)
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 4)
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .opacity(effectivelyCollapsed ? 1 : 0)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: effectivelyCollapsed)
             }
         }
     }
@@ -4889,34 +5822,30 @@ private struct CBControlSection: View {
             Text("Control Area").font(.subheadline).fontWeight(.medium).foregroundColor(textColor)
                 Spacer()
             if !isCollapsed {
-                // Show edit buttons only when expanded
-                if isEditing {
-                    HStack(spacing: 6) {
+                // Show edit buttons only when expanded - use opacity for smooth transitions
+                HStack(spacing: 6) {
                     Button(action: onUndo) { Image(systemName: "arrow.uturn.backward") }
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
+                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                             .controlSize(.small)
                         .disabled(!canUndo)
                     Button(action: onRedo) { Image(systemName: "arrow.uturn.forward") }
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
+                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                             .controlSize(.small)
                         .disabled(!canRedo)
                         // Two explicit add buttons
                         Button("+ Button") { onAddButton() }
-                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
+                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                         .controlSize(.small)
                         .disabled(!canAddMoreControls)
                         Button("+ Fader") { onAddFader() }
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
+                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                         .controlSize(.small)
-                    .disabled(!canAddMoreControls)
+                    .disabled(!canAddFader)
                 }
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.8)).animation(.easeOut(duration: 0.2).delay(0.1)),
-                        removal: .opacity.combined(with: .scale(scale: 0.8)).animation(.easeIn(duration: 0.15))
-                    ))
-                }
+                .opacity(isEditing ? 1 : 0)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
             }
-                // Always show Edit/Done button
+                // Always show Edit/Done button - use accent color when collapsed
                 Button(isEditing ? "Done" : "Edit") {
                     debugPrint("🎛️ Edit button tapped, current isEditing: \(isEditing)")
                     withAnimation(.easeInOut) {
@@ -4930,8 +5859,8 @@ private struct CBControlSection: View {
                         }
                     }
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
-                // Collapse/Expand button (only show when not collapsed and has buttons)
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: effectivelyCollapsed ? defaultCueColor : standardButtonColor))
+                // Collapse/Expand button (only show when not collapsed and has buttons) - use accent color when collapsed
                 if !buttons.isEmpty {
                     Button(action: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -4942,7 +5871,7 @@ private struct CBControlSection: View {
                             .font(.system(size: 14, weight: .medium))
                             .frame(minWidth: 28)  // Make it square
                     }
-                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: defaultCueColor))
+                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: effectivelyCollapsed ? defaultCueColor : standardButtonColor))
                     .controlSize(.small)
                 }
             }
@@ -4954,40 +5883,37 @@ private struct CBControlSection: View {
 
     var body: some View {
         let gridArea = Group {
-            if effectivelyCollapsed {
-                // Collapsed or empty state: header-only, no grid height
-                let collapsedHeight: CGFloat = 0
-                Color.clear.frame(height: collapsedHeight)
-            } else {
-                // Create a view that responds to height changes
-                GeometryReader { outerProxy in
-                    buildControlGrid(proxy: outerProxy, isCtrlEditing: isEditing, sessionNonce: editSessionNonce, usbServer: usbServer, wifiClient: wifiClient, connectionCoordinator: connectionCoordinator)
-                        .onAppear {
-                            // Update actual width when view appears
-                            actualWidth = outerProxy.size.width
-                        }
-                        .onChange(of: outerProxy.size.width) { _, newWidth in
-                            // Update actual width when orientation changes
-                            actualWidth = newWidth
-                            debugPrint("🔄 CBControlSection: Width changed to \(newWidth)")
-                        }
-                }
-                .id("ctrl-geo-\(isEditing)-sess-\(editSessionNonce)")
-                .frame(height: calculateDynamicHeight())
-                .onChange(of: actualWidth) { _, _ in
-                    // Recalculate height when width changes (orientation change)
-                    let height = calculateDynamicHeight()
-                    cachedHeight = height
-                    reportedHeight = height
-                }
+            // Always render the grid area, but animate height and opacity
+            GeometryReader { outerProxy in
+                buildControlGrid(proxy: outerProxy, isCtrlEditing: isEditing, sessionNonce: editSessionNonce, usbServer: usbServer, wifiClient: wifiClient, connectionCoordinator: connectionCoordinator)
+                    .opacity(effectivelyCollapsed ? 0 : 1)  // Fade out when collapsing
+                    .onAppear {
+                        // Update actual width when view appears
+                        actualWidth = outerProxy.size.width
+                    }
+                    .onChange(of: outerProxy.size.width) { _, newWidth in
+                        // Update actual width when orientation changes
+                        actualWidth = newWidth
+                        debugPrint("🔄 CBControlSection: Width changed to \(newWidth)")
+                    }
+            }
+            .id("ctrl-geo-\(isEditing)-sess-\(editSessionNonce)")
+            .frame(height: effectivelyCollapsed ? 0 : calculateDynamicHeight())  // Animate height to 0
+            .animation(.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0.05), value: cachedHeight)
+            .animation(.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0.05), value: isEditing)
+            .drawingGroup(opaque: false, colorMode: .nonLinear)
+            .onChange(of: actualWidth) { _, _ in
+                // Recalculate height when width changes (orientation change)
+                let height = calculateDynamicHeight()
+                cachedHeight = height
+                reportedHeight = height
             }
         }
-        
+
         let styledGridArea = gridArea
             .animation(Animation.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.1), value: buttons.count)
-            .animation(Animation.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0.05), value: isEditing)
             .animation(Animation.spring(response: 0.4, dampingFraction: 0.8), value: isCollapsed)
-            .animation(Animation.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0.05), value: cachedHeight)
+            .animation(Animation.spring(response: 0.4, dampingFraction: 0.8), value: effectivelyCollapsed)
             .onChange(of: isEditing) { _, newValue in
                 if !newValue {
                     // fully reset drag/drop when leaving edit
@@ -5280,14 +6206,19 @@ private struct CBControlSection: View {
         let width = control.gridWidth
         let height = control.gridHeight
         let maxSearchRows = 4 // Reasonable limit
-        
+
         debugPrint("🔍 Finding position for \(control.title) (fader: \(control.isFader == true), size: \(width)x\(height))")
-        
+
         // Search from top-left to bottom-right
         for row in 0..<maxSearchRows {
+            // Skip this row if the control would extend beyond the bottom edge
+            if row + height > maxSearchRows {
+                continue
+            }
+
             for col in 0...(columns - width) {
                 var canPlace = true
-                
+
                 // Check if all required cells are free
                 for c in col..<(col + width) {
                     for r in row..<(row + height) {
@@ -5298,7 +6229,7 @@ private struct CBControlSection: View {
                     }
                     if !canPlace { break }
                 }
-                
+
                 if canPlace {
                     return (col, row)
                 }
@@ -5312,11 +6243,16 @@ private struct CBControlSection: View {
         let width = control.gridWidth
         let height = control.gridHeight
         let maxSearchRows = 4
-        
+
         debugPrint("🔍 Finding position for \(control.isFader == true ? "fader" : "button"): \(control.title) (size: \(width)x\(height))")
-        
+
         // Search from top-left to bottom-right
         for row in 0..<maxSearchRows {
+            // Skip this row if the control would extend beyond the bottom edge
+            if row + height > maxSearchRows {
+                continue
+            }
+
             for col in 0...(columns - width) {
                 let testRect = GridRect(col: col, row: row, width: width, height: height)
                 let hasOverlap = hasOverlapExcluding(testRect, excluding: [control.id])
@@ -5764,6 +6700,10 @@ private struct CBControlSection: View {
         let height = item.gridHeight
         let maxSearchRows = 4 // Increased search area
         for row in 0..<maxSearchRows {
+            // Skip this row if the control would extend beyond the bottom edge
+            if row + height > maxSearchRows {
+                continue
+            }
             for col in 0...(columns - width) {
                 let test = GridRect(col: col, row: row, width: width, height: height)
                 if !hasOverlapExcluding(test, excluding: excludeIds) {
@@ -5939,6 +6879,7 @@ private struct CBControlSection: View {
                     isEditing: isEditing,
                     isDragging: dragging?.id == button.id,
                     defaultCueColor: defaultCueColor,
+                    showMIDIData: showMIDIData,
                     onTap: { onTap(button) },
                     onEdit: { onEditButton(button) },
                     onDelete: { onDelete(button) },
@@ -6270,6 +7211,7 @@ private struct ControlButtonTile: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -6281,7 +7223,16 @@ private struct ControlButtonTile: View {
         // Clear visual distinction between on/off states:
         // OFF state = control area background color (same as title bar)
         // ON state = solid, full opacity with theme accent color
-        let onColor = selectedTheme.defaultCueColor(for: colorScheme)
+        // Use custom color if button has colorHex, otherwise use custom accent color if set, otherwise use theme default
+        let onColor: Color = {
+            if let colorHex = button.colorHex {
+                return Color(hex: colorHex)
+            } else if !customDefaultCueColorStorage.isEmpty {
+                return Color(hex: customDefaultCueColorStorage)
+            } else {
+                return selectedTheme.defaultCueColor(for: colorScheme)
+            }
+        }()
         let offColor = selectedTheme.titleBarColor(for: colorScheme)
 
         // Determine if button should show as "on" (pressed/active)
@@ -6356,7 +7307,7 @@ private struct ControlButtonTile: View {
             }
             .onDisappear { stopWobble() }
             if let owner = takenBy, !isEditing {
-                Text("Taken by: \(owner)")
+                Text("MIDI taken by: \(owner)")
                     .font(.caption2).padding(6)
                     .foregroundColor(Color(uiColor: .systemBackground))
                     .background(Color.primary.opacity(0.6))
@@ -6380,8 +7331,8 @@ private struct ControlButtonTile: View {
 
         // Generate unique wobble parameters for this tile (iPhone-like wobble)
         var rng = SeededRandom(seed: button.id.uuidString.hashValue)
-        let amplitude = 1.2 + Double(rng.nextNormalized()) * 0.6 // ~1.2 ... 1.8 deg
-        let scaleDelta = 0.003 + Double(rng.nextNormalized()) * 0.002 // ~0.3% ... 0.5%
+        let amplitude = 0.5 + Double(rng.nextNormalized()) * 0.3 // ~0.5 ... 0.8 deg (more subtle)
+        let scaleDelta = 0.001 + Double(rng.nextNormalized()) * 0.0005 // ~0.1% ... 0.15% (more subtle)
         let interval = 0.16 + Double(rng.nextNormalized()) * 0.04 // ~0.16 ... 0.20s
         let initialDelay = Double(rng.nextNormalized()) * 0.2
 
@@ -6483,6 +7434,7 @@ private struct ControlButtonTile: View {
 
         @Environment(\.colorScheme) private var colorScheme
         @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+        @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
         private var selectedTheme: AppTheme {
             AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -6492,8 +7444,16 @@ private struct ControlButtonTile: View {
             let isHorizontal = (button.faderOrientation == "horizontal")
             let direction = button.faderDirection ?? (isHorizontal ? "right" : "up")
 
-            // Use defaultCueColor for fader (accent color)
-            let faderColor = selectedTheme.defaultCueColor(for: colorScheme)
+            // Use custom color if button has colorHex, otherwise use custom accent color if set, otherwise use theme default
+            let faderColor: Color = {
+                if let colorHex = button.colorHex {
+                    return Color(hex: colorHex)
+                } else if !customDefaultCueColorStorage.isEmpty {
+                    return Color(hex: customDefaultCueColorStorage)
+                } else {
+                    return selectedTheme.defaultCueColor(for: colorScheme)
+                }
+            }()
             let textColor = selectedTheme.primaryTextColor(for: colorScheme)
 
             ZStack(alignment: .topTrailing) {
@@ -6690,8 +7650,8 @@ private struct ControlButtonTile: View {
 
             // Generate unique wobble parameters for this tile (iPhone-like wobble)
             var rng = SeededRandom(seed: button.id.uuidString.hashValue)
-            let amplitude = 1.2 + Double(rng.nextNormalized()) * 0.6 // ~1.2 ... 1.8 deg
-            let scaleDelta = 0.003 + Double(rng.nextNormalized()) * 0.002 // ~0.3% ... 0.5%
+            let amplitude = 0.5 + Double(rng.nextNormalized()) * 0.3 // ~0.5 ... 0.8 deg (more subtle)
+            let scaleDelta = 0.001 + Double(rng.nextNormalized()) * 0.0005 // ~0.1% ... 0.15% (more subtle)
             let interval = 0.16 + Double(rng.nextNormalized()) * 0.04 // ~0.16 ... 0.20s
             let initialDelay = Double(rng.nextNormalized()) * 0.3
 
@@ -7226,6 +8186,7 @@ private struct iPadControlTile: View {
     let isEditing: Bool
     let isDragging: Bool
     let defaultCueColor: Color  // Theme default cue color
+    let showMIDIData: Bool  // Toggle for showing MIDI data
     var onTap: () -> Void
     var onEdit: () -> Void
     var onDelete: () -> Void
@@ -7246,7 +8207,6 @@ private struct iPadControlTile: View {
     // Wobble state - now uses shared animator
     @ObservedObject private var wobbleAnimator = WobbleAnimator.shared
     @State private var wobbleID = UUID()
-        @State private var flashOpacity: Double = 0.0
 
     // Theme access
     @Environment(\.colorScheme) private var colorScheme
@@ -7262,8 +8222,8 @@ private struct iPadControlTile: View {
 
         // Generate unique wobble parameters for this tile (iPhone-like wobble)
         var rng = SeededRandom(seed: button.id.uuidString.hashValue)
-        let amplitude = 1.2 + Double(rng.nextNormalized()) * 0.6
-        let scaleDelta = 0.003 + Double(rng.nextNormalized()) * 0.002
+        let amplitude = 0.8 + Double(rng.nextNormalized()) * 0.4 // ~0.8 ... 1.2 deg (reduced from 1.2...1.8)
+        let scaleDelta = 0.002 + Double(rng.nextNormalized()) * 0.001 // ~0.2% ... 0.3% (reduced from 0.3%...0.5%)
         let interval = 0.12 + Double(rng.nextNormalized()) * 0.03
         let initialDelay = Double(rng.nextNormalized()) * 0.3
 
@@ -7306,36 +8266,23 @@ private struct iPadControlTile: View {
                     .onTapGesture { onEdit() }
                 } else {
                     Button(action: {
-                        // v1.0.3: Blue flash on tap - removed 20ms delay for instant feedback
-                        flashOpacity = 1.0
-                        withAnimation(.easeOut(duration: 0.18)) { flashOpacity = 0.0 }
                         onTap()
                     }) {
-                        ZStack {
-                            ButtonTileContent()
-                                .contentShape(Rectangle())
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(Color.accentColor)
-                                .opacity(flashOpacity)
-                                .allowsHitTesting(false)
-                        }
+                        ButtonTileContent()
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { _ in
                                 if !isTouching {
-                                    withAnimation(.easeOut(duration: 0.08)) {
-                                        isTouching = true
-                                        isPressed = true
-                                    }
+                                    isTouching = true
+                                    isPressed = true
                                 }
                             }
                             .onEnded { _ in
-                                withAnimation(.easeOut(duration: 0.12)) {
-                                    isTouching = false
-                                    isPressed = false
-                                }
+                                isTouching = false
+                                isPressed = false
                             }
                     )
                 }
@@ -7447,6 +8394,17 @@ private struct iPadControlTile: View {
             return .primary // Default text color
         }
     }
+
+    // Computed property for icon color based on button state
+    private var buttonIconColor: Color {
+        if isPressed {
+            return selectedTheme.accentColor(for: colorScheme) // White when pressed
+        } else if button.isToggle == true && button.toggleState {
+            return selectedTheme.accentColor(for: colorScheme) // White when toggled ON
+        } else {
+            return customButtonColor // Custom color when unpressed
+        }
+    }
     
     @ViewBuilder
     private func ButtonTileContent() -> some View {
@@ -7454,31 +8412,37 @@ private struct iPadControlTile: View {
                 if button.symbol.isEmpty {
                     Text(button.title)
                         .font(.title3.weight(.semibold))
-                    Text(midiLabel())
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    if showMIDIData {
+                        Text(midiLabel())
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 } else if button.title.isEmpty {
                     // Icon only - center it vertically with MIDI label at bottom
                     VStack {
                         Spacer()
                         Image(systemName: button.symbol)
                             .font(.system(size: 32, weight: .semibold))
-                            .foregroundColor(customButtonColor)
+                            .foregroundColor(buttonIconColor)
                         Spacer()
-                        Text(midiLabel())
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .padding(.bottom, 4)
+                        if showMIDIData {
+                            Text(midiLabel())
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .padding(.bottom, 4)
+                        }
                     }
                 } else {
                     // Icon + text
                     Image(systemName: button.symbol)
                         .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(customButtonColor)
+                        .foregroundColor(buttonIconColor)
                     Text(button.title).font(.footnote.weight(.semibold))
-                    Text(midiLabel())
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    if showMIDIData {
+                        Text(midiLabel())
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
         }
         .foregroundColor(buttonTextColor)
@@ -7491,16 +8455,9 @@ private struct iPadControlTile: View {
                         .fill(buttonBackgroundColor)
                 )
         )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(customButtonColor)
-                    .opacity(flashOpacity)
-            )
-            .animation(.easeOut(duration: 0.12), value: flashOpacity)
-            .scaleEffect(isTouching ? 1.05 : 1.0)
-            .shadow(color: (isTouching || (isEditing && isDragging)) ? .blue.opacity(0.6) : .clear, radius: 8, x: 0, y: 0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isTouching)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isDragging)
+            .scaleEffect(isTouching ? 1.02 : 1.0)
+            .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
+            .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
     }
     
     @ViewBuilder
@@ -7547,9 +8504,7 @@ private struct iPadControlTile: View {
                         .onChanged { value in
                             // Instant touch feedback on first touch
                             if !isTouching {
-                                withAnimation(.easeOut(duration: 0.08)) {
-                                    isTouching = true
-                                }
+                                isTouching = true
                             }
 
                             let dragX = value.location.x
@@ -7584,9 +8539,7 @@ private struct iPadControlTile: View {
                         }
                         .onEnded { _ in
                             // End touch feedback
-                            withAnimation(.easeOut(duration: 0.12)) {
-                                isTouching = false
-                            }
+                            isTouching = false
 
                             // Ensure final MIDI value is sent
                             let finalMidiValue = Int(round(faderValue * 127))
@@ -7605,11 +8558,13 @@ private struct iPadControlTile: View {
                         .multilineTextAlignment(.center)
                         .padding(.leading, 4)
                     Spacer()
-                    Text(midiLabel())
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.trailing, 4)
+                    if showMIDIData {
+                        Text(midiLabel())
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.trailing, 4)
+                    }
                 }
                 .frame(maxHeight: .infinity, alignment: .center)
                 .allowsHitTesting(false) // Don't interfere with fader drag
@@ -7651,9 +8606,7 @@ private struct iPadControlTile: View {
                         .onChanged { value in
                             // Instant touch feedback on first touch
                             if !isTouching {
-                                withAnimation(.easeOut(duration: 0.08)) {
-                                    isTouching = true
-                                }
+                                isTouching = true
                             }
 
                             let dragY = value.location.y
@@ -7688,9 +8641,7 @@ private struct iPadControlTile: View {
                         }
                         .onEnded { _ in
                             // End touch feedback
-                            withAnimation(.easeOut(duration: 0.12)) {
-                                isTouching = false
-                            }
+                            isTouching = false
 
                             // Ensure final MIDI value is sent
                             let finalMidiValue = Int(round(faderValue * 127))
@@ -7709,11 +8660,13 @@ private struct iPadControlTile: View {
                         .multilineTextAlignment(.center)
                         .padding(.top, 4)
                     Spacer()
-                    Text(midiLabel())
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.bottom, 4)
+                    if showMIDIData {
+                        Text(midiLabel())
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.bottom, 4)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
                 .allowsHitTesting(false) // Don't interfere with fader drag
@@ -7732,12 +8685,11 @@ private struct iPadControlTile: View {
                 }
             }
         )
-        .scaleEffect(isTouching ? 1.05 : 1.0)
-        .shadow(color: (isTouching || (isEditing && isDragging)) ? .blue.opacity(0.6) : .clear, radius: 8, x: 0, y: 0)
-        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isTouching)
-        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isDragging)
+        .scaleEffect(isTouching ? 1.02 : 1.0)
+        .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
+        .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
     }
-    
+
     private func midiLabel() -> String {
         switch button.kind {
         case .cc:   return "\(button.channel)•\(button.number)"
@@ -8048,6 +9000,7 @@ struct MidiTableSheet: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -8059,15 +9012,12 @@ struct MidiTableSheet: View {
                 // Section 1: Global MIDI Channel
                 Section {
                     Toggle("Global MIDI Channel", isOn: $isGlobalChannel)
+                        .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                     if isGlobalChannel {
-                        Picker("Channel", selection: $globalChannel) {
-                            ForEach(1...16, id: \.self) { ch in
-                                Text("Channel \(ch)").tag(ch)
-                            }
-                        }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        ChannelPicker(title: "Channel", channel: $globalChannel, disabled: false)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
                 } footer: {
                     Text("When enabled, all cues and controls will be assigned to the same MIDI channel. When disabled, each item can use any of the 16 MIDI channels.")
@@ -8079,7 +9029,7 @@ struct MidiTableSheet: View {
                     NavigationLink(destination: MidiFilterView(midiFilter: $midiFilter, customMidiFilters: $customMidiFilters)) {
                         Text("MIDI Filter")
                     }
-                    .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+                    .tint(selectedTheme.defaultCueColor(for: colorScheme))
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 } header: {
                     Text("Auto-Assignment")
@@ -8098,7 +9048,7 @@ struct MidiTableSheet: View {
                     )) {
                         Text("MIDI Assignments")
                     }
-                    .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+                    .tint(selectedTheme.defaultCueColor(for: colorScheme))
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 } footer: {
                     Text("View and edit MIDI assignments for all cues and controls")
@@ -8111,9 +9061,10 @@ struct MidiTableSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done", action: onDismiss)
+                        .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
                 }
             }
-            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+            .tint(selectedTheme.defaultCueColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
@@ -8129,6 +9080,7 @@ struct MidiAssignmentsView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -8201,8 +9153,8 @@ struct MidiAssignmentsView: View {
                                 onMidiChange: { item, newMidiType, newChannel, newValue in
                                     handleMidiChange(item: item, newMidiType: newMidiType, newChannel: newChannel, newValue: newValue)
                                 },
-                                getOwnerName: { midiType, channel, value, excludeId in
-                                    getOwnerName(for: midiType, channel: channel, value: value, excluding: excludeId)
+                                getOwnerName: { midiType, channel, value, excludeId, excludeName in
+                                    getOwnerName(for: midiType, channel: channel, value: value, excluding: excludeId, excludeName: excludeName)
                                 }
                             )
                             .background(Color(UIColor.systemBackground))
@@ -8239,14 +9191,19 @@ struct MidiAssignmentsView: View {
         .background(selectedTheme.backgroundColor(for: colorScheme))
         .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+        .tint(selectedTheme.defaultCueColor(for: colorScheme))
     }
     
     private func buildMidiTableItems() {
         var items: [MidiTableItem] = []
-        
+        var seenIDs: Set<UUID> = []
+
         // Add setlist items
         for song in setlist {
+            // Skip if we've already added this ID (prevents duplicates)
+            guard !seenIDs.contains(song.id) else { continue }
+            seenIDs.insert(song.id)
+
             items.append(MidiTableItem(
                 id: song.id,
                 name: song.name,
@@ -8256,9 +9213,13 @@ struct MidiAssignmentsView: View {
                 value: song.kind == .cc ? song.cc : (song.note ?? 0)
             ))
         }
-        
+
         // Add control buttons and faders
         for button in controlButtons {
+            // Skip if we've already added this ID (prevents duplicates)
+            guard !seenIDs.contains(button.id) else { continue }
+            seenIDs.insert(button.id)
+
             items.append(MidiTableItem(
                 id: button.id,
                 name: button.title,
@@ -8268,7 +9229,7 @@ struct MidiAssignmentsView: View {
                 value: button.number
             ))
         }
-        
+
             editableItems = items
             sortEditableItems()
     }
@@ -8298,19 +9259,31 @@ struct MidiAssignmentsView: View {
     
     private func checkForMidiConflict(item: MidiTableItem, newMidiType: MIDIKind, newChannel: Int, newValue: Int) -> MidiConflict? {
         let newKey = MIDIKey(kind: newMidiType, channel: newChannel, number: newValue)
-        
-        // Check against all other items
-        for otherItem in editableItems {
-            if otherItem.id != item.id {
-                let otherKey = MIDIKey(kind: otherItem.midiType, channel: otherItem.channel, number: otherItem.value)
-                if otherKey == newKey {
-                    return MidiConflict(
-                        newItem: item,
-                        existingOwner: otherItem.name,
-                        midiKey: newKey
-                    )
-                }
+
+        // Collect all owners of this MIDI key
+        let owners = editableItems.filter { otherItem in
+            otherItem.id != item.id && MIDIKey(kind: otherItem.midiType, channel: otherItem.channel, number: otherItem.value) == newKey
+        }.map { $0.name }
+
+        if !owners.isEmpty {
+            // Format multiple owners
+            let ownerString: String
+            if owners.count == 1 {
+                ownerString = owners[0]
+            } else if owners.count == 2 {
+                ownerString = "\(owners[0]) and \(owners[1])"
+            } else if owners.count <= 4 {
+                ownerString = owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+            } else {
+                let shown = owners.prefix(3).joined(separator: ", ")
+                ownerString = "\(shown), and \(owners.count - 3) more"
             }
+
+            return MidiConflict(
+                newItem: item,
+                existingOwner: ownerString,
+                midiKey: newKey
+            )
         }
         return nil
     }
@@ -8348,11 +9321,29 @@ struct MidiAssignmentsView: View {
         return 0 // Fallback
     }
     
-    private func getOwnerName(for midiType: MIDIKind, channel: Int, value: Int, excluding excludeId: UUID) -> String? {
+    private func getOwnerName(for midiType: MIDIKind, channel: Int, value: Int, excluding excludeId: UUID, excludeName: String) -> String? {
         let testKey = MIDIKey(kind: midiType, channel: channel, number: value)
-        return editableItems.first { item in
+        let owners = editableItems.filter { item in
             item.id != excludeId && MIDIKey(kind: item.midiType, channel: item.channel, number: item.value) == testKey
-        }?.name
+        }.map { $0.name }
+
+        // Remove duplicate names (filter out the item being edited by name as well)
+        let uniqueOwners = owners.filter { $0 != excludeName }
+        let dedupedOwners = Array(Set(uniqueOwners)).sorted()
+
+        // Format multiple owners
+        if dedupedOwners.isEmpty {
+            return nil
+        } else if dedupedOwners.count == 1 {
+            return dedupedOwners[0]
+        } else if dedupedOwners.count == 2 {
+            return "\(dedupedOwners[0]) and \(dedupedOwners[1])"
+        } else if dedupedOwners.count <= 4 {
+            return dedupedOwners.dropLast().joined(separator: ", ") + ", and " + dedupedOwners.last!
+        } else {
+            let shown = dedupedOwners.prefix(3).joined(separator: ", ")
+            return "\(shown), and \(dedupedOwners.count - 3) more"
+        }
     }
 
     // MARK: - Sorting
@@ -8432,14 +9423,14 @@ struct MidiValueMenu: View {
     let globalChannel: Int
     let allowFullCCR: Bool
     let onMidiChange: (MidiTableItem, MIDIKind, Int, Int) -> Void
-    let getOwnerName: (MIDIKind, Int, Int, UUID) -> String?
+    let getOwnerName: (MIDIKind, Int, Int, UUID, String) -> String?
     
     var body: some View {
         Menu {
             if item.midiType == .cc && !allowFullCCR {
                 ForEach(1...119, id: \.self) { val in
                     let channel = isGlobalChannel ? globalChannel : item.channel
-                    let owner = getOwnerName(item.midiType, channel, val, item.id)
+                    let owner = getOwnerName(item.midiType, channel, val, item.id, item.name)
                     let displayText = owner == nil ? "\(val)" : "\(val) (Used by: \(owner!))"
                     Button(displayText) { onMidiChange(item, item.midiType, channel, val) }
                         .foregroundColor(owner == nil ? .primary : .secondary)
@@ -8447,8 +9438,8 @@ struct MidiValueMenu: View {
             } else {
                 ForEach(0...127, id: \.self) { val in
                     let channel = isGlobalChannel ? globalChannel : item.channel
-                    let owner = getOwnerName(item.midiType, channel, val, item.id)
-                    let displayText = item.midiType == .note ? 
+                    let owner = getOwnerName(item.midiType, channel, val, item.id, item.name)
+                    let displayText = item.midiType == .note ?
                         (owner == nil ? "\(val) - \(val.midiNoteName)" : "\(val) - \(val.midiNoteName) (Used by: \(owner!))") :
                         (owner == nil ? "\(val)" : "\(val) (Used by: \(owner!))")
                     Button(displayText) { onMidiChange(item, item.midiType, channel, val) }
@@ -8473,92 +9464,243 @@ struct MidiValueMenu: View {
     }
 }
 
+// MARK: - MIDI Assignment Edit Sheet
+struct MidiAssignmentEditSheet: View {
+    @Binding var item: MidiTableItem
+    let isGlobalChannel: Bool
+    let globalChannel: Int
+    let allowFullCCR: Bool
+    let onMidiChange: (MidiTableItem, MIDIKind, Int, Int) -> Void
+    let getOwnerName: (MIDIKind, Int, Int, UUID, String) -> String?
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
+
+    @State private var editedType: MIDIKind
+    @State private var editedChannel: Int
+    @State private var editedValue: Int
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
+    init(item: Binding<MidiTableItem>, isGlobalChannel: Bool, globalChannel: Int, allowFullCCR: Bool, onMidiChange: @escaping (MidiTableItem, MIDIKind, Int, Int) -> Void, getOwnerName: @escaping (MIDIKind, Int, Int, UUID, String) -> String?) {
+        self._item = item
+        self.isGlobalChannel = isGlobalChannel
+        self.globalChannel = globalChannel
+        self.allowFullCCR = allowFullCCR
+        self.onMidiChange = onMidiChange
+        self.getOwnerName = getOwnerName
+        self._editedType = State(initialValue: item.wrappedValue.midiType)
+        self._editedChannel = State(initialValue: item.wrappedValue.channel)
+        self._editedValue = State(initialValue: item.wrappedValue.value)
+    }
+
+    var body: some View {
+        Form {
+            Section(header: Text("Item")) {
+                    HStack {
+                        Text("Name")
+                        Spacer()
+                        Text(item.name)
+                            .foregroundColor(.secondary)
+                    }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+
+                    HStack {
+                        Text("Type")
+                        Spacer()
+                        Text(item.type.displayName)
+                            .foregroundColor(.secondary)
+                    }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                }
+
+                Section(header: Text("MIDI Assignment")) {
+                    if item.type != .fader {
+                        Picker("MIDI Type", selection: $editedType) {
+                            Text("Control Change").tag(MIDIKind.cc)
+                            Text("Note").tag(MIDIKind.note)
+                        }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
+                    }
+
+                    if !isGlobalChannel {
+                        ChannelPicker(title: "Channel", channel: $editedChannel, disabled: false)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    } else {
+                        HStack {
+                            Text("Channel")
+                            Spacer()
+                            Text("\(globalChannel) (Global)")
+                                .foregroundColor(.secondary)
+                        }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    }
+
+                    // Value picker with ownership warnings
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 12) {
+                            Text(editedType == .cc ? "CC Number" : "Note Number")
+                                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+
+                            Spacer()
+
+                            if editedType == .note {
+                                Text(editedValue.midiNoteName)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                            }
+
+                            // Minus button
+                            Button(action: {
+                                if editedValue > (editedType == .cc && !allowFullCCR ? 1 : 0) {
+                                    editedValue -= 1
+                                }
+                            }) {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(editedValue > (editedType == .cc && !allowFullCCR ? 1 : 0) ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                                    .frame(width: 28, height: 28)
+                                    .background(selectedTheme.titleBarColor(for: colorScheme))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(editedValue <= (editedType == .cc && !allowFullCCR ? 1 : 0))
+
+                            // Text field
+                            TextField("", value: $editedValue, format: .number)
+                                .textFieldStyle(.plain)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 50)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(selectedTheme.backgroundColor(for: colorScheme))
+                                .cornerRadius(6)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
+                                )
+                                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                                .keyboardType(.numberPad)
+
+                            // Plus button
+                            Button(action: {
+                                let maxValue = (editedType == .cc && !allowFullCCR) ? 119 : 127
+                                if editedValue < maxValue {
+                                    editedValue += 1
+                                }
+                            }) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(editedValue < ((editedType == .cc && !allowFullCCR) ? 119 : 127) ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
+                                    .frame(width: 28, height: 28)
+                                    .background(selectedTheme.titleBarColor(for: colorScheme))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(editedValue >= ((editedType == .cc && !allowFullCCR) ? 119 : 127))
+                        }
+
+                        // Show ownership warning
+                        if let owner = getOwnerName(editedType, isGlobalChannel ? globalChannel : editedChannel, editedValue, item.id, item.name) {
+                            Text("⚠️ MIDI taken by: \(owner)")
+                                .font(.caption)
+                                .foregroundColor(selectedTheme.warningColor(for: colorScheme))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                }
+        }
+        .scrollContentBackground(.hidden)
+        .background(selectedTheme.backgroundColor(for: colorScheme))
+        .navigationTitle("Edit MIDI Assignment")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    let channel = isGlobalChannel ? globalChannel : editedChannel
+                    onMidiChange(item, editedType, channel, editedValue)
+                    dismiss()
+                }
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+            }
+        }
+    }
+}
+
 struct MidiTableRow: View {
     @Binding var item: MidiTableItem
     let isGlobalChannel: Bool
     let globalChannel: Int
-        let allowFullCCR: Bool
+    let allowFullCCR: Bool
     let onMidiChange: (MidiTableItem, MIDIKind, Int, Int) -> Void
-    let getOwnerName: (MIDIKind, Int, Int, UUID) -> String?
-    
+    let getOwnerName: (MIDIKind, Int, Int, UUID, String) -> String?
+
     var body: some View {
-        HStack(spacing: 0) {
-            // Name Column
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.name)
-                    .font(.body)
-                    .lineLimit(1)
-                Text(item.type.displayName)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            
-            // Type Column
-            Menu {
-                Button("Control Change") {
-                    let channel = isGlobalChannel ? globalChannel : item.channel
-                    onMidiChange(item, .cc, channel, item.value)
-                }
-                .disabled(item.type == .fader)
-                
-                if item.type != .fader {
-                    Button("Note") {
-                        let channel = isGlobalChannel ? globalChannel : item.channel
-                        onMidiChange(item, .note, channel, item.value)
-                    }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(item.midiType == .cc ? "CC" : "Note")
+        NavigationLink(destination: MidiAssignmentEditSheet(
+            item: $item,
+            isGlobalChannel: isGlobalChannel,
+            globalChannel: globalChannel,
+            allowFullCCR: allowFullCCR,
+            onMidiChange: onMidiChange,
+            getOwnerName: getOwnerName
+        )) {
+            HStack(spacing: 0) {
+                // Name Column
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.name)
                         .font(.body)
-                        .foregroundColor(.primary)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption2)
+                        .lineLimit(1)
+                    Text(item.type.displayName)
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
-            }
-            .buttonStyle(.plain)
-            .disabled(item.type == .fader)
-            .frame(width: 70, alignment: .center)
-            
-            // Channel Column (only shown if not global)
-            if !isGlobalChannel {
-                Menu {
-                    ForEach(1...16, id: \.self) { ch in
-                        Button("Channel \(ch)") {
-                            onMidiChange(item, item.midiType, ch, item.value)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("\(item.channel)")
-                            .font(.body)
-                            .foregroundColor(.primary)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Type Column
+                Text(item.midiType == .cc ? "CC" : "Note")
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .frame(width: 70, alignment: .center)
+
+                // Channel Column (only shown if not global)
+                if !isGlobalChannel {
+                    Text("\(item.channel)")
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .frame(width: 80, alignment: .center)
                 }
-                .buttonStyle(.plain)
-                .frame(width: 80, alignment: .center)
+
+                // Value Column
+                Text(item.midiType == .note ? "\(item.value) - \(item.value.midiNoteName)" : "\(item.value)")
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .frame(width: 90, alignment: .center)
+
+                // Chevron to indicate tappable
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 20)
             }
-            
-                // Value Column - CC default 1–119; Notes 0–127. Advanced can allow full 0–127 for CC.
-            MidiValueMenu(
-                item: item,
-                isGlobalChannel: isGlobalChannel,
-                globalChannel: globalChannel,
-                allowFullCCR: allowFullCCR,
-                onMidiChange: onMidiChange,
-                getOwnerName: getOwnerName
-            )
-            .frame(width: 90, alignment: .center)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
         }
     }
+}
 
 // MARK: - MIDI Filter View
 struct MidiFilterView: View {
@@ -8603,7 +9745,7 @@ struct MidiFilterView: View {
                         Text("Add Custom Filter")
                     }
                 }
-                .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+                .tint(selectedTheme.defaultCueColor(for: colorScheme))
                 .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
             }
 
@@ -8633,6 +9775,7 @@ struct MidiFilterView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
                         .swipeActions {
                             Button(role: .destructive) {
                                 midiFilter.remove(cc)
@@ -8674,6 +9817,7 @@ struct MidiFilterView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
             }
@@ -8682,11 +9826,12 @@ struct MidiFilterView: View {
         .background(selectedTheme.backgroundColor(for: colorScheme))
         .navigationTitle("MIDI Filter")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+        .tint(selectedTheme.defaultCueColor(for: colorScheme))
     }
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -8705,12 +9850,8 @@ struct AddCustomFilterView: View {
     var body: some View {
         Form {
             Section {
-                Picker("CC Number", selection: $customCC) {
-                    ForEach(0...127, id: \.self) { cc in
-                        Text("CC \(cc)").tag(cc)
-                    }
-                }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                CCNumberPicker(title: "CC Number", ccNumber: $customCC, disabled: false)
+                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                 TextField("Description", text: $customDescription)
                     .textInputAutocapitalization(.words)
@@ -8734,14 +9875,16 @@ struct AddCustomFilterView: View {
                     }
                     dismiss()
                 }
+                .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
                 .disabled(customDescription.isEmpty)
             }
         }
-        .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+        .tint(selectedTheme.defaultCueColor(for: colorScheme))
     }
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -8755,6 +9898,7 @@ struct DraggableNavigationCapsule: View {
     let onPrev: () -> Void
     let onNext: () -> Void
     @Binding var controlAreaHeight: CGFloat
+    let sizeMultiplier: Double  // Appearance setting for pill size (0.7-1.5x)
 
     @State private var position: CGPoint = .zero
     @State private var isTrackingDrag: Bool = false
@@ -8765,7 +9909,7 @@ struct DraggableNavigationCapsule: View {
     @State private var nextFlashOpacity: Double = 0.0  // Flash for bottom half
 
     // Vertical pill size (reduced from 166×365 based on user feedback)
-    private var pillSize: CGSize { CGSize(width: 125, height: 275) }
+    private var pillSize: CGSize { CGSize(width: 125 * sizeMultiplier, height: 275 * sizeMultiplier) }
 
     var body: some View {
         GeometryReader { geo in
@@ -8777,14 +9921,14 @@ struct DraggableNavigationCapsule: View {
             let upperLimit = safeTop + 20 + (pillSize.height / 2)  // Center position that keeps top edge at safeTop + 20
 
             VStack(spacing: 0) {
-                // Top button: Up arrow (PREVIOUS)
+                // Top button: Minus (PREVIOUS)
                 Button(action: {
                     guard canPrev else { return }
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onPrev()
                     flashPrev()
                 }) {
-                    Image(systemName: "arrow.up")
+                    Image(systemName: "minus")
                         .font(.system(size: 35, weight: .bold))  // Scaled down proportionally
                         .foregroundColor(canPrev ? .primary : .secondary)
                         .frame(width: pillSize.width, height: pillSize.height / 2)
@@ -8808,14 +9952,14 @@ struct DraggableNavigationCapsule: View {
                 Divider()
                     .frame(height: 1)
 
-                // Bottom button: Down arrow (NEXT)
+                // Bottom button: Plus (NEXT)
                 Button(action: {
                     guard canNext else { return }
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onNext()
                     flashNext()
                 }) {
-                    Image(systemName: "arrow.down")
+                    Image(systemName: "plus")
                         .font(.system(size: 35, weight: .bold))  // Scaled down proportionally
                         .foregroundColor(canNext ? .primary : .secondary)
                         .frame(width: pillSize.width, height: pillSize.height / 2)
@@ -8982,13 +10126,16 @@ struct SimpleDraggableTransportDock: View {
     let onNext: () -> Void
     let onClear: () -> Void
     @Binding var controlAreaHeight: CGFloat
+    let sizeMultiplier: Double  // Appearance setting for capsule size (0.8-1.5x)
 
     @State private var position: CGPoint = .zero
     @State private var isTrackingDrag: Bool = false
     @State private var isDragging: Bool = false
 
-    // Visual size of the transport capsule (20% larger than baseline)
-    private var dockSize: CGSize { CGSize(width: 320 * 1.20, height: 150 * 1.20) }
+    // Base size of the transport capsule (before scaling)
+    private var baseDockSize: CGSize { CGSize(width: 320, height: 150) }
+    // Actual visual size after scaling (used for boundary calculations)
+    private var scaledDockSize: CGSize { CGSize(width: baseDockSize.width * 1.20 * sizeMultiplier, height: baseDockSize.height * 1.20 * sizeMultiplier) }
 
     var body: some View {
         GeometryReader { geo in
@@ -8997,12 +10144,15 @@ struct SimpleDraggableTransportDock: View {
 
             // Upper limit: position() uses CENTER, so add half height to keep top edge below safe area
             let safeTop = max(geo.safeAreaInsets.top, 20) // Minimum 20pt if no safe area
-            let upperLimit = safeTop + 20 + (dockSize.height / 2)  // Center position that keeps top edge at safeTop + 20
+            let upperLimit = safeTop + 20 + (scaledDockSize.height / 2)  // Center position that keeps top edge at safeTop + 20
 
-            // Calculate proper boundaries based on actual dock size
-            let padding: CGFloat = 0
-            let minX = dockSize.width / 2 + padding
-            let maxX = width - dockSize.width / 2 - padding
+            // Calculate proper boundaries accounting for parent padding
+            // CBPerformanceList has 36pt horizontal padding, extend bounds to get closer to screen edges
+            // but leave a small margin (8pt) for visual breathing room
+            let parentPadding: CGFloat = 36
+            let edgeMargin: CGFloat = 8
+            let minX = scaledDockSize.width / 2 - parentPadding + edgeMargin
+            let maxX = width - scaledDockSize.width / 2 + parentPadding - edgeMargin
 
             ZStack {
                 CBTransportDock(
@@ -9015,10 +10165,10 @@ struct SimpleDraggableTransportDock: View {
                     onNext: onNext,
                     onClear: onClear
                 )
-                .scaleEffect(1.20)
+                .scaleEffect(1.20 * sizeMultiplier)
                 .allowsHitTesting(!isDragging)
             }
-            .frame(width: dockSize.width, height: dockSize.height)
+            .frame(width: scaledDockSize.width, height: scaledDockSize.height)
             .contentShape(RoundedRectangle(cornerRadius: 32))
             .highPriorityGesture(
                 DragGesture(minimumDistance: 3, coordinateSpace: .local)
@@ -9028,14 +10178,14 @@ struct SimpleDraggableTransportDock: View {
                             isDragging = true
                             if position == .zero {
                                 // Initialize to bottom-right, respecting control area
-                                let bottomCenterY = max(upperLimit, height - (dockSize.height / 2) - 8)
+                                let bottomCenterY = max(upperLimit, height - (scaledDockSize.height / 2))
                                 let bottomRightX = maxX
                                 position = CGPoint(x: bottomRightX, y: bottomCenterY)
                             }
                         }
 
                         // Update position directly during drag for smooth 1:1 movement
-                        let maxY = height - (dockSize.height / 2) - 8  // Position dock at bottom of cue list view with 8pt gap
+                        let maxY = height - (scaledDockSize.height / 2)  // Position dock flush to bottom border
                         let newX = max(minX, min(maxX, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
 
@@ -9046,7 +10196,7 @@ struct SimpleDraggableTransportDock: View {
                             isTrackingDrag = false
                             isDragging = false
                         }
-                        let maxY = height - (dockSize.height / 2) - 8  // Position dock at bottom of cue list view with 8pt gap
+                        let maxY = height - (scaledDockSize.height / 2)  // Position dock flush to bottom border
                         let newX = max(minX, min(maxX, position.x + value.translation.width))
                         let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
                         position = CGPoint(x: newX, y: newY)
@@ -9054,14 +10204,14 @@ struct SimpleDraggableTransportDock: View {
             )
             .position(
                 x: max(minX, min(maxX, position.x)),
-                y: max(upperLimit, min(height - (dockSize.height / 2) - 8, position.y))
+                y: max(upperLimit, min(height - (scaledDockSize.height / 2), position.y))
             )
             // Ensure default position snaps once control area height is known
             .task(id: "\(width)-\(height)") {
                 guard width > 0 && height > 0 else { return }
 
                 if position == .zero {
-                    let bottomCenterY = max(upperLimit, height - (dockSize.height / 2) - 8)
+                    let bottomCenterY = max(upperLimit, height - (scaledDockSize.height / 2))
                     let bottomRightX = maxX
 
                     var transaction = Transaction()
@@ -9076,7 +10226,7 @@ struct SimpleDraggableTransportDock: View {
 
                 // If position is zero, initialize it
                 if position == .zero {
-                    let bottomCenterY = max(upperLimit, height - newHeight - 10 - (dockSize.height / 2))
+                    let bottomCenterY = max(upperLimit, height - newHeight - 10 - (scaledDockSize.height / 2))
                     let bottomRightX = maxX
 
                     var transaction = Transaction()
@@ -9088,7 +10238,7 @@ struct SimpleDraggableTransportDock: View {
                 }
 
                 // Control area height changed - adjust Y position to stay above it
-                let maxY = height - (dockSize.height / 2) - 8
+                let maxY = height - (scaledDockSize.height / 2) - 8
                 if position.y > maxY {
                     // Capsule would be below the new control area boundary, move it up
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -9097,5 +10247,133 @@ struct SimpleDraggableTransportDock: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Design Preview Sheet
+struct DesignPreviewSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+    
+    // Sample cues for preview
+    private var sampleCues: [Song] {
+        var cue1 = Song(id: UUID(), name: "Opening Number", subtitle: "Full Band", cc: 0, channel: 1)
+        cue1.colorHex = "FF9500"
+
+        var cue2 = Song(id: UUID(), name: "Act 1 Scene 2", subtitle: "Piano & Strings", cc: 1, channel: 1)
+        cue2.colorHex = "30D158"
+
+        var cue3 = Song(id: UUID(), name: "Intermission", subtitle: nil, cc: 2, channel: 1)
+        cue3.colorHex = "0A84FF"
+
+        var cue4 = Song(id: UUID(), name: "Finale", subtitle: "Full Orchestra", cc: 3, channel: 1)
+        cue4.colorHex = "FF453A"
+
+        return [cue1, cue2, cue3, cue4]
+    }
+    
+    @State private var selectedCue: UUID? = nil
+    @State private var lastPlayedCue: UUID? = nil
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    Text("Tap cues to see different states")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 20)
+                    
+                    // Preview cue list
+                    VStack(spacing: 12) {
+                        ForEach(sampleCues) { cue in
+                            previewCueButton(cue)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 40)
+                }
+            }
+            .background(selectedTheme.backgroundColor(for: colorScheme))
+            .navigationTitle("Design Preview")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(Color(hex: "0A84FF"))
+                }
+            }
+        }
+    }
+    
+    private func previewCueButton(_ cue: Song) -> some View {
+        let isCued = selectedCue == cue.id
+        let isLastPlayed = lastPlayedCue == cue.id
+        let baseColor = Color(hex: cue.colorHex ?? "0A84FF")
+        let corner: CGFloat = 16
+
+        return Button(action: {
+            if selectedCue == cue.id {
+                lastPlayedCue = cue.id
+                selectedCue = nil
+            } else {
+                lastPlayedCue = selectedCue
+                selectedCue = cue.id
+            }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }) {
+            ZStack(alignment: .center) {
+                // Simple button background
+                RoundedRectangle(cornerRadius: corner)
+                    .fill(baseColor)
+                    .frame(maxWidth: .infinity, minHeight: isCued ? 103.2 : 86)
+
+                HStack(spacing: 14) {
+                    // Play icon
+                    if isCued || isLastPlayed {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: isCued ? 28 : 24, weight: .bold))
+                            .foregroundColor(Color(uiColor: .systemBackground))
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(cue.name)
+                            .font(.system(size: isCued ? 28 : 22, weight: .bold))
+                            .foregroundColor(Color(uiColor: .systemBackground))
+                            .lineLimit(1)
+                        if let sub = cue.subtitle, !sub.isEmpty {
+                            Text(sub)
+                                .font(isCued ? .headline : .footnote)
+                                .foregroundColor(Color(uiColor: .systemBackground).opacity(0.8))
+                        }
+                    }
+
+                    Spacer()
+
+                    // MIDI info
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("CC \(cue.cc)")
+                            .font(.caption.bold())
+                            .foregroundColor(Color(uiColor: .systemBackground).opacity(0.7))
+                        Text("Ch \(cue.channel)")
+                            .font(.caption2)
+                            .foregroundColor(Color(uiColor: .systemBackground).opacity(0.6))
+                    }
+                }
+                .padding(.horizontal, isCued ? 24 : 20)
+                .padding(.vertical, isCued ? 12 : 8)
+            }
+        }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCued)
     }
 }

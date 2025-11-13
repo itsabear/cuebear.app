@@ -897,8 +897,10 @@ class ConnectionManager: ObservableObject {
                     self.isConnected = false
                     self.isConnecting = false
                     self.connectionHealth = .disconnected
-                    // Clear connectedComputerName when Bridge quits so chip disappears
-                    self.connectedComputerName = nil
+                    // DON'T clear connectedComputerName - keep USB chip visible
+                    // The chip will be cleared only when cable is unplugged or user manually disconnects
+                    // This allows the chip to stay visible (blue/inactive) when switching to WiFi
+                    // self.connectedComputerName = nil
                     self.connectionQuality = .disconnected
 
                     // v1.0.11 FIX: Keep listening so new Bridge instances can connect
@@ -906,7 +908,7 @@ class ConnectionManager: ObservableObject {
                     // accept new connections when Bridge starts again
                     debugPrint("🔗 ConnectionManager: 🔄 Bridge disconnected - listener remains active for reconnection")
 
-                    // Update USB bridge availability to hide chip
+                    // Update USB bridge availability to keep chip visible
                     self.checkUSBBridgeAvailability()
 
                     self.connectionStateCallback?(false)
@@ -947,8 +949,10 @@ class ConnectionManager: ObservableObject {
                     self.isConnected = false
                     self.isConnecting = false
                     self.connectionHealth = .disconnected
-                    // Clear connectedComputerName when Bridge quits so chip disappears
-                    self.connectedComputerName = nil
+                    // DON'T clear connectedComputerName - keep USB chip visible
+                    // The chip will be cleared only when cable is unplugged or user manually disconnects
+                    // This allows the chip to stay visible (blue/inactive) when switching to WiFi
+                    // self.connectedComputerName = nil
                     self.connectionQuality = .disconnected
 
                     // v1.0.11 FIX: Keep listening so new Bridge instances can connect
@@ -956,7 +960,7 @@ class ConnectionManager: ObservableObject {
                     // accept new connections when Bridge starts again
                     debugPrint("🔗 ConnectionManager: 🔄 Bridge disconnected - listener remains active for reconnection")
 
-                    // Update USB bridge availability to hide chip
+                    // Update USB bridge availability to keep chip visible
                     self.checkUSBBridgeAvailability()
 
                     self.connectionStateCallback?(false)
@@ -1706,20 +1710,34 @@ class ConnectionManager: ObservableObject {
     }
     
     private func checkUSBBridgeAvailability() {
-        // Show USB chip based on Bridge app running (handshake completed)
+        // Show USB chip when listener is ready OR Bridge has connected before
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
 
-            // Show USB bridge chip ONLY when Bridge app is running (has sent handshake)
-            // Having connectedComputerName means Bridge app connected at some point
-            let shouldBeAvailable = self.connectedComputerName != nil
+            // Show USB bridge chip when:
+            // 1. Bridge app has connected before (has sent handshake) - connectedComputerName is set
+            //    This keeps the chip visible even when switching to WiFi (stays blue/inactive)
+            // 2. OR when listener is running (ready for Bridge to connect)
+            //    This handles the case where iPad app starts after Bridge is already running
+            let hasConnectedBefore = self.connectedComputerName != nil
+            let isListenerReady = self.isListening
+            let shouldBeAvailable = hasConnectedBefore || isListenerReady
+
             let wasAvailable = self.usbBridgeAvailable
             self.usbBridgeAvailable = shouldBeAvailable
 
+            // Enhanced debug logging to diagnose visibility issues
+            debugPrint("🔗 ConnectionManager: 🔍 checkUSBBridgeAvailability() - connectedComputerName: \(self.connectedComputerName ?? "nil"), isListening: \(self.isListening), isWiFiConnected: \(self.isWiFiConnected)")
+            debugPrint("🔗 ConnectionManager: 🔍 hasConnectedBefore: \(hasConnectedBefore), isListenerReady: \(isListenerReady), shouldBeAvailable: \(shouldBeAvailable)")
+
             if shouldBeAvailable && !wasAvailable {
-                debugPrint("🔗 ConnectionManager: 🎯 USB Bridge available - showing USB chip (Bridge running)")
+                if hasConnectedBefore {
+                    debugPrint("🔗 ConnectionManager: 🎯 USB Bridge available - showing USB chip (Bridge connected before)")
+                } else {
+                    debugPrint("🔗 ConnectionManager: 🎯 USB Bridge ready - showing USB chip (listener running, ready for connection)")
+                }
             } else if !shouldBeAvailable && wasAvailable {
-                debugPrint("🔗 ConnectionManager: ❌ USB Bridge unavailable - hiding USB chip (Bridge not running)")
+                debugPrint("🔗 ConnectionManager: ❌ USB Bridge unavailable - hiding USB chip")
             }
         }
     }

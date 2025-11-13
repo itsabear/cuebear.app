@@ -25,16 +25,21 @@ private func relativeLuminance(_ rgb: (Int, Int, Int)) -> Double {
 // MARK: - Performance List (instant touch-down flash; long-press Change MIDI…)
 struct CBPerformanceList: View {
     let songs: [Song]
+    let songLibrary: [Song]  // Full song library for resolving alias references
     let isCueMode: Bool
     let cuedID: UUID?
     let isEditing: Bool
     let flashingCueID: UUID?  // ID of cue that should flash
+    let lastPlayedID: UUID?  // ID of last played cue (for steady play icon)
     let accentColor: Color  // Theme accent color for selection stroke
     let defaultCueColor: Color  // Theme default cue color
     let themeFont: (CGFloat, Font.Weight) -> Font  // Theme font function
     let selectionStrokeColor: (String?) -> Color  // Closure to compute contrasting selection color based on cue color
     let backgroundColorHex: String  // Theme background color hex for contrast calculation
     let defaultCueColorHex: String  // Theme default cue color hex for color preview
+    let showMIDIData: Bool  // Toggle for showing MIDI data
+    let cueHeight: Double  // Customizable cue height
+    let fontSize: Double  // Font size multiplier
     var onTapSong: (Song) -> Void
     var onLongPressChangeMIDI: (Song) -> Void
     var onRename: (Song) -> Void
@@ -51,19 +56,44 @@ struct CBPerformanceList: View {
                         ? MIDIKey(kind: .note, channel: s.channel, number: s.note ?? 0)
                         : MIDIKey(kind: .cc,   channel: s.channel, number: s.cc)
                     let takenBy = conflictFor[key]
+                    let filteredTakenBy: String? = {
+                        guard let takenBy = takenBy else { return nil }
+                        // Filter out current song's name from the conflict list
+                        if takenBy.contains("|||") {
+                            // Multiple owners - split and filter
+                            let owners = takenBy.split(separator: "|||").map(String.init).filter { $0 != s.name }
+                            guard !owners.isEmpty else { return nil }
+                            if owners.count == 1 {
+                                return owners[0]
+                            } else if owners.count == 2 {
+                                return "\(owners[0]) and \(owners[1])"
+                            } else {
+                                return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+                            }
+                        } else if takenBy == s.name {
+                            // Single owner and it's us
+                            return nil
+                        }
+                        return takenBy
+                    }()
                     CBPerformanceRow(
                         song: s,
+                        songLibrary: songLibrary,  // Pass full song library for alias resolution
                         isCued: cuedID == s.id,  // Show stroke in both Cue and Navigator modes
                         isCueMode: isCueMode,
                         isEditing: isEditing,
-                        takenBy: (takenBy != nil && takenBy != s.name) ? takenBy : nil,
+                        takenBy: filteredTakenBy,
                         shouldFlash: flashingCueID == s.id,  // Flash when triggered
+                        isLastPlayed: lastPlayedID == s.id,  // Show steady play icon on last played
                         accentColor: accentColor,  // Pass theme accent color
                         defaultCueColor: defaultCueColor,  // Pass theme default cue color
                         themeFont: themeFont,  // Pass theme font function
                         selectionStrokeColor: selectionStrokeColor(s.colorHex),  // Compute contrasting selection stroke color
                         backgroundColorHex: backgroundColorHex,  // Pass background color hex for contrast
                         defaultCueColorHex: defaultCueColorHex,  // Pass default cue color hex for preview
+                        showMIDIData: showMIDIData,  // Pass MIDI data visibility setting
+                        cueHeight: cueHeight,  // Pass customizable cue height
+                        fontSize: fontSize,  // Pass font size multiplier
                         onTap: { onTapSong(s) },
                         onLongPressChangeMIDI: { onLongPressChangeMIDI(s) },
                         onRename: { onRename(s) },
@@ -89,17 +119,22 @@ struct CBPerformanceList: View {
 
 struct CBPerformanceRow: View {
     let song: Song
+    let songLibrary: [Song]  // Full song library for resolving alias references
     let isCued: Bool
     let isCueMode: Bool
     let isEditing: Bool
     let takenBy: String?
     let shouldFlash: Bool  // Trigger from parent to flash the row
+    let isLastPlayed: Bool  // Is this the last played cue?
     let accentColor: Color  // Theme accent color for selection stroke
     let defaultCueColor: Color  // Theme default cue color
     let themeFont: (CGFloat, Font.Weight) -> Font  // Theme font function
     let selectionStrokeColor: Color  // Contrasting selection stroke color based on cue background
     let backgroundColorHex: String  // Theme background color hex for contrast calculation
     let defaultCueColorHex: String  // Theme default cue color hex for preview
+    let showMIDIData: Bool  // Toggle for showing MIDI data
+    let cueHeight: Double  // Customizable cue height
+    let fontSize: Double  // Font size multiplier
     var onTap: () -> Void
     var onLongPressChangeMIDI: () -> Void
     var onRename: () -> Void
@@ -109,8 +144,26 @@ struct CBPerformanceRow: View {
     @GestureState private var isPressed = false
     @State private var didDrag = false
     @State private var flashOpacity: Double = 0.0
+    @State private var playIconOpacity: Double = 1.0  // For blinking animation
     @Environment(\.colorScheme) private var colorScheme
     private let corner: CGFloat = 20
+
+    /// Adaptive text color based on cue background brightness
+    /// Uses WCAG luminance calculation to ensure readable contrast
+    private var adaptiveTextColor: Color {
+        // Get the base color (custom or default)
+        let backgroundHex = song.colorHex ?? defaultCueColorHex
+        let backgroundColor = Color(hex: backgroundHex)
+
+        // Use WCAG-compliant contrast calculation
+        if backgroundColor.needsDarkText() {
+            // Bright background needs dark text
+            return Color.black
+        } else {
+            // Dark background needs light text
+            return Color.white
+        }
+    }
 
     var body: some View {
         let press = DragGesture(minimumDistance: 0)
@@ -128,8 +181,8 @@ struct CBPerformanceRow: View {
                         onRename()
                     }
                 } else {
-                    // Normal mode: send MIDI on quick tap
-                    if !didDrag && takenBy == nil {
+                    // Normal mode: send MIDI on quick tap (allow taps even with conflicts)
+                    if !didDrag {
                         // Only flash/haptic when actually sending MIDI (regular mode, not cued)
                         if !isCueMode {
                             flash()
@@ -156,52 +209,92 @@ struct CBPerformanceRow: View {
         ZStack(alignment: .center) {
             RoundedRectangle(cornerRadius: corner)
                 .fill(baseColor)
-                .frame(maxWidth: .infinity, minHeight: isCued ? 96 : 86)
-                .opacity(takenBy == nil ? (isCued ? 1.0 : 0.90) : 0.55)
+                .frame(maxWidth: .infinity, minHeight: isCued ? cueHeight * 1.2 : cueHeight)
+                .opacity(isCued ? 1.0 : 0.90)  // Always use normal opacity, regardless of conflicts
                 .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
 
             HStack(spacing: 14) {
+                // Play icon - show on chosen cue or last played cue
+                if isCued || isLastPlayed {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: (isCued ? 28 : 24) * fontSize, weight: .bold))
+                        .foregroundColor(adaptiveTextColor)
+                        .opacity(isCued && isCueMode ? playIconOpacity : 1.0)  // Blink if cued in Cue mode, steady otherwise
+                        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)  // Smooth size transition
+                        .id("\(song.id)-play-icon")  // Force clean transitions when switching cues
+                        .transition(.opacity)
+                }
+
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(song.name)
-                        .font(themeFont(isCued ? 26 : 22, .bold))  // Larger text when selected
-                        .foregroundColor(Color(uiColor: .systemBackground))
-                        .lineLimit(1)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
+                    HStack(spacing: 6) {
+                        // Show shortcut icon for alias cues
+                        if song.aliasedCueID != nil {
+                            Image(systemName: "arrow.turn.down.right")
+                                .font(.system(size: (isCued ? 18 * 1.2 : 18) * fontSize, weight: .semibold))
+                                .foregroundColor(adaptiveTextColor.opacity(0.7))
+                        }
+                        Text(song.name)
+                            .font(themeFont((isCued ? 22 * 1.2 : 22) * fontSize, .bold))  // 20% larger text when selected, scaled by fontSize
+                            .foregroundColor(adaptiveTextColor)
+                            .lineLimit(1)
+
+                        // Show "Copy of [cue name]" for alias cues
+                        if let aliasedID = song.aliasedCueID {
+                            if let originalCue = songLibrary.first(where: { $0.id == aliasedID }) {
+                                Text("Copy of \(originalCue.name)")
+                                    .font(themeFont((isCued ? 14 * 1.2 : 14) * fontSize, .regular))
+                                    .italic()
+                                    .foregroundColor(adaptiveTextColor.opacity(0.6))
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
                     if let sub = song.subtitle, !sub.isEmpty {
                         Text(sub)
-                            .font(isCued ? .subheadline : .footnote)  // Larger subtitle when selected
-                            .foregroundColor(Color(uiColor: .systemBackground).opacity(0.85))
+                            .font(isCued ? themeFont(14 * 1.2 * fontSize, .medium) : themeFont(14 * fontSize, .medium))  // 20% larger subtitle when selected, scaled by fontSize
+                            .foregroundColor(adaptiveTextColor.opacity(0.85))
                             .lineLimit(1)
                             .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
                     }
                 }
                 Spacer(minLength: 12)
 
-                VStack(alignment: .trailing, spacing: 4) {
-                    let subtitle: String = {
-                        if song.kind == .cc {
-                            return "Ch \(song.channel)  •  CC \(song.cc)"
-                        } else {
-                            let noteName = (song.note ?? 0).midiNoteName
-                            return "Ch \(song.channel)  •  \(noteName)"
-                        }
-                    }()
-                    Text(subtitle)
-                        .font(isCued ? .caption : .caption2)  // Larger info when selected
-                        .foregroundColor(Color(uiColor: .systemBackground).opacity(0.9))
-                        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
+                if showMIDIData && song.midiEnabled {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        let subtitle: String = {
+                            if song.kind == .cc {
+                                return "Ch \(song.channel)  •  CC \(song.cc)"
+                            } else {
+                                let noteName = (song.note ?? 0).midiNoteName
+                                return "Ch \(song.channel)  •  \(noteName)"
+                            }
+                        }()
+                        Text(subtitle)
+                            .font(isCued ? .caption : .caption2)  // Larger info when selected
+                            .foregroundColor(adaptiveTextColor.opacity(0.9))
+                            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
 
-                    // Color indicator circle - only show in edit mode
-                    if isEditing {
-                        let displayColor = song.colorHex ?? defaultCueColorHex
-                        HStack(spacing: 4) {
-                            Text("Color:")
+                        // Show conflict warning below MIDI data
+                        if let owner = takenBy {
+                            Text("⚠️ MIDI taken by: \(owner)")
                                 .font(.caption2)
-                                .foregroundColor(Color(uiColor: .systemBackground).opacity(0.7))
-                            Circle()
-                                .fill(Color(hex: displayColor))
-                                .frame(width: 16, height: 16)
-                                .overlay(Circle().stroke(Color(uiColor: .systemBackground).opacity(0.3), lineWidth: 1))
+                                .foregroundColor(adaptiveTextColor.opacity(0.8))
+                                .lineLimit(1)
+                        }
+
+                        // Color indicator circle - only show in edit mode
+                        if isEditing {
+                            let displayColor = song.colorHex ?? defaultCueColorHex
+                            HStack(spacing: 4) {
+                                Text("Color:")
+                                    .font(.caption2)
+                                    .foregroundColor(adaptiveTextColor.opacity(0.7))
+                                Circle()
+                                    .fill(Color(hex: displayColor))
+                                    .frame(width: 16, height: 16)
+                                    .overlay(Circle().stroke(adaptiveTextColor.opacity(0.3), lineWidth: 1))
+                            }
                         }
                     }
                 }
@@ -213,26 +306,14 @@ struct CBPerformanceRow: View {
                 .fill(Color(uiColor: .systemBackground))
                 .opacity(flashOpacity)
                 .allowsHitTesting(false)
-
-            if let owner = takenBy {
-                Text("Taken by: \(owner)")
-                    .font(.caption2)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .foregroundColor(Color(uiColor: .systemBackground))
-                    .background(Color.primary.opacity(0.6))
-                    .clipShape(Capsule())
-                    .allowsHitTesting(false)  // Allow tap through the chip
-            }
         }
         .contentShape(Rectangle())
         // Add extra padding when selected to push other cues aside
-        .padding(.vertical, isCued ? 8 : 0)
-        .padding(.horizontal, isCued ? 4 : 0)
-        // Asymmetric scale: slightly wider, more height
+        .padding(.vertical, isCued ? 12 : 0)
+        .padding(.horizontal, isCued ? 6 : 0)
+        // Uniform scale: slightly bigger without stretching text
         .scaleEffect(
-            x: isCued ? 1.05 : (isPressed ? 0.985 : 1.0),
-            y: isCued ? 1.20 : (isPressed ? 0.985 : 1.0),
+            isCued ? 1.08 : (isPressed ? 0.985 : 1.0),
             anchor: .center
         )
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
@@ -268,10 +349,24 @@ struct CBPerformanceRow: View {
                 flash()
             }
         }
+        .onChange(of: isCued && isCueMode) { _, shouldBlink in
+            // Start blinking animation when cue becomes active in Cue mode
+            if shouldBlink {
+                playIconOpacity = 0.3
+            } else {
+                playIconOpacity = 1.0
+            }
+        }
+        .onAppear {
+            // Initialize blinking state if cue is already active in Cue mode
+            if isCued && isCueMode {
+                playIconOpacity = 0.3
+            }
+        }
     }
 
     private func flash() {
-        flashOpacity = 1.0
+        flashOpacity = 0.4  // Subtle flash instead of full white
         // v1.0.9: Balanced flash duration - noticeable but snappy
         withAnimation(.easeOut(duration: 0.20)) { flashOpacity = 0.0 }
     }
@@ -304,6 +399,7 @@ struct CBPerformanceRow: View {
 struct CBSetlistRow: View {
     let song: Song
     let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
+    let conflictFor: [MIDIKey: String]
     var onTap: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -333,33 +429,43 @@ struct CBSetlistRow: View {
             }
             Spacer()
 
-            // MIDI info and color indicator
-            HStack(spacing: 16) {
-                // MIDI info
-                let midiInfo: String = {
-                    if song.kind == .cc {
-                        return "Ch \(song.channel) • CC \(song.cc)"
-                    } else {
-                        let noteName = (song.note ?? 0).midiNoteName
-                        return "Ch \(song.channel) • \(noteName)"
-                    }
-                }()
-                Text(midiInfo)
-                    .font(.caption2)
-                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+            // Show MIDI info and conflict warning
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 16) {
+                    // Always show MIDI info
+                    let midiInfo: String = {
+                        if song.kind == .cc {
+                            return "Ch \(song.channel) • CC \(song.cc)"
+                        } else {
+                            let noteName = (song.note ?? 0).midiNoteName
+                            return "Ch \(song.channel) • \(noteName)"
+                        }
+                    }()
+                    Text(midiInfo)
+                        .font(.caption2)
+                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
 
-                // Color indicator circle (always reserve space for alignment)
-                Group {
-                    if let hex = song.colorHex {
-                        Circle()
-                            .fill(Color(hex: hex))
-                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                    } else {
-                        Circle()
-                            .fill(Color.clear)
+                    // Color indicator circle (always reserve space for alignment)
+                    Group {
+                        if let hex = song.colorHex {
+                            Circle()
+                                .fill(Color(hex: hex))
+                                .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                        } else {
+                            Circle()
+                                .fill(Color.clear)
+                        }
                     }
+                    .frame(width: 20, height: 20)
                 }
-                .frame(width: 20, height: 20)
+
+                // Show conflict warning below MIDI info
+                if let owner = filteredTakenBy() {
+                    Text("⚠️ MIDI taken by: \(owner)")
+                        .font(.caption2)
+                        .foregroundColor(selectedTheme.errorColor(for: colorScheme))
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.vertical, 6)
@@ -370,6 +476,31 @@ struct CBSetlistRow: View {
         .onTapGesture {
             onTap()
         }
+    }
+
+    private func filteredTakenBy() -> String? {
+        let key = (song.kind == .note)
+            ? MIDIKey(kind: .note, channel: song.channel, number: song.note ?? 0)
+            : MIDIKey(kind: .cc, channel: song.channel, number: song.cc)
+        guard let takenBy = conflictFor[key] else { return nil }
+
+        // Filter out current song's name from the conflict list
+        if takenBy.contains("|||") {
+            // Multiple owners - split and filter
+            let owners = takenBy.split(separator: "|||").map(String.init).filter { $0 != song.name }
+            guard !owners.isEmpty else { return nil }
+            if owners.count == 1 {
+                return owners[0]
+            } else if owners.count == 2 {
+                return "\(owners[0]) and \(owners[1])"
+            } else {
+                return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+            }
+        } else if takenBy == song.name {
+            // Single owner and it's us
+            return nil
+        }
+        return takenBy
     }
 }
 
@@ -417,15 +548,24 @@ struct CBSetlistDragPreview: View {
 struct CBSetlistColumn: View {
     let songs: [Song]
     let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
+    let conflictFor: [MIDIKey: String]
     @Binding var searchText: String
     @Binding var reorderMode: Bool
+    @Binding var batchMode: Bool
+    @Binding var selected: Set<UUID>
     var onRename: (Song) -> Void
     var onRemove: (Song) -> Void
     var onMove: (IndexSet, Int) -> Void
     var onAdd: () -> Void
+    var onToggleSelect: (UUID) -> Void
+    var onSelectAll: (() -> Void)?
+    var onClearSelection: (() -> Void)?
+    var onBatchRemove: (() -> Void)?
+    var onDuplicate: ((Song) -> Void)?  // Optional callback for duplicating a cue
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -441,24 +581,34 @@ struct CBSetlistColumn: View {
                     .padding(.top, 8)
                 Spacer()
 
-                // Show + button when in reorder mode (edit mode)
-                if reorderMode {
-                    Button {
-                        onAdd()
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 17))
-                            .frame(width: 24, height: 24)
-                            .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
-                    }
-                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
-                    .padding(.trailing, 12)
-                }
-
                 Button {
-                    withAnimation(.easeInOut) { reorderMode.toggle() }
+                    withAnimation(.easeInOut) {
+                        reorderMode.toggle()
+                        if reorderMode {
+                            batchMode = false
+                            selected.removeAll()
+                        }
+                    }
                 } label: {
                     Image(systemName: reorderMode ? "checkmark" : "list.dash")
+                        .font(.system(size: 17))
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
+                }
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
+
+                Button {
+                    withAnimation(.easeInOut) {
+                        batchMode.toggle()
+                        if batchMode {
+                            reorderMode = false
+                        }
+                        if !batchMode {
+                            selected.removeAll()
+                        }
+                    }
+                } label: {
+                    Image(systemName: batchMode ? "xmark" : "checkmark.circle")
                         .font(.system(size: 17))
                         .frame(width: 24, height: 24)
                         .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
@@ -468,54 +618,129 @@ struct CBSetlistColumn: View {
             }
             .frame(height: 44) // Match library column header height
 
-            // Search TextField
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
-                    .font(.body)
-
-                TextField("Search cues...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-
-                if !searchText.isEmpty {
-                    Button(action: {
-                        searchText = ""
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                            .font(.body)
+            // Batch controls replace search bar when in batch mode
+            if batchMode {
+                HStack(spacing: 20) {
+                    Button("Select All") {
+                        onSelectAll?()
                     }
-                    .buttonStyle(.plain)
+                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
+
+                    Button("Clear") {
+                        onClearSelection?()
+                    }
+                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
+
+                    Spacer()
+
+                    Button("Remove") {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onBatchRemove?()
+                    }
+                    .foregroundColor(selected.isEmpty ? .gray : .red)
+                    .disabled(selected.isEmpty)
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            } else {
+                // Search TextField
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.gray)
+                        .font(.body)
+
+                    TextField("Search cues...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.gray)
+                                .font(.body)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(selectedTheme.titleBarColor(for: colorScheme).opacity(0.8))
+                .cornerRadius(10)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(selectedTheme.buttonBackgroundColor(for: colorScheme).opacity(0.5))
-            .cornerRadius(10)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 4)
 
             List {
                 ForEach(songs) { s in
-                    CBSetlistRow(
-                        song: s,
-                        themeFont: themeFont,
-                        onTap: {
-                            onRename(s)
+                    HStack(spacing: 12) {
+                        // Show selection circle in batch mode
+                        if batchMode {
+                            ZStack {
+                                Circle()
+                                    .strokeBorder(Color.gray.opacity(0.5), lineWidth: 2)
+                                    .frame(width: 24, height: 24)
+                                if selected.contains(s.id) {
+                                    Circle()
+                                        .fill(Color.accentColor)
+                                        .frame(width: 24, height: 24)
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .frame(width: 24, height: 24)
+                            .onTapGesture {
+                                onToggleSelect(s.id)
+                            }
                         }
-                    )
+
+                        CBSetlistRow(
+                            song: s,
+                            themeFont: themeFont,
+                            conflictFor: conflictFor,
+                            onTap: {
+                                if batchMode {
+                                    onToggleSelect(s.id)
+                                } else {
+                                    onRename(s)
+                                }
+                            }
+                        )
+                    }
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowSeparator(.visible)
                     .listRowSeparatorTint(.gray)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if !reorderMode {
+                    .contextMenu {
+                        if reorderMode {
+                            Button {
+                                onRename(s)
+                            } label: {
+                                Label("Edit Cue", systemImage: "pencil")
+                            }
+
+                            Button {
+                                onDuplicate?(s)
+                            } label: {
+                                Label("Duplicate", systemImage: "doc.on.doc")
+                            }
+
                             Button(role: .destructive) {
                                 onRemove(s)
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Label("Remove", systemImage: "trash")
+                            }
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if !reorderMode && !batchMode {
+                            Button(role: .destructive) {
+                                onRemove(s)
+                            } label: {
+                                Label("Remove", systemImage: "minus.circle")
                             }
                         }
                     }
@@ -540,6 +765,7 @@ struct CBSetlistColumn: View {
 struct CBLibraryColumn: View {
     let rows: [CBLibraryRow]
     let themeFont: ((CGFloat, Font.Weight) -> Font)?  // Optional theme font function
+    let conflictFor: [MIDIKey: String]
     @Binding var isEditing: Bool
     @Binding var batchMode: Bool
     @Binding var selected: Set<UUID>
@@ -557,6 +783,7 @@ struct CBLibraryColumn: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -605,12 +832,12 @@ struct CBLibraryColumn: View {
                     Button("Select All") {
                         onSelectAll?()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
 
                     Button("Clear") {
                         onClearSelection?()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
 
                     Spacer()
 
@@ -618,7 +845,7 @@ struct CBLibraryColumn: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         onBatchAddToSetlist?()
                     }
-                    .foregroundColor(selected.isEmpty ? .gray : .blue)
+                    .foregroundColor(selected.isEmpty ? .gray : Color(hex: "0A84FF"))  // Default cue color
                     .disabled(selected.isEmpty)
 
                     Button("Delete") {
@@ -655,7 +882,7 @@ struct CBLibraryColumn: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(selectedTheme.buttonBackgroundColor(for: colorScheme).opacity(0.5))
+                .background(selectedTheme.titleBarColor(for: colorScheme).opacity(0.8))
                 .cornerRadius(10)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
@@ -700,33 +927,43 @@ struct CBLibraryColumn: View {
                         }
                         Spacer()
 
-                        // MIDI info and color indicator
-                        HStack(spacing: 16) {
-                            // MIDI info
-                            let midiInfo: String = {
-                                if row.song.kind == .cc {
-                                    return "Ch \(row.song.channel) • CC \(row.song.cc)"
-                                } else {
-                                    let noteName = (row.song.note ?? 0).midiNoteName
-                                    return "Ch \(row.song.channel) • \(noteName)"
-                                }
-                            }()
-                            Text(midiInfo)
-                                .font(.caption2)
-                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                        // Show MIDI info and conflict warning
+                        VStack(alignment: .trailing, spacing: 4) {
+                            HStack(spacing: 16) {
+                                // Always show MIDI info
+                                let midiInfo: String = {
+                                    if row.song.kind == .cc {
+                                        return "Ch \(row.song.channel) • CC \(row.song.cc)"
+                                    } else {
+                                        let noteName = (row.song.note ?? 0).midiNoteName
+                                        return "Ch \(row.song.channel) • \(noteName)"
+                                    }
+                                }()
+                                Text(midiInfo)
+                                    .font(.caption2)
+                                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
 
-                            // Color indicator circle (always reserve space for alignment)
-                            Group {
-                                if let hex = row.song.colorHex {
-                                    Circle()
-                                        .fill(Color(hex: hex))
-                                        .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                                } else {
-                                    Circle()
-                                        .fill(Color.clear)
+                                // Color indicator circle (always reserve space for alignment)
+                                Group {
+                                    if let hex = row.song.colorHex {
+                                        Circle()
+                                            .fill(Color(hex: hex))
+                                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                    } else {
+                                        Circle()
+                                            .fill(Color.clear)
+                                    }
                                 }
+                                .frame(width: 20, height: 20)
                             }
-                            .frame(width: 20, height: 20)
+
+                            // Show conflict warning below MIDI info
+                            if let owner = filteredTakenBy(for: row.song) {
+                                Text("⚠️ MIDI taken by: \(owner)")
+                                    .font(.caption2)
+                                    .foregroundColor(selectedTheme.errorColor(for: colorScheme))
+                                    .lineLimit(1)
+                            }
                         }
                     }
                     .contentShape(Rectangle())
@@ -772,6 +1009,31 @@ struct CBLibraryColumn: View {
             .onReceive(NotificationCenter.default.publisher(for: .init("CBRemoveFromSetlist"))) { _ in }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func filteredTakenBy(for song: Song) -> String? {
+        let key = (song.kind == .note)
+            ? MIDIKey(kind: .note, channel: song.channel, number: song.note ?? 0)
+            : MIDIKey(kind: .cc, channel: song.channel, number: song.cc)
+        guard let takenBy = conflictFor[key] else { return nil }
+
+        // Filter out current song's name from the conflict list
+        if takenBy.contains("|||") {
+            // Multiple owners - split and filter
+            let owners = takenBy.split(separator: "|||").map(String.init).filter { $0 != song.name }
+            guard !owners.isEmpty else { return nil }
+            if owners.count == 1 {
+                return owners[0]
+            } else if owners.count == 2 {
+                return "\(owners[0]) and \(owners[1])"
+            } else {
+                return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+            }
+        } else if takenBy == song.name {
+            // Single owner and it's us
+            return nil
+        }
+        return takenBy
     }
 }
 
@@ -872,7 +1134,7 @@ private struct BridgeDeviceCard: View {
         case usb, wifi
         
         var color: Color {
-            return .blue
+            return Color(hex: "0A84FF")  // Default cue color
         }
         
         var connectedColor: Color {
@@ -994,6 +1256,7 @@ struct CBConnectionsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -1002,7 +1265,7 @@ struct CBConnectionsSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("USB")) {
+                Section(header: Text("USB").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
                     KeyValueRow("Status", connectionCoordinator.activeConnection == .usb ? "Connected" : "Waiting")
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if connectionCoordinator.activeConnection == .usb {
@@ -1041,7 +1304,7 @@ struct CBConnectionsSheet: View {
                     }
                 }
 
-                Section(header: Text("Wi-Fi")) {
+                Section(header: Text("Wi-Fi").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
                     KeyValueRow("Status", connectionCoordinator.activeConnection == .wifi ? "Connected" : "Not Connected")
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if connectionCoordinator.activeConnection == .wifi {
@@ -1094,8 +1357,13 @@ struct CBConnectionsSheet: View {
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("Connections")
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+                }
+            }
+            .tint(selectedTheme.defaultCueColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
@@ -1133,6 +1401,7 @@ struct CBProjectsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
     @State private var confirmDelete: String? = nil
 
     private var selectedTheme: AppTheme {
@@ -1145,33 +1414,41 @@ struct CBProjectsSheet: View {
                 Section {
                     HStack {
                         Text("Project")
+                            .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                         Spacer()
                         if projectName == "Untitled" || isDirty {
                             Button(projectName) { onTapTitleWhenUnsaved() }
-                                .foregroundColor(.blue)
+                                .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
                         } else {
-                            Text(projectName).foregroundColor(.secondary)
+                            Text(projectName)
+                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                         }
                     }
                 }
+                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
-                Section(header: Text("Saved Projects")) {
+                Section(header: Text("Saved Projects").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
                     if projects.isEmpty {
-                        Text("No saved projects yet.").foregroundColor(.secondary)
+                        Text("No saved projects yet.")
+                            .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     } else {
                         ForEach(projects, id: \.self) { name in
                             HStack {
                                 Button(name) { onLoad(name); dismiss() }
+                                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                                 Spacer()
                                 Button {
                                     debugPrint("🗑️ Delete button tapped for project: \(name)")
                                     confirmDelete = name
                                     debugPrint("🗑️ Set confirmDelete to: \(name)")
                                 } label: {
-                                    Image(systemName: "trash").foregroundColor(.red)
+                                    Image(systemName: "trash")
+                                        .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 }
                                 .buttonStyle(.plain)
                             }
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         }
                     }
                 }
@@ -1179,8 +1456,18 @@ struct CBProjectsSheet: View {
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("Projects")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
-            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+                }
+            }
+            .tint(selectedTheme.defaultCueColor(for: colorScheme))
             .alert("Delete Project", isPresented: Binding(get: { confirmDelete != nil }, set: { newVal in if !newVal { confirmDelete = nil } })) {
                 Button("Delete", role: .destructive) {
                     debugPrint("🗑️ Delete confirmed for project: \(confirmDelete ?? "nil")")
@@ -1212,6 +1499,7 @@ struct CBAddEditCueSheet: View {
     var onSave: (Song, Bool) -> Void  // Added Bool parameter for andAddAnother
     var onCancel: () -> Void
     var onDelete: ((Song) -> Void)? = nil
+    var onDuplicate: ((Song) -> Void)? = nil  // Callback for duplicating cue
 
     // Global channel support
     let isGlobalChannel: Bool
@@ -1224,6 +1512,7 @@ struct CBAddEditCueSheet: View {
     @State private var number: Int = 0
     @State private var channel: Int = 1
     @State private var velocity: Int = 127
+    @State private var midiEnabled: Bool = true
     @State private var autoAssign: Bool = true
     @State private var colorHex: String? = nil
     @State private var showColorPicker: Bool = false
@@ -1234,6 +1523,7 @@ struct CBAddEditCueSheet: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -1242,15 +1532,17 @@ struct CBAddEditCueSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Song")) {
-                    TextField("Name", text: $name, prompt: Text(defaultName).foregroundColor(.secondary))
+                Section(header: Text("SONG").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
+                    TextField("Name", text: $name, prompt: Text(defaultName).foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme)))
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(false)
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    TextField("Subtitle (Tempo/Key/Notes)", text: $subtitle)
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
+                    TextField("Subtitle (Tempo/Key/Notes)", text: $subtitle, prompt: Text("Subtitle (Tempo/Key/Notes)").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme)))
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(false)
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
                     // Color Picker - Inline Disclosure
                     DisclosureGroup(
@@ -1271,77 +1563,102 @@ struct CBAddEditCueSheet: View {
                                         .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                                 } else {
                                     Text("Default")
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                                 }
                             }
                         }
                     )
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
-                Section(header: Text("MIDI")) {
-                    Toggle(isOn: $autoAssign) {
-                        Text("Assign MIDI automatically")
+                Section(header: Text("MIDI").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
+                    Toggle(isOn: $midiEnabled) {
+                        Text("Enable MIDI")
                     }
+                    .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    Picker("Type", selection: $kind) {
-                        Text("Control Change").tag(MIDIKind.cc)
-                        Text("Note").tag(MIDIKind.note)
-                    }
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    Picker("Channel", selection: $channel) {
-                        ForEach(1...16, id: \.self) { ch in
-                            Text("\(ch)").tag(ch)
-                        }
-                    }
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    Picker(kind == .cc ? "CC Number" : "Note Number", selection: $number) {
-                        ForEach(0...127, id: \.self) { n in
-                            let owner = ownerFor(kind: kind, number: n, channel: channel)
-                            let displayText = kind == .note
-                                ? (owner == nil ? "\(n) - \(n.midiNoteName)" : "\(n) - \(n.midiNoteName) (Used by: \(owner!))")
-                                : (owner == nil ? "\(n)" : "\(n) (Used by: \(owner!))")
 
-                            Text(displayText)
-                                .foregroundColor(owner == nil ? .primary : .secondary)
-                                .tag(n)
+                    if midiEnabled {
+                        Toggle(isOn: $autoAssign) {
+                            Text("Assign MIDI automatically")
                         }
+                        .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
-                    .disabled(autoAssign)
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    if kind == .note {
-                        Stepper(value: $velocity, in: 1...127) { Text("Velocity: \(velocity)") }
+
+                    if midiEnabled {
+                        Picker("Type", selection: $kind) {
+                            Text("Control Change").tag(MIDIKind.cc)
+                            Text("Note").tag(MIDIKind.note)
+                        }
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .tint(selectedTheme.secondaryTextColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
+
+                        ChannelPicker(title: "Channel", channel: $channel, disabled: false)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    }
-                    if let owner = conflictOwner() {
-                        Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+
+                        MIDINumberPicker(
+                            kind: kind,
+                            number: $number,
+                            disabled: autoAssign,
+                            channel: channel,
+                            currentOwnerName: currentOwnerName,
+                            editingControl: nil
+                        )
+                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+
+                        if kind == .note {
+                            VelocityPicker(velocity: $velocity, disabled: false)
+                                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        }
                     }
                 }
                 if let err = error {
-                    Text(err).foregroundColor(.red)
+                    Text(err).foregroundColor(selectedTheme.errorColor(for: colorScheme))
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
 
-                // Delete section - only show when editing existing cue
-                if editingSong != nil, onDelete != nil {
+                // Duplicate & Delete section - only show when editing existing cue
+                if editingSong != nil {
                     Section {
-                        Button(role: .destructive) {
-                            showDeleteAlert = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text("Delete Cue")
-                                Spacer()
+                        // Duplicate button
+                        if onDuplicate != nil {
+                            Button {
+                                if let song = editingSong {
+                                    onDuplicate?(song)
+                                }
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    Image(systemName: "doc.on.doc")
+                                    Text("Duplicate Cue")
+                                    Spacer()
+                                }
+                                .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
                             }
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+
+                        // Delete button
+                        if onDelete != nil {
+                            Button(role: .destructive) {
+                                showDeleteAlert = true
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    Text("Delete Cue")
+                                    Spacer()
+                                }
+                            }
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        }
                     }
                 }
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle(editingSong == nil ? "Add Cue" : "Edit Cue")
-            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+            .tint(selectedTheme.defaultCueColor(for: colorScheme))
             .alert("Delete Cue", isPresented: $showDeleteAlert) {
                 Button("Delete", role: .destructive) {
                     if let song = editingSong {
@@ -1434,6 +1751,7 @@ struct CBAddEditCueSheet: View {
             channel = s.channel
             velocity = s.velocity
             colorHex = s.colorHex
+            midiEnabled = s.midiEnabled
             // For existing songs, disable auto-assign to allow manual editing
             autoAssign = false
         } else {
@@ -1585,6 +1903,7 @@ struct CBAddEditCueSheet: View {
         song.channel = channel
         song.velocity = velocity
         song.colorHex = colorHex
+        song.midiEnabled = midiEnabled
 
         // Set cc or note based on kind
         if kind == .note {
@@ -1650,9 +1969,11 @@ struct CBMIDIPickerSheet: View {
     var currentOwnerName: (MIDIKey) -> String?
     var onSave: (MIDIKind, Int, Int, Int) -> Void
     var onCancel: () -> Void
+    var editingSongName: String? = nil  // Optional: name of song being edited to filter from conflicts
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -1677,7 +1998,7 @@ struct CBMIDIPickerSheet: View {
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 if let owner = conflictOwner() {
-                    Text("⚠️ Taken by: \(owner)").foregroundColor(.orange)
+                    Text("⚠️ MIDI taken by: \(owner)").foregroundColor(selectedTheme.warningColor(for: colorScheme))
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
             }
@@ -1685,20 +2006,46 @@ struct CBMIDIPickerSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle(title)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                        .foregroundColor(Color(hex: "0A84FF"))
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { onSave(kind, number, channel, velocity) }
+                        .foregroundColor(Color(hex: "0A84FF"))
                         .disabled(conflictOwner() != nil)
                 }
             }
-            .tint(selectedTheme.buttonBackgroundColor(for: colorScheme))
+            .tint(selectedTheme.defaultCueColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
 
     private func conflictOwner() -> String? {
         let key = MIDIKey(kind: kind, channel: channel, number: number)
-        return conflictFor[key]
+        guard let ownersString = conflictFor[key] else { return nil }
+
+        // Filter out the editing song's name if provided
+        guard let editingName = editingSongName else { return ownersString }
+
+        // Check if the owners string contains the separator (multiple owners)
+        if ownersString.contains("|||") {
+            // Multiple owners - split and filter
+            let owners = ownersString.split(separator: "|||").map(String.init).filter { $0 != editingName }
+            guard !owners.isEmpty else { return nil }
+            if owners.count == 1 {
+                return owners[0]
+            } else if owners.count == 2 {
+                return "\(owners[0]) and \(owners[1])"
+            } else {
+                return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+            }
+        } else if ownersString == editingName {
+            // Single owner and it's us
+            return nil
+        }
+
+        return ownersString
     }
 }
 
@@ -1760,6 +2107,34 @@ extension Color {
         // Consider colors similar if distance is less than 0.5 (threshold)
         // Increased from 0.3 to 0.5 to be more liberal in detecting similar colors
         return distance < 0.5
+    }
+
+    /// Calculate WCAG relative luminance for a color
+    /// Based on WCAG 2.1 specification for contrast ratio calculation
+    func relativeLuminance() -> Double {
+        guard let components = cgColor?.components, components.count >= 3 else {
+            return 0.0
+        }
+
+        func adjust(_ component: CGFloat) -> Double {
+            let c = Double(component)
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+
+        let r = adjust(components[0])
+        let g = adjust(components[1])
+        let b = adjust(components[2])
+
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+
+    /// Determine if this color needs dark text (true) or light text (false) for optimal readability
+    /// Uses WCAG relative luminance to ensure proper contrast
+    func needsDarkText() -> Bool {
+        let luminance = relativeLuminance()
+        // Use 0.5 as threshold - colors brighter than this need dark text
+        // This matches the approach used in color_analysis_tool.py
+        return luminance > 0.5
     }
 }
 

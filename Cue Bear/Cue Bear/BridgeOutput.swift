@@ -387,16 +387,10 @@ final class BridgeOutput: ObservableObject {
             // Update connection quality
             self.updateConnectionQuality()
 
-            // Check if connection appears healthy but hasn't sent messages recently
-            if self.connection != nil {
-                let timeSinceLastMessage = Date().timeIntervalSince(self.lastSuccessfulMessage)
-
-                // If no messages sent in 60 seconds, connection might be stale (less aggressive)
-                if timeSinceLastMessage > 60.0 {
-                    debugPrint("🔄 BridgeOutput: Connection appears stale (no messages in \(Int(timeSinceLastMessage))s), forcing reconnection")
-                    self.forceReconnection()
-                }
-            }
+            // Note: We do NOT disconnect based on idle time. NWConnection state monitoring
+            // handles actual connection failures. Users may legitimately have long idle periods
+            // between songs during a performance, and disconnecting after inactivity would be
+            // disruptive. The connection quality indicator will show if the connection is poor.
         }
     }
     
@@ -794,14 +788,18 @@ final class BridgeOutput: ObservableObject {
     
     // MARK: - Health Check
     func checkConnectionHealth() {
-        // Force a health check by checking if we've sent messages recently
-        let timeSinceLastMessage = Date().timeIntervalSince(lastSuccessfulMessage)
-        if timeSinceLastMessage > 30 {
-            debugPrint("BridgeOutput: Connection appears stale (no messages for \(timeSinceLastMessage)s), forcing reconnection")
+        // Check if connection state is healthy
+        // Note: We do NOT reconnect based on idle time - NWConnection handles actual failures
+        guard isConnected, let _ = connection else {
+            debugPrint("BridgeOutput: Health check - not connected, attempting reconnection")
             if let current = current {
                 connect(to: current)
             }
+            return
         }
+
+        // Connection exists and isConnected is true - trust the NWConnection state monitoring
+        debugPrint("BridgeOutput: Health check - connection appears healthy")
     }
     
     func restartDiscovery() {

@@ -9,6 +9,13 @@ struct PurchaseStatusView: View {
     @EnvironmentObject var purchaseManager: PurchaseManager
     @State private var isRestoring = false
 
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
     var body: some View {
         NavigationView {
             List {
@@ -25,7 +32,7 @@ struct PurchaseStatusView: View {
                     if purchaseManager.hasLifetimeAccess {
                         HStack {
                             Image(systemName: "checkmark.seal.fill")
-                                .foregroundColor(.green)
+                                .foregroundColor(selectedTheme.successColor(for: colorScheme))
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Lifetime Access")
                                     .fontWeight(.semibold)

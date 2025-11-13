@@ -30,12 +30,38 @@ public struct Song: Identifiable, Codable, Equatable {
     // Custom color (hex string, e.g. "#FF5733")
     public var colorHex: String? = nil
 
+    // MIDI enable/disable for dummy cues (default true for backward compatibility)
+    public var midiEnabled: Bool = true
+
+    // Alias system - if set, this cue is an alias of another cue
+    public var aliasedCueID: UUID? = nil
+
     public init(id: UUID = UUID(), name: String, subtitle: String? = nil, cc: Int, channel: Int) {
         self.id = id
         self.name = name
         self.subtitle = subtitle
         self.cc = cc
         self.channel = channel
+    }
+
+    // Custom decoder for backward compatibility with old projects
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // Required fields
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
+        cc = try container.decode(Int.self, forKey: .cc)
+        channel = try container.decode(Int.self, forKey: .channel)
+
+        // Optional fields with defaults for backward compatibility
+        kind = try container.decodeIfPresent(MIDIKind.self, forKey: .kind) ?? .cc
+        note = try container.decodeIfPresent(Int.self, forKey: .note)
+        velocity = try container.decodeIfPresent(Int.self, forKey: .velocity) ?? 127
+        colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex)
+        midiEnabled = try container.decodeIfPresent(Bool.self, forKey: .midiEnabled) ?? true
+        aliasedCueID = try container.decodeIfPresent(UUID.self, forKey: .aliasedCueID)
     }
 }
 

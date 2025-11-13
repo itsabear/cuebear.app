@@ -12,6 +12,13 @@ struct PaywallView: View {
     @State private var isRestoring = false
     @State private var errorMessage: String?
 
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -110,7 +117,7 @@ struct PaywallView: View {
                         if let error = errorMessage {
                             Text(error)
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 .padding(.horizontal, 40)
                                 .multilineTextAlignment(.center)
                         }
