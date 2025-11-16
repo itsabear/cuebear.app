@@ -298,29 +298,36 @@ struct ThemedCapsuleButtonStyle: ButtonStyle {
 
         @Environment(\.isEnabled) private var isEnabled
 
+        // iPhone detection
+        private var isPhone: Bool {
+            UIDevice.current.userInterfaceIdiom == .phone
+        }
+
         var body: some View {
             // Use darker text color if stroke color is too light
             let textColor = isColorTooLight(strokeColor) ? darkenColor(strokeColor) : strokeColor
 
-            configuration.label
-                .foregroundColor(textColor)
-                .frame(minHeight: 28)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .fill(.ultraThinMaterial)
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .fill(backgroundColor.opacity(0.2))
-                    }
-                )
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(strokeColor, lineWidth: 1.5))
-                .shadow(color: strokeColor.opacity(0.2), radius: 2, x: 0, y: 1)
-                .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-                .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
-                .opacity(isEnabled ? 1.0 : 0.4)  // Grey out when disabled
+            if isPhone {
+                // iPhone: Text-only button, no background or shadow
+                configuration.label
+                    .foregroundColor(textColor)
+                    .frame(minHeight: 28)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+                    .opacity(isEnabled ? 1.0 : 0.4)
+            } else {
+                // iPad: Just text/icons, no background or shadow
+                configuration.label
+                    .foregroundColor(textColor)
+                    .frame(minHeight: 28)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+                    .opacity(isEnabled ? 1.0 : 0.4)
+            }
         }
     }
 }

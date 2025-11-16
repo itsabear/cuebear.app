@@ -170,6 +170,23 @@ struct TimeBasedWobbleModifier: ViewModifier {
     }
 }
 
+// Conditional wobble modifier - only applies wobble on iPad
+struct ConditionalWobbleModifier: ViewModifier {
+    let isPhone: Bool
+    let wobbleID: UUID
+    @ObservedObject var wobbleAnimator: WobbleAnimator
+
+    func body(content: Content) -> some View {
+        if isPhone {
+            // iPhone: No wobble
+            content
+        } else {
+            // iPad: Apply wobble
+            content.modifier(TimeBasedWobbleModifier(wobbleID: wobbleID, wobbleAnimator: wobbleAnimator))
+        }
+    }
+}
+
 // MARK: - Reserved CCs for legacy transport mapping (kept for compatibility)
 private enum CBTransportCC { static let play = 100, stop = 101, prev = 102, next = 103 }
 
@@ -256,22 +273,33 @@ internal struct ControlButton: Identifiable, Codable, Equatable {
 
     // Computed properties for grid dimensions
     var gridWidth: Int {
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+
         if isFader == true {
-            // Fader dimensions depend on orientation
-            let orientation = faderOrientation ?? "vertical"
-            return orientation == "horizontal" ? 2 : 1
+            // iPhone: All faders are 1 wide, iPad: orientation-dependent
+            if isPhone {
+                return 1
+            } else {
+                let orientation = faderOrientation ?? "vertical"
+                return orientation == "horizontal" ? 2 : 1
+            }
         } else if isSmall == true {
             return 1  // Small button: 1x1
         } else {
-            return 2  // Regular button: 2x1
+            // iPhone: Regular buttons are 2x1, iPad: 2x1
+            return 2
         }
     }
 
     var gridHeight: Int {
         if isFader == true {
-            // Fader dimensions depend on orientation
-            let orientation = faderOrientation ?? "vertical"
-            return orientation == "horizontal" ? 1 : 2
+            // iPhone: All faders are 2 high, iPad: orientation-dependent
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                return 2
+            } else {
+                let orientation = faderOrientation ?? "vertical"
+                return orientation == "horizontal" ? 1 : 2
+            }
         } else {
             return 1  // All buttons: height 1
         }
@@ -307,6 +335,7 @@ struct MIDINumberPicker: View {
     let channel: Int
     var currentOwnerName: ((MIDIKey) -> String?)?
     var editingControl: ControlButton?
+    var editingSong: Song?  // Added to filter cue conflicts
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @State private var textValue: String = ""
@@ -429,8 +458,37 @@ struct MIDINumberPicker: View {
             }
         }
 
+        // If we're editing a song and checking its current MIDI assignment, don't show as taken
+        if let edit = editingSong {
+            let editNumber = (edit.kind == .note) ? (edit.note ?? 60) : edit.cc
+            if edit.kind == kind && edit.channel == channel && editNumber == number {
+                return nil
+            }
+        }
+
         let key = MIDIKey(kind: kind, channel: channel, number: number)
         guard let ownersString = currentOwnerName(key) else { return nil }
+
+        // Filter out the editing song's name from the conflict list
+        if let edit = editingSong {
+            if ownersString.contains("|||") {
+                // Multiple owners - filter out editing song
+                let owners = ownersString.split(separator: "|||")
+                    .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { $0 != edit.name }
+                guard !owners.isEmpty else { return nil }
+                if owners.count == 1 {
+                    return owners[0]
+                } else if owners.count == 2 {
+                    return "\(owners[0]) and \(owners[1])"
+                } else {
+                    return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+                }
+            } else if ownersString.trimmingCharacters(in: .whitespacesAndNewlines) == edit.name {
+                // Single owner and it's the editing song
+                return nil
+            }
+        }
 
         // Filter out the current control's name from the conflict list
         if let edit = editingControl {
@@ -2522,6 +2580,8 @@ internal struct ContentView: View {
     @State private var showAddEdit = false
     @State private var editingSong: Song? = nil
     @State private var isEditing = false
+    @State private var editModeTab: Int = 1  // iPhone only: 0 = Library, 1 = Cue List
+    @State private var showEditModeViewPicker = false  // iPhone only: Show sheet to choose view
     @State private var reorderMode = false  // v1.0.9: Reorder mode for cue list
     @State private var setlistBatchMode = false  // Batch select mode for cue list
     @State private var setlistSelected: Set<UUID> = []  // Selected cues in batch mode
@@ -2735,11 +2795,11 @@ internal struct ContentView: View {
                 },
                 onImport: {
                     if isEditing { isEditing = false }
-                    /* TODO: Import from Files */
+                    openDocumentPicker()
                 },
                 onExport: {
                     if isEditing { isEditing = false }
-                    /* TODO: Export to Files */
+                    exportCurrentProject()
                 },
                 onShowMidiSettings: {
                     if isEditing { isEditing = false }
@@ -2765,58 +2825,204 @@ internal struct ContentView: View {
 
     private func buildMiddleSectionView() -> some View {
             if isEditing {
-            return AnyView(
-                VStack(spacing: 0) {
-                    HStack(spacing: 0) {
-                    // v1.0.8: Swapped order - library on left, cue list on right
-                    // Logical flow: Song Library → Cue List
-                    CBLibraryColumn(
-                        rows: filteredLibraryRows(),
-                        themeFont: currentTheme.font,
-                        conflictFor: conflictLookup(),
-                        isEditing: $isEditing,
-                        batchMode: $libBatchMode,
-                        selected: $libSelected,
-                        sortMode: $sortMode,
-                        searchText: $libraryQuery,
-                        onToggleSelect: { id in toggleLibSelection(id) },
-                        onAddToSetlist: { s in addToSetlist(s) },
-                        onDeleteFromLibrary: { s in deleteFromLibrary(s) },
-                        onRename: { s in editingSong = s; showAddEdit = true },
-                        onSelectAll: selectAllLibrary,
-                        onClearSelection: { libSelected.removeAll() },
-                        onBatchAddToSetlist: addSelectedToSetlist,
-                        onBatchDelete: deleteSelectedFromLibrary
-                    )
-                    .padding(.top, 88)
+                // iPhone: Tab-based edit mode, iPad: Side-by-side
+                let isPhone = UIDevice.current.userInterfaceIdiom == .phone
 
-                    Divider()
+                if isPhone {
+                    // iPhone: Conditional view with modal picker
+                    return AnyView(
+                        VStack(spacing: 0) {
+                            // View selector button below title bar capsule
+                            Button(action: {
+                                showEditModeViewPicker = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: editModeTab == 0 ? "music.note" : "list.bullet")
+                                        .font(.system(size: 14))
+                                    Text(editModeTab == 0 ? "Song Library" : "Cue List")
+                                        .font(.system(size: 16, weight: .medium))
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                                .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 60)  // Push below the floating title bar capsule
+                            .background(currentTheme.backgroundColor(for: colorScheme))
+                            .sheet(isPresented: $showEditModeViewPicker) {
+                                VStack(spacing: 0) {
+                                    // Sheet header
+                                    HStack {
+                                        Spacer()
+                                        Text("Switch View")
+                                            .font(.headline)
+                                        Spacer()
+                                    }
+                                    .padding()
+                                    .background(currentTheme.titleBarColor(for: colorScheme))
 
-                    CBSetlistColumn(
-                        songs: filteredSetlistSongs(),
-                        themeFont: currentTheme.font,
-                        conflictFor: conflictLookup(),
-                        searchText: $setlistQuery,
-                        reorderMode: $reorderMode,
-                        batchMode: $setlistBatchMode,
-                        selected: $setlistSelected,
-                        onRename: { s in editingSong = s; showAddEdit = true },
-                        onRemove: { s in removeFromSetlist(s) },
-                        onMove: { inds, newOffset in
-                            pushSetlistUndo()
-                            store.setlist.songs.move(fromOffsets: inds, toOffset: newOffset)
-                        },
-                        onAdd: { editingSong = nil; showAddEdit = true },
-                        onToggleSelect: { id in toggleSetlistSelection(id) },
-                        onSelectAll: selectAllSetlist,
-                        onClearSelection: { setlistSelected.removeAll() },
-                        onBatchRemove: removeSelectedFromSetlist,
-                        onDuplicate: { s in duplicateSong(s) }
+                                    // View options
+                                    VStack(spacing: 0) {
+                                        Button(action: {
+                                            withAnimation(.easeInOut) {
+                                                editModeTab = 0
+                                                showEditModeViewPicker = false
+                                            }
+                                        }) {
+                                            HStack {
+                                                Image(systemName: "music.note")
+                                                    .font(.system(size: 20))
+                                                    .frame(width: 30)
+                                                Text("Song Library")
+                                                    .font(.system(size: 17))
+                                                Spacer()
+                                                if editModeTab == 0 {
+                                                    Image(systemName: "checkmark")
+                                                        .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
+                                                }
+                                            }
+                                            .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
+                                            .padding()
+                                        }
+
+                                        Divider()
+
+                                        Button(action: {
+                                            withAnimation(.easeInOut) {
+                                                editModeTab = 1
+                                                showEditModeViewPicker = false
+                                            }
+                                        }) {
+                                            HStack {
+                                                Image(systemName: "list.bullet")
+                                                    .font(.system(size: 20))
+                                                    .frame(width: 30)
+                                                Text("Cue List")
+                                                    .font(.system(size: 17))
+                                                Spacer()
+                                                if editModeTab == 1 {
+                                                    Image(systemName: "checkmark")
+                                                        .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
+                                                }
+                                            }
+                                            .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
+                                            .padding()
+                                        }
+                                    }
+                                    .background(currentTheme.backgroundColor(for: colorScheme))
+
+                                    Spacer()
+                                }
+                                .presentationDetents([.height(200)])
+                                .presentationDragIndicator(.visible)
+                            }
+
+                            // Content area
+                            if editModeTab == 0 {
+                                // Library
+                                CBLibraryColumn(
+                                    rows: filteredLibraryRows(),
+                                    themeFont: currentTheme.font,
+                                    conflictFor: conflictLookup(),
+                                    isEditing: $isEditing,
+                                    batchMode: $libBatchMode,
+                                    selected: $libSelected,
+                                    sortMode: $sortMode,
+                                    searchText: $libraryQuery,
+                                    onToggleSelect: { id in toggleLibSelection(id) },
+                                    onAddToSetlist: { s in addToSetlist(s) },
+                                    onDeleteFromLibrary: { s in deleteFromLibrary(s) },
+                                    onRename: { s in editingSong = s; showAddEdit = true },
+                                    onSelectAll: selectAllLibrary,
+                                    onClearSelection: { libSelected.removeAll() },
+                                    onBatchAddToSetlist: addSelectedToSetlist,
+                                    onBatchDelete: deleteSelectedFromLibrary
+                                )
+                                .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading)))
+                            } else {
+                                // Cue List
+                                CBSetlistColumn(
+                                    songs: filteredSetlistSongs(),
+                                    themeFont: currentTheme.font,
+                                    conflictFor: conflictLookup(),
+                                    searchText: $setlistQuery,
+                                    reorderMode: $reorderMode,
+                                    batchMode: $setlistBatchMode,
+                                    selected: $setlistSelected,
+                                    onRename: { s in editingSong = s; showAddEdit = true },
+                                    onRemove: { s in removeFromSetlist(s) },
+                                    onMove: { inds, newOffset in
+                                        pushSetlistUndo()
+                                        store.setlist.songs.move(fromOffsets: inds, toOffset: newOffset)
+                                    },
+                                    onAdd: { editingSong = nil; showAddEdit = true },
+                                    onToggleSelect: { id in toggleSetlistSelection(id) },
+                                    onSelectAll: selectAllSetlist,
+                                    onClearSelection: { setlistSelected.removeAll() },
+                                    onBatchRemove: removeSelectedFromSetlist,
+                                    onDuplicate: { s in duplicateSong(s) }
+                                )
+                                .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .trailing)))
+                            }
+                        }
                     )
-                    .padding(.top, 88)
-                    }
+                } else {
+                    // iPad: Original side-by-side layout
+                    return AnyView(
+                        VStack(spacing: 0) {
+                            HStack(spacing: 0) {
+                                // v1.0.8: Swapped order - library on left, cue list on right
+                                // Logical flow: Song Library → Cue List
+                                CBLibraryColumn(
+                                    rows: filteredLibraryRows(),
+                                    themeFont: currentTheme.font,
+                                    conflictFor: conflictLookup(),
+                                    isEditing: $isEditing,
+                                    batchMode: $libBatchMode,
+                                    selected: $libSelected,
+                                    sortMode: $sortMode,
+                                    searchText: $libraryQuery,
+                                    onToggleSelect: { id in toggleLibSelection(id) },
+                                    onAddToSetlist: { s in addToSetlist(s) },
+                                    onDeleteFromLibrary: { s in deleteFromLibrary(s) },
+                                    onRename: { s in editingSong = s; showAddEdit = true },
+                                    onSelectAll: selectAllLibrary,
+                                    onClearSelection: { libSelected.removeAll() },
+                                    onBatchAddToSetlist: addSelectedToSetlist,
+                                    onBatchDelete: deleteSelectedFromLibrary
+                                )
+                                .padding(.top, 88)
+
+                                Divider()
+
+                                CBSetlistColumn(
+                                    songs: filteredSetlistSongs(),
+                                    themeFont: currentTheme.font,
+                                    conflictFor: conflictLookup(),
+                                    searchText: $setlistQuery,
+                                    reorderMode: $reorderMode,
+                                    batchMode: $setlistBatchMode,
+                                    selected: $setlistSelected,
+                                    onRename: { s in editingSong = s; showAddEdit = true },
+                                    onRemove: { s in removeFromSetlist(s) },
+                                    onMove: { inds, newOffset in
+                                        pushSetlistUndo()
+                                        store.setlist.songs.move(fromOffsets: inds, toOffset: newOffset)
+                                    },
+                                    onAdd: { editingSong = nil; showAddEdit = true },
+                                    onToggleSelect: { id in toggleSetlistSelection(id) },
+                                    onSelectAll: selectAllSetlist,
+                                    onClearSelection: { setlistSelected.removeAll() },
+                                    onBatchRemove: removeSelectedFromSetlist,
+                                    onDuplicate: { s in duplicateSong(s) }
+                                )
+                                .padding(.top, 88)
+                            }
+                        }
+                    )
                 }
-            )
             } else {
             // Debug print removed - was causing console spam on every render
             return AnyView(
@@ -2946,6 +3152,8 @@ internal struct ContentView: View {
                 canRedo: !controlRedoStack.isEmpty,
                 onDelete: { btn in deleteControl(btn); resetControlEditModeTimer() },
                 onMove: { from, to in pushControlUndo(); controlButtons.move(fromOffsets: from, toOffset: to); markDirty(); resetControlEditModeTimer() },
+                onCancelTimer: cancelControlEditModeTimer,
+                onResetTimer: resetControlEditModeTimer,
                 usbServer: usbServer,
                 wifiClient: wifiClient,
                 connectionCoordinator: connectionCoordinator,
@@ -3173,10 +3381,12 @@ internal struct ContentView: View {
                         })
                         sideMenuButton("Import...", icon: "arrow.down.doc", action: {
                             if isEditing { isEditing = false }
+                            openDocumentPicker()
                             closeMenu()
                         })
                         sideMenuButton("Export...", icon: "square.and.arrow.up", action: {
                             if isEditing { isEditing = false }
+                            exportCurrentProject()
                             closeMenu()
                         })
                     }
@@ -3361,8 +3571,11 @@ internal struct ContentView: View {
 
     private var bottomSectionView: some View {
         VStack(spacing: 0) {
-            // Always show control area - it handles its own edit mode internally
-            AnyView(controlSectionView)
+            // Hide control area completely when in cue list edit mode
+            if !isEditing {
+                AnyView(controlSectionView)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
     }
 
@@ -4633,14 +4846,22 @@ internal struct ContentView: View {
     private func performDeleteFromLibrary(_ s: Song) {
         pushSetlistUndo()
         pushLibraryUndo()
-        
+
+        // Convert any alias cues pointing to this song into regular cues
+        for i in 0..<store.setlist.songs.count {
+            if store.setlist.songs[i].aliasedCueID == s.id {
+                store.setlist.songs[i].aliasedCueID = nil
+                debugPrint("🔄 Converted alias cue '\(store.setlist.songs[i].name)' to regular cue (original deleted)")
+            }
+        }
+
         // Remove from both library and cue list
         songLibrary.removeAll { $0.id == s.id }
         store.setlist.songs.removeAll { $0.id == s.id }
         libAddedAt[s.id] = nil
         invalidateConflictCache()
         isDirty = true
-        
+
         UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
     }
 
@@ -5327,47 +5548,38 @@ private struct CBTopBar: View {
     var onShowAbout: () -> Void = {}
 
     var body: some View {
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+
         HStack(spacing: 0) {
             // LEFT CAPSULE: Menu button + Project Name
-            HStack(spacing: 12) {
-                mainMenuButton
-                projectNameButton
+            // iPhone: Hide when in edit mode
+            if !(isPhone && isEditing) {
+                HStack(spacing: 8) {
+                    mainMenuButton
+                    projectNameButton
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.regularMaterial)
+                .background(titleBarColor.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .padding(.leading, 16)
+                .transition(.move(edge: .leading).combined(with: .opacity))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
-            .background(titleBarColor.opacity(0.3))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-            .padding(.leading, 16)
 
             Spacer()
 
-            // RIGHT CAPSULE: Context-dependent controls
-            Group {
-                if isEditing {
-                    editModeControls
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .trailing).combined(with: .opacity)
-                        ))
-                        .id("editMode")
-                } else {
-                    performanceModeControls
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .trailing).combined(with: .opacity)
-                        ))
-                        .id("performanceMode")
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
-            .background(titleBarColor.opacity(0.3))
+            // RIGHT CAPSULE: Unified controls that morph between states
+            rightCapsuleControls
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.regularMaterial)
+            .background(titleBarColor.opacity(0.5))
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
             .padding(.trailing, 16)
+            .padding(.leading, isPhone && isEditing ? 16 : 0)  // iPhone edit mode: expand to left edge
             .offset(x: showSideMenu ? 300 : 0)
             .animation(.easeInOut(duration: 0.3), value: showSideMenu)
         }
@@ -5380,6 +5592,8 @@ private struct CBTopBar: View {
             Text(projectTitle)
                 .font(themeFont(17, .semibold))  // Use theme font (headline equivalent size)
                 .foregroundStyle(textColor)
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .buttonStyle(.plain)
     }
@@ -5393,8 +5607,90 @@ private struct CBTopBar: View {
         .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
     }
 
+    // Unified right capsule that morphs between performance and edit modes
+    private var rightCapsuleControls: some View {
+        return HStack(spacing: 12) {
+            // Connections button (hide when editing)
+            if !isEditing {
+                Button(action: onConnections) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .imageScale(.large)
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(connectionTint)
+                            .scaleEffect(connectionCoordinator.activeConnection == .none ? 1.0 : 1.0)
+                            .animation(
+                                connectionCoordinator.activeConnection == .none
+                                    ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
+                                    : .default,
+                                value: connectionCoordinator.activeConnection
+                            )
+
+                        // Show connection type chip when connected
+                        if connectionCoordinator.activeConnection == .usb {
+                            Text("USB")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.green)
+                                .clipShape(Capsule())
+                        } else if connectionCoordinator.activeConnection == .wifi {
+                            Text("WiFi")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.blue)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: connectionTint))
+                .transition(.opacity.combined(with: .scale))
+            }
+
+            // Edit mode controls (show when editing)
+            if isEditing {
+                Button(action: onUndo) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .imageScale(.large)
+                }
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                .disabled(!canUndo)
+                .transition(.opacity.combined(with: .scale))
+
+                Button(action: onRedo) {
+                    Image(systemName: "arrow.uturn.forward")
+                        .imageScale(.large)
+                }
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                .disabled(!canRedo)
+                .transition(.opacity.combined(with: .scale))
+
+                Button(action: onAdd) {
+                    Image(systemName: "plus")
+                        .imageScale(.large)
+                }
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                .transition(.opacity.combined(with: .scale))
+            }
+
+            // Edit/Done button (morphs between states)
+            if isEditing {
+                Button("Done", action: onEditToggle)
+                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                    .transition(.opacity.combined(with: .scale))
+            } else {
+                Button("Edit", action: onEditToggle)
+                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                    .transition(.opacity.combined(with: .scale))
+            }
+        }
+    }
+
     private var performanceModeControls: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 12) {
             // Connections button
             Button(action: onConnections) {
                 HStack(spacing: 8) {
@@ -5438,8 +5734,73 @@ private struct CBTopBar: View {
         }
     }
 
+    // iPhone only: Combined controls for edit mode (connections + edit actions)
+    private var combinedEditModeControls: some View {
+        HStack(spacing: 12) {
+            // Connections button
+            Button(action: onConnections) {
+                HStack(spacing: 8) {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .imageScale(.large)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(connectionTint)
+                        .scaleEffect(connectionCoordinator.activeConnection == .none ? 1.0 : 1.0)
+                        .animation(
+                            connectionCoordinator.activeConnection == .none
+                                ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
+                                : .default,
+                            value: connectionCoordinator.activeConnection
+                        )
+
+                    // Show connection type chip when connected
+                    if connectionCoordinator.activeConnection == .usb {
+                        Text("USB")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.green)
+                            .clipShape(Capsule())
+                    } else if connectionCoordinator.activeConnection == .wifi {
+                        Text("WiFi")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.blue)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: connectionTint))
+
+            Button(action: onUndo) {
+                Image(systemName: "arrow.uturn.backward")
+                    .imageScale(.large)
+            }
+            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+            .disabled(!canUndo)
+
+            Button(action: onRedo) {
+                Image(systemName: "arrow.uturn.forward")
+                    .imageScale(.large)
+            }
+            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+            .disabled(!canRedo)
+
+            Button(action: onAdd) {
+                Image(systemName: "plus")
+                    .imageScale(.large)
+            }
+            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+
+            Button("Done", action: onEditToggle)
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+        }
+    }
+
     private var editModeControls: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 12) {
             Button(action: onUndo) {
                 Image(systemName: "arrow.uturn.backward")
                     .imageScale(.large)
@@ -5602,6 +5963,8 @@ private struct CBControlSection: View {
     var canRedo: Bool = false
     var onDelete: (ControlButton) -> Void
     var onMove: (IndexSet, Int) -> Void
+    var onCancelTimer: () -> Void  // Called to cancel edit mode timer
+    var onResetTimer: () -> Void  // Called to reset edit mode timer
     var usbServer: ConnectionManager
     var wifiClient: BridgeOutput
     var connectionCoordinator: ConnectionCoordinator
@@ -5639,6 +6002,9 @@ private struct CBControlSection: View {
     @State private var displacementCache: [UUID: (col: Int, row: Int)] = [:]
     @State private var displacementCacheKey: String = ""
     @State private var hasInvalidDisplacement: Bool = false
+
+    // iPhone 3-dot menu for adding controls
+    @State private var showControlAddMenu: Bool = false
 
     // Pixel snapping to prevent jitter (from cue capsule success)
     private func snap(_ value: CGFloat) -> CGFloat {
@@ -5692,9 +6058,15 @@ private struct CBControlSection: View {
 
     // Grid configuration (same as Mac editor)
     private let columns = 8
-    private let columnSpacing: CGFloat = 12
-    private let rowSpacing: CGFloat = 10
-    private let gridPadding: CGFloat = 20
+    private var columnSpacing: CGFloat {
+        UIDevice.current.userInterfaceIdiom == .phone ? 10 : 12
+    }
+    private var rowSpacing: CGFloat {
+        UIDevice.current.userInterfaceIdiom == .phone ? 10 : 10
+    }
+    private var gridPadding: CGFloat {
+        UIDevice.current.userInterfaceIdiom == .phone ? 8 : 20
+    }
     
     private var canAddMoreControlsGlobal: Bool {
         // Check if there's space for either a button (2x1) or fader (1x2)
@@ -5750,13 +6122,14 @@ private struct CBControlSection: View {
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: effectivelyCollapsed)
 
                 // Collapsed header (fades in when collapsed) - use same styling as main header for consistency
-                HStack {
+                HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
                     Text("Control Area")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(textColor)
-                Spacer()
-                    // Allow entering edit mode even when collapsed/empty
+                    Spacer()
+
+                    // Collapsed mode always shows: Edit + Chevron (iPhone and iPad)
                     Button(isEditing ? "Done" : "Edit") {
                         withAnimation(.easeInOut) {
                             isEditing.toggle()
@@ -5772,6 +6145,7 @@ private struct CBControlSection: View {
                     }
                     .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                     .controlSize(.small)
+
                     // Expand button (only show when collapsed and has buttons)
                     if !buttons.isEmpty {
                         Button(action: {
@@ -5787,9 +6161,10 @@ private struct CBControlSection: View {
                         .controlSize(.small)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 4)
+                .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .phone ? 8 : 16)
+                .padding(.top, UIDevice.current.userInterfaceIdiom == .phone ? 6 : 12)
+                .padding(.bottom, UIDevice.current.userInterfaceIdiom == .phone ? 6 : 4)
+                .frame(height: UIDevice.current.userInterfaceIdiom == .phone ? 44 : nil)  // Fixed height on iPhone
                 .opacity(effectivelyCollapsed ? 1 : 0)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: effectivelyCollapsed)
             }
@@ -5818,39 +6193,125 @@ private struct CBControlSection: View {
     }
     
     private var mainHeader: some View {
-        HStack(spacing: 10) {
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+
+        return HStack(spacing: isPhone ? 6 : 10) {
             Text("Control Area").font(.subheadline).fontWeight(.medium).foregroundColor(textColor)
-                Spacer()
-            if !isCollapsed {
-                // Show edit buttons only when expanded - use opacity for smooth transitions
-                HStack(spacing: 6) {
-                    Button(action: onUndo) { Image(systemName: "arrow.uturn.backward") }
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+            Spacer()
+
+            if isPhone {
+                // iPhone: Compact button layout
+                if !isCollapsed {
+                    if isEditing {
+                        // Edit mode: Chevron, Done, Redo, Undo, More (right to left order)
+                        HStack(spacing: 6) {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    isCollapsed.toggle()
+                                }
+                            }) {
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                             .controlSize(.small)
-                        .disabled(!canUndo)
-                    Button(action: onRedo) { Image(systemName: "arrow.uturn.forward") }
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+
+                            Button("Done") {
+                                withAnimation(.easeInOut) {
+                                    isEditing = false
+                                    clearDragState(reason: "done button")
+                                }
+                            }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                             .controlSize(.small)
-                        .disabled(!canRedo)
-                        // Two explicit add buttons
-                        Button("+ Button") { onAddButton() }
-                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                        .controlSize(.small)
-                        .disabled(!canAddMoreControls)
-                        Button("+ Fader") { onAddFader() }
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                        .controlSize(.small)
-                    .disabled(!canAddFader)
+
+                            Button(action: onRedo) {
+                                Image(systemName: "arrow.uturn.forward")
+                            }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                            .controlSize(.small)
+                            .disabled(!canRedo)
+
+                            Button(action: onUndo) {
+                                Image(systemName: "arrow.uturn.backward")
+                            }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                            .controlSize(.small)
+                            .disabled(!canUndo)
+
+                            Button(action: { showControlAddMenu = true }) {
+                                Image(systemName: "ellipsis")
+                            }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                            .controlSize(.small)
+                            .confirmationDialog("Add Control", isPresented: $showControlAddMenu) {
+                                Button("+ Button") {
+                                    onAddButton()
+                                }
+                                .disabled(!canAddMoreControls)
+                                Button("+ Fader") {
+                                    onAddFader()
+                                }
+                                .disabled(!canAddFader)
+                                Button("Cancel", role: .cancel) {}
+                            }
+                        }
+                    } else {
+                        // Not editing: Edit, Chevron
+                        HStack(spacing: 6) {
+                            Button("Edit") {
+                                withAnimation(.easeInOut) {
+                                    isEditing = true
+                                    editSessionNonce &+= 1
+                                    clearDragState(reason: "edit button")
+                                }
+                            }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                            .controlSize(.small)
+
+                            if !buttons.isEmpty {
+                                Button(action: {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        isCollapsed.toggle()
+                                    }
+                                }) {
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 14, weight: .medium))
+                                }
+                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                                .controlSize(.small)
+                            }
+                        }
+                    }
                 }
-                .opacity(isEditing ? 1 : 0)
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
-            }
-                // Always show Edit/Done button - use accent color when collapsed
+            } else {
+                // iPad: Original button layout
+                if !isCollapsed {
+                    HStack(spacing: 6) {
+                        Button(action: onUndo) { Image(systemName: "arrow.uturn.backward") }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                            .controlSize(.small)
+                            .disabled(!canUndo)
+                        Button(action: onRedo) { Image(systemName: "arrow.uturn.forward") }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                            .controlSize(.small)
+                            .disabled(!canRedo)
+                        Button("+ Button") { onAddButton() }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                            .controlSize(.small)
+                            .disabled(!canAddMoreControls)
+                        Button("+ Fader") { onAddFader() }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                            .controlSize(.small)
+                            .disabled(!canAddFader)
+                    }
+                    .opacity(isEditing ? 1 : 0)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
+                }
+
                 Button(isEditing ? "Done" : "Edit") {
-                    debugPrint("🎛️ Edit button tapped, current isEditing: \(isEditing)")
                     withAnimation(.easeInOut) {
                         isEditing.toggle()
-                        debugPrint("🎛️ Edit mode changed to: \(isEditing)")
                         if !isEditing {
                             clearDragState(reason: "main edit button - exiting edit mode")
                         } else {
@@ -5860,7 +6321,7 @@ private struct CBControlSection: View {
                     }
                 }
                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: effectivelyCollapsed ? defaultCueColor : standardButtonColor))
-                // Collapse/Expand button (only show when not collapsed and has buttons) - use accent color when collapsed
+
                 if !buttons.isEmpty {
                     Button(action: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -5869,15 +6330,17 @@ private struct CBControlSection: View {
                     }) {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 14, weight: .medium))
-                            .frame(minWidth: 28)  // Make it square
+                            .frame(minWidth: 28)
                     }
                     .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: effectivelyCollapsed ? defaultCueColor : standardButtonColor))
                     .controlSize(.small)
                 }
             }
-            .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
+        }
+        .padding(.horizontal, isPhone ? 8 : 16)
+        .padding(.top, isPhone ? 6 : 12)
+        .padding(.bottom, isPhone ? 6 : 4)
+        .frame(height: isPhone ? 44 : nil)  // Fixed height on iPhone to prevent title bar from growing
     }
     
 
@@ -5898,6 +6361,7 @@ private struct CBControlSection: View {
                     }
             }
             .id("ctrl-geo-\(isEditing)-sess-\(editSessionNonce)")
+            .frame(maxWidth: .infinity)  // Ensure full width
             .frame(height: effectivelyCollapsed ? 0 : calculateDynamicHeight())  // Animate height to 0
             .animation(.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0.05), value: cachedHeight)
             .animation(.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0.05), value: isEditing)
@@ -5982,6 +6446,15 @@ private struct CBControlSection: View {
                 }
                 .onChange(of: dragging) { _, newValue in
                     debugPrint("🔄 dragging state changed → \(newValue?.title ?? "nil")")
+
+                    if newValue != nil {
+                        // Dragging started - cancel timer to keep edit mode active
+                        onCancelTimer()
+                    } else {
+                        // Dragging ended - reset timer
+                        onResetTimer()
+                    }
+
                     // If dragging ended without going through performDrop, clean up state
                     if newValue == nil {
                         isDragOperation = false
@@ -6047,12 +6520,15 @@ private struct CBControlSection: View {
         let defaultWidth: CGFloat = isLandscape ? 1200 : 800
         let width: CGFloat = proxy?.size.width ?? screenWidth ?? defaultWidth
         let totalSpacing = CGFloat(columns - 1) * columnSpacing
-        let availableWidth = width - (2 * gridPadding) - totalSpacing
+        // iPhone uses columnSpacing for horizontal padding, iPad uses gridPadding
+        let actualHorizontalPadding = UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
+        let availableWidth = width - (2 * actualHorizontalPadding) - totalSpacing
         let cellSize = floor(availableWidth / CGFloat(columns))
-        
-        // Ensure minimum cell size in landscape to prevent cutoff
+
+        // Ensure minimum cell size in landscape to prevent cutoff (iPad only)
         let minCellSize: CGFloat = isLandscape ? 80 : 60
-        let adjustedCellSize = max(cellSize, minCellSize)
+        let shouldApplyMinSize = UIDevice.current.userInterfaceIdiom != .phone  // Only apply on iPad
+        let adjustedCellSize = shouldApplyMinSize ? max(cellSize, minCellSize) : cellSize
         
         // Determine rows based on mode and orientation
         let rows: Int
@@ -6078,10 +6554,18 @@ private struct CBControlSection: View {
         // Convert rows to pixels
         let verticalGaps = max(0, rows - 1)
         let gridHeight = CGFloat(rows) * adjustedCellSize + CGFloat(verticalGaps) * rowSpacing
-        
+
         // Add extra padding in landscape to prevent cutoff and provide breathing room
         let extraPadding: CGFloat = isLandscape ? 30 : 0
-        let finalHeight = gridHeight + (2 * gridPadding) + extraPadding
+        // iPhone uses different vertical padding: top=16, bottom=16 (total 32)
+        // iPad uses gridPadding for both top and bottom
+        let actualVerticalPadding: CGFloat
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            actualVerticalPadding = 16 + 16  // top + bottom
+        } else {
+            actualVerticalPadding = (gridPadding + 4) + (gridPadding + (isLandscape ? 10 : 0))  // top + bottom (from line 7359-7361)
+        }
+        let finalHeight = gridHeight + actualVerticalPadding + extraPadding
         
         // Removed verbose height calculation logs for cleaner testing
         return finalHeight
@@ -6864,12 +7348,20 @@ private struct CBControlSection: View {
     // Helper function to build individual control tile (extracted from ForEach for type-checking performance)
     @ViewBuilder
     private func buildControlTileView(button: ControlButton, cellSize: CGFloat, columnSpacing: CGFloat, rowSpacing: CGFloat, conflictFor: [MIDIKey: String], isEditing: Bool, maxRows: Int, usbServer: ConnectionManager, wifiClient: BridgeOutput, connectionCoordinator: ConnectionCoordinator, controlButtons: Binding<[ControlButton]>, markDirty: @escaping () -> Void) -> some View {
-        let width = CGFloat(button.gridWidth) * cellSize + CGFloat(max(0, button.gridWidth - 1)) * columnSpacing
-        let height = CGFloat(button.gridHeight) * cellSize + CGFloat(max(0, button.gridHeight - 1)) * rowSpacing
+        // Calculate button size
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        let totalWidth = CGFloat(button.gridWidth) * cellSize + CGFloat(max(0, button.gridWidth - 1)) * columnSpacing
+        let totalHeight = CGFloat(button.gridHeight) * cellSize + CGFloat(max(0, button.gridHeight - 1)) * rowSpacing
+        // iPhone: buttons fill the full grid space (spacing creates gaps)
+        let width = totalWidth
+        let height = totalHeight
 
         let pos: (col: Int, row: Int) = effectivePosition(for: button, dragging: dragging, preview: previewLocation, columns: columns)
-                let x = CGFloat(pos.col) * (cellSize + columnSpacing)
-                let y = CGFloat(pos.row) * (cellSize + rowSpacing)
+                // iPhone: no offset needed since buttons fill the full space
+                let xBase = CGFloat(pos.col) * (cellSize + columnSpacing)
+                let yBase = CGFloat(pos.row) * (cellSize + rowSpacing)
+                let x = xBase
+                let y = yBase
                 let key = MIDIKey(kind: button.kind, channel: button.channel, number: button.number)
                 let owner = conflictFor[key]
 
@@ -6904,10 +7396,10 @@ private struct CBControlSection: View {
                 .id("\(button.id.uuidString)-\(isEditing)-\(button.colorHex ?? "nil")")
                 .frame(width: width, height: height)
                 .offset(
-                    x: x + (dragging?.id == button.id ? dragTranslation.width : 0), 
+                    x: x + (dragging?.id == button.id ? dragTranslation.width : 0),
                     y: y + (dragging?.id == button.id ? dragTranslation.height : 0)
                 )
-                .scaleEffect(dragging?.id == button.id ? 1.1 : 1.0) // iOS-style scale during drag
+                .scaleEffect((dragging?.id == button.id && !isPhone) ? 1.1 : 1.0) // iPad only: scale during drag
                 // Enable smooth spring animations for buttons moving out of the way (iPhone-like)
                 .animation(
                     dragging?.id == button.id ? nil : .spring(response: 0.35, dampingFraction: 0.75),
@@ -7044,7 +7536,9 @@ private struct CBControlSection: View {
     private func calculateGridParameters(proxy: GeometryProxy) -> (cellSize: CGFloat, displayRows: Int, gridHeight: CGFloat, gridWidth: CGFloat) {
         // Calculate grid dimensions using same logic as height calculation
         let totalSpacing = CGFloat(columns - 1) * columnSpacing
-        let availableWidth = proxy.size.width - (2 * gridPadding) - totalSpacing
+        // Use actual horizontal padding: columnSpacing on iPhone, gridPadding on iPad
+        let actualHorizontalPadding = UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
+        let availableWidth = proxy.size.width - (2 * actualHorizontalPadding) - totalSpacing
         let cellSize = floor(availableWidth / CGFloat(columns))
         
         // Determine rows based on mode and orientation (same as height calculation)
@@ -7052,11 +7546,12 @@ private struct CBControlSection: View {
         
         // Unified approach: Both orientations use dynamic height with 4-row maximum
             if isEditing {
-            // Edit mode: Always show full 4-row editing canvas
+            // Edit mode: Show editing canvas (4 rows for both iPhone and iPad)
             displayRows = 4
         } else {
-            // Non-edit mode: Dynamic based on occupied buttons, capped at 4 rows
+            // Non-edit mode: Dynamic based on occupied buttons
             let visualRows = calculateVisualRows()
+            // 4 rows max for both iPhone and iPad
             displayRows = min(4, max(0, visualRows))
         }
         
@@ -7129,18 +7624,21 @@ private struct CBControlSection: View {
             // Choose shadow color based on whether displacement is valid
             let shadowColor = hasInvalidDisplacement ? Color.red : Color.blue
 
+            // iPhone uses 6px corner radius, iPad uses 12px
+            let cornerRadius: CGFloat = UIDevice.current.userInterfaceIdiom == .phone ? 6 : 12
+
             let previewView = ZStack {
                 // Shadow effect (blue if valid, red if no space available)
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(shadowColor.opacity(0.2))
                     .blur(radius: 8)
                     .scaleEffect(1.1)
 
                 // Main preview shape
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(shadowColor.opacity(0.3))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: cornerRadius)
                             .stroke(shadowColor, lineWidth: 3)
                     )
             }
@@ -7181,7 +7679,12 @@ private struct CBControlSection: View {
             dragPreview
         }
         .id("ctrl-container-\(isCtrlEditing)-sess-\(sessionNonce)-\(buttons.map { "\($0.gridCol ?? -1)-\($0.gridRow ?? -1)-\($0.colorHex ?? "nil")" }.joined(separator: ","))")
-        .padding(EdgeInsets(top: gridPadding + 4, leading: gridPadding, bottom: gridPadding + (verticalSizeClass == .compact ? 10 : 0), trailing: gridPadding))
+        .padding(EdgeInsets(
+            top: UIDevice.current.userInterfaceIdiom == .phone ? 18 : (gridPadding + 4),
+            leading: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding,
+            bottom: UIDevice.current.userInterfaceIdiom == .phone ? 18 : (gridPadding + (verticalSizeClass == .compact ? 10 : 0)),
+            trailing: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
+        ))
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .animation(.easeInOut(duration: 0.3), value: displayRows)
         // .onDrop(of: [], delegate: dropDelegate) // Disabled old drop system in favor of smooth drag
@@ -7217,14 +7720,19 @@ private struct ControlButtonTile: View {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 
+    // iPhone/compact mode detection
+    private var isPhone: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone
+    }
+
     var body: some View {
         let isToggle = button.isToggle ?? false
 
-        // Clear visual distinction between on/off states:
-        // OFF state = control area background color (same as title bar)
-        // ON state = solid, full opacity with theme accent color
-        // Use custom color if button has colorHex, otherwise use custom accent color if set, otherwise use theme default
-        let onColor: Color = {
+        // Determine if button should show as "on" (pressed/active)
+        let isOn = isToggle ? button.toggleState : down
+
+        // Accent color (same for both modes)
+        let accentColor: Color = {
             if let colorHex = button.colorHex {
                 return Color(hex: colorHex)
             } else if !customDefaultCueColorStorage.isEmpty {
@@ -7233,22 +7741,30 @@ private struct ControlButtonTile: View {
                 return selectedTheme.defaultCueColor(for: colorScheme)
             }
         }()
-        let offColor = selectedTheme.titleBarColor(for: colorScheme)
 
-        // Determine if button should show as "on" (pressed/active)
-        let isOn = isToggle ? button.toggleState : down
-
-        // Button color: simple on/off logic
-        let buttonColor: Color = isOn ? onColor : offColor
-
-        // Dynamic text color based on state
-        let textColor: Color = {
-            if isOn {
-                // When on, use contrasting text color for the accent color background
-                return onColor.contrastingTextColor
+        // iPhone mode: Keyboard-style solid buttons
+        // iPad mode: Original stroked style
+        let buttonColor: Color = {
+            if isPhone {
+                // iPhone: Solid buttons like keyboard keys
+                // Background: slightly lighter than control area (darker overall)
+                let controlAreaBg = selectedTheme.titleBarColor(for: colorScheme)
+                let lightenAmount = colorScheme == .dark ? 0.1 : -0.05 // Lighter in dark mode, darker in light mode
+                return controlAreaBg.adjust(brightness: lightenAmount)
             } else {
-                // When off, use theme's primary text color
-                return selectedTheme.primaryTextColor(for: colorScheme)
+                // iPad: Original behavior
+                let offColor = selectedTheme.titleBarColor(for: colorScheme)
+                return isOn ? accentColor : offColor
+            }
+        }()
+
+        let textColor: Color = {
+            if isPhone {
+                // Text: accent color when off, contrasting when on
+                return isOn ? accentColor.contrastingTextColor : accentColor
+            } else {
+                // iPad: Original behavior
+                return isOn ? accentColor.contrastingTextColor : selectedTheme.primaryTextColor(for: colorScheme)
             }
         }()
 
@@ -7256,24 +7772,24 @@ private struct ControlButtonTile: View {
             Button {
                     if isEditing { onEdit() } else { onTap() }
             } label: {
-                VStack(spacing: 6) {
+                VStack(spacing: isPhone ? 2 : 6) {
                         if button.symbol.isEmpty {
                             Text(button.title)
-                                .font(.title3.weight(.semibold))
+                                .font(isPhone ? .caption.weight(.semibold) : .title3.weight(.semibold))
                         } else {
                     Image(systemName: button.symbol)
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(.system(size: isPhone ? 16 : 24, weight: .semibold))
                         .foregroundColor(textColor)
-                    Text(button.title).font(.footnote.weight(.semibold))
+                    Text(button.title).font(isPhone ? .caption2.weight(.semibold) : .footnote.weight(.semibold))
                     Text(midiLabel())
-                        .font(.caption2)
+                        .font(isPhone ? .system(size: 8) : .caption2)
                         .foregroundColor(textColor.opacity(0.9))
                         }
                 }
                 .foregroundColor(textColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: isPhone ? 6 : 14)
                         .fill(buttonColor)
                 )
                     .overlay(alignment: .topLeading) {
@@ -7299,8 +7815,8 @@ private struct ControlButtonTile: View {
             .disabled(takenBy != nil && !isEditing)
             .opacity(1.0)
             .modifier(PressEffectWhenNotEditing(isEditing: isEditing, onChange: { down = true }, onEnd: { down = false }))
-            .scaleEffect((down && !isEditing) ? 0.97 : 1.0)
-            .animation(.spring(response: 0.18, dampingFraction: 0.8), value: down)
+            .scaleEffect((down && !isEditing && !isPhone) ? 0.97 : 1.0)  // iPhone: no scale effect
+            .animation(isPhone ? nil : .spring(response: 0.18, dampingFraction: 0.8), value: down)  // iPhone: no animation
             .modifier(TimeBasedWobbleModifier(wobbleID: wobbleID, wobbleAnimator: wobbleAnimator))
                 .onChange(of: isEditing) { _, editing in
                     if editing { startWobble() } else { stopWobble(); down = false }
@@ -7440,6 +7956,11 @@ private struct ControlButtonTile: View {
             AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
         }
 
+        // iPhone/compact mode detection
+        private var isPhone: Bool {
+            UIDevice.current.userInterfaceIdiom == .phone
+        }
+
         var body: some View {
             let isHorizontal = (button.faderOrientation == "horizontal")
             let direction = button.faderDirection ?? (isHorizontal ? "right" : "up")
@@ -7471,11 +7992,11 @@ private struct ControlButtonTile: View {
 
                         ZStack(alignment: fillAlignment) {
                             // Main fader track background
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: isPhone ? 4 : 10)
                                 .fill(faderColor.opacity(0.3))
 
                             // Fader fill (dynamic based on value) - alignment handles the direction
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: isPhone ? 3 : 8)
                                 .fill(faderColor.opacity(0.6))
                                 .frame(width: w * value)
                                 .padding(3)
@@ -7537,7 +8058,7 @@ private struct ControlButtonTile: View {
 
                         ZStack(alignment: fillAlignment) {
                             // Main fader track background
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: isPhone ? 4 : 10)
                                 .fill(faderColor.opacity(0.3))
 
                             // Fader fill (dynamic based on value) - alignment handles the direction
@@ -8215,7 +8736,12 @@ private struct iPadControlTile: View {
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
-    
+
+    // iPhone/compact mode detection
+    private var isPhone: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone
+    }
+
     // MARK: - iPhone-style wobble implementation (using shared animator)
     private func startWobble() {
         guard isEditing else { return }
@@ -8294,16 +8820,16 @@ private struct iPadControlTile: View {
                     ZStack {
                         Circle()
                             .fill(Color.gray.opacity(0.9))
-                            .frame(width: 30, height: 30)
+                            .frame(width: isPhone ? 20 : 30, height: isPhone ? 20 : 30)  // iPhone: 20pt (like homescreen), iPad: 30pt
                         Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: isPhone ? 10 : 13, weight: .bold))  // iPhone: smaller X
                             .foregroundColor(Color(uiColor: .systemBackground))
                     }
                 }
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
-                .frame(width: 70, height: 70)
-                .offset(x: -30, y: -30)
+                .frame(width: isPhone ? 44 : 70, height: isPhone ? 44 : 70)  // iPhone: smaller hit area
+                .offset(x: isPhone ? -10 : -30, y: isPhone ? -10 : -30)  // iPhone: position at corner, half sticking out
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
@@ -8313,9 +8839,12 @@ private struct iPadControlTile: View {
             .opacity(isDragging ? (button.isFader == true ? 0.8 : 0.5) : 1.0)
             // .modifier(ConditionalDragModifier(isEditing: isEditing, onDrag: onDrag, buttonTitle: button.title)) // Disabled in favor of smooth drag
             .allowsHitTesting(isEditing ? true : true)
-        .modifier(TimeBasedWobbleModifier(wobbleID: wobbleID, wobbleAnimator: wobbleAnimator))
+        .modifier(ConditionalWobbleModifier(isPhone: isPhone, wobbleID: wobbleID, wobbleAnimator: wobbleAnimator))
         .onChange(of: isEditing) { _, editing in
-            if editing { startWobble() } else { stopWobble() }
+            if !isPhone {
+                // Only wobble on iPad
+                if editing { startWobble() } else { stopWobble() }
+            }
         }
         .onAppear {
             // Initialize fader value from stored value in ControlButton model
@@ -8330,7 +8859,8 @@ private struct iPadControlTile: View {
                 faderVisualValue = defaultValue
                 debugPrint("🎚️ iPadControlTile: Initialized fader \"\(button.title)\" with default value: \(defaultValue)")
             }
-            if isEditing { startWobble() }
+            // Only start wobble on iPad (iPhone never wobbles)
+            if isEditing && !isPhone { startWobble() }
 
             // FIX #1: Setup notification subscription using Combine to prevent memory leak
             faderUpdateCancellable = NotificationCenter.default.publisher(for: Notification.Name("cbUpdateFaderFromDAW"))
@@ -8386,6 +8916,18 @@ private struct iPadControlTile: View {
 
     // Computed property for button text color based on toggle state
     private var buttonTextColor: Color {
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+
+        // iPad toggle buttons: don't flash, only show toggle state
+        if !isPhone && button.isToggle == true {
+            if button.toggleState {
+                return customButtonColor // Custom color for toggle ON
+            } else {
+                return .primary // Default text color
+            }
+        }
+
+        // Regular buttons or iPhone: show press flash
         if isPressed {
             return Color(uiColor: .systemBackground)
         } else if button.isToggle == true && button.toggleState {
@@ -8397,6 +8939,18 @@ private struct iPadControlTile: View {
 
     // Computed property for icon color based on button state
     private var buttonIconColor: Color {
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+
+        // iPad toggle buttons: don't flash, only show toggle state
+        if !isPhone && button.isToggle == true {
+            if button.toggleState {
+                return selectedTheme.accentColor(for: colorScheme) // White when toggled ON
+            } else {
+                return customButtonColor // Custom color when unpressed
+            }
+        }
+
+        // Regular buttons or iPhone: show press flash
         if isPressed {
             return selectedTheme.accentColor(for: colorScheme) // White when pressed
         } else if button.isToggle == true && button.toggleState {
@@ -8405,59 +8959,121 @@ private struct iPadControlTile: View {
             return customButtonColor // Custom color when unpressed
         }
     }
-    
+
+    // iPhone-specific background color (keyboard-style solid buttons)
+    private var phoneButtonBackgroundColor: Color {
+        if isPressed || (button.isToggle == true && button.toggleState) {
+            // When pressed/toggled: background is accent color
+            return customButtonColor
+        } else {
+            // When off: background is lightened titleBarColor
+            let controlAreaBg = selectedTheme.titleBarColor(for: colorScheme)
+            let lightenAmount = colorScheme == .dark ? 0.1 : -0.05
+            return controlAreaBg.adjust(brightness: lightenAmount)
+        }
+    }
+
+    // iPhone-specific text color (accent color when off, contrasting when on)
+    private var phoneButtonTextColor: Color {
+        if isPressed || (button.isToggle == true && button.toggleState) {
+            // When pressed/toggled: text is contrasting color
+            return customButtonColor.contrastingTextColor
+        } else {
+            // When off: text is accent color
+            return customButtonColor
+        }
+    }
+
     @ViewBuilder
     private func ButtonTileContent() -> some View {
-        VStack(spacing: 6) {
-                if button.symbol.isEmpty {
+        Group {
+            if button.symbol.isEmpty {
+                // Text only
+                VStack(spacing: isPhone ? 2 : 6) {
+                    if !isPhone {
+                        Spacer(minLength: 0)
+                    }
                     Text(button.title)
-                        .font(.title3.weight(.semibold))
+                        .font(isPhone ? .system(size: 11, weight: .semibold) : .title3.weight(.semibold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
                     if showMIDIData {
                         Text(midiLabel())
-                            .font(.caption2)
+                            .font(isPhone ? .system(size: 7) : .caption2)
                             .foregroundColor(.secondary)
                     }
-                } else if button.title.isEmpty {
-                    // Icon only - center it vertically with MIDI label at bottom
-                    VStack {
-                        Spacer()
-                        Image(systemName: button.symbol)
-                            .font(.system(size: 32, weight: .semibold))
-                            .foregroundColor(buttonIconColor)
-                        Spacer()
-                        if showMIDIData {
-                            Text(midiLabel())
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .padding(.bottom, 4)
-                        }
-                    }
-                } else {
-                    // Icon + text
-                    Image(systemName: button.symbol)
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(buttonIconColor)
-                    Text(button.title).font(.footnote.weight(.semibold))
-                    if showMIDIData {
-                        Text(midiLabel())
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                    if !isPhone {
+                        Spacer(minLength: 0)
                     }
                 }
+            } else if button.title.isEmpty {
+                // Icon only - center it vertically (no outer VStack to avoid layout issues)
+                if showMIDIData {
+                    // With MIDI label: use VStack with proper spacing
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        Image(systemName: button.symbol)
+                            .font(.system(size: isPhone ? 16 : 32, weight: .semibold))
+                            .foregroundColor(buttonIconColor)
+                        Spacer(minLength: 0)
+                        Text(midiLabel())
+                            .font(isPhone ? .system(size: 7) : .caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, isPhone ? 2 : 4)
+                    }
+                } else {
+                    // Without MIDI label: perfectly center the icon
+                    Image(systemName: button.symbol)
+                        .font(.system(size: isPhone ? 16 : 32, weight: .semibold))
+                        .foregroundColor(buttonIconColor)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else {
+                // Icon + text
+                VStack(spacing: isPhone ? 2 : 6) {
+                    if !isPhone {
+                        Spacer(minLength: 0)
+                    }
+                    Image(systemName: button.symbol)
+                        .font(.system(size: isPhone ? 14 : 24, weight: .semibold))
+                        .foregroundColor(buttonIconColor)
+                    Text(button.title)
+                        .font(isPhone ? .system(size: 9, weight: .semibold) : .footnote.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    if showMIDIData {
+                        Text(midiLabel())
+                            .font(isPhone ? .system(size: 7) : .caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    if !isPhone {
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
         }
-        .foregroundColor(buttonTextColor)
+        .foregroundColor(isPhone ? phoneButtonTextColor : buttonTextColor)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(customButtonColor, lineWidth: 2)
-                .background(
+            Group {
+                if isPhone {
+                    // iPhone: Solid keyboard-style buttons, no stroke
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(phoneButtonBackgroundColor)
+                } else {
+                    // iPad: Original stroked design
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(buttonBackgroundColor)
-                )
+                        .stroke(customButtonColor, lineWidth: 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(buttonBackgroundColor)
+                        )
+                }
+            }
         )
-            .scaleEffect(isTouching ? 1.02 : 1.0)
-            .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
-            .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
+            .scaleEffect(isPhone ? 1.0 : (isTouching ? 1.02 : 1.0))  // iPhone: no scale effects
+            .animation(isPhone ? nil : .spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
+            .animation(isPhone ? nil : .spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
     }
     
     @ViewBuilder
@@ -8478,16 +9094,23 @@ private struct iPadControlTile: View {
 
                 ZStack(alignment: fillAlignment) {
                     // Main fader track background
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(selectedTheme.titleBarColor(for: colorScheme))
-                        .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(customButtonColor, lineWidth: 2)
-                        )
+                    if isPhone {
+                        // iPhone: Solid background, no stroke
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(phoneButtonBackgroundColor)
+                    } else {
+                        // iPad: Original stroked design
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(selectedTheme.titleBarColor(for: colorScheme))
+                            .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(customButtonColor, lineWidth: 2)
+                            )
+                    }
 
                     // Fader fill (dynamic based on faderValue) - alignment handles the direction
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(customButtonColor.opacity(0.2))
+                    RoundedRectangle(cornerRadius: isPhone ? 3 : 8)
+                        .fill(customButtonColor.opacity(isPhone ? 0.5 : 0.2))
                         .frame(width: w * faderVisualValue)
                         .padding(3)
 
@@ -8553,17 +9176,17 @@ private struct iPadControlTile: View {
                 // Title overlay - centered
                 HStack {
                     Text(button.title)
-                        .font(.caption.weight(.semibold))
+                        .font(isPhone ? .system(size: 9, weight: .semibold) : .caption.weight(.semibold))
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.center)
-                        .padding(.leading, 4)
+                        .padding(.leading, isPhone ? 2 : 4)
                     Spacer()
                     if showMIDIData {
                         Text(midiLabel())
-                            .font(.caption2)
+                            .font(isPhone ? .system(size: 7) : .caption2)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
-                            .padding(.trailing, 4)
+                            .padding(.trailing, isPhone ? 2 : 4)
                     }
                 }
                 .frame(maxHeight: .infinity, alignment: .center)
@@ -8580,16 +9203,23 @@ private struct iPadControlTile: View {
 
                 ZStack(alignment: fillAlignment) {
                     // Main fader track background
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(selectedTheme.titleBarColor(for: colorScheme))
-                        .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(customButtonColor, lineWidth: 2)
-                        )
+                    if isPhone {
+                        // iPhone: Solid background, no stroke
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(phoneButtonBackgroundColor)
+                    } else {
+                        // iPad: Original stroked design
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(selectedTheme.titleBarColor(for: colorScheme))
+                            .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(customButtonColor, lineWidth: 2)
+                            )
+                    }
 
                     // Fader fill (dynamic based on faderValue) - alignment handles the direction
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(customButtonColor.opacity(0.2))
+                    RoundedRectangle(cornerRadius: isPhone ? 3 : 8)
+                        .fill(customButtonColor.opacity(isPhone ? 0.5 : 0.2))
                             .frame(height: h * faderVisualValue)
                         .padding(3)
 
@@ -8655,17 +9285,17 @@ private struct iPadControlTile: View {
                 // Title overlay - centered
                 VStack {
                     Text(button.title)
-                        .font(.caption.weight(.semibold))
+                        .font(isPhone ? .system(size: 9, weight: .semibold) : .caption.weight(.semibold))
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.center)
-                        .padding(.top, 4)
+                        .padding(.top, isPhone ? 2 : 4)
                     Spacer()
                     if showMIDIData {
                         Text(midiLabel())
-                            .font(.caption2)
+                            .font(isPhone ? .system(size: 7) : .caption2)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
-                            .padding(.bottom, 4)
+                            .padding(.bottom, isPhone ? 2 : 4)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -8685,9 +9315,9 @@ private struct iPadControlTile: View {
                 }
             }
         )
-        .scaleEffect(isTouching ? 1.02 : 1.0)
-        .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
-        .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
+        .scaleEffect(isPhone ? 1.0 : (isTouching ? 1.02 : 1.0))
+        .animation(isPhone ? nil : .spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
+        .animation(isPhone ? nil : .spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
     }
 
     private func midiLabel() -> String {

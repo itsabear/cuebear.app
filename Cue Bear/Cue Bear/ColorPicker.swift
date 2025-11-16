@@ -215,4 +215,18 @@ extension Color {
         // If luminance is greater than 0.5, use dark text, otherwise use white text
         return luminance > 0.5 ? .black : .white
     }
+
+    // Adjust brightness by a percentage (-1.0 to 1.0)
+    func adjust(brightness delta: Double) -> Color {
+        guard let components = UIColor(self).cgColor.components, components.count >= 3 else {
+            return self
+        }
+
+        let r = max(0, min(1, components[0] + delta))
+        let g = max(0, min(1, components[1] + delta))
+        let b = max(0, min(1, components[2] + delta))
+        let a = components.count >= 4 ? components[3] : 1.0
+
+        return Color(.sRGB, red: r, green: g, blue: b, opacity: a)
+    }
 }

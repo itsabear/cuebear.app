@@ -141,7 +141,14 @@ struct AboutSheet: View {
         return Button(action: {
             // Trigger a test crash to verify crash reporting
             CrashReporter.shared.markCrashOccurred()
-            fatalError("🧪 TEST CRASH: This is a test crash to verify crash reporting works")
+
+            // Use a slight delay to ensure UI state is properly saved before termination
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // Terminate the app to simulate a crash
+                // In debug mode, actual crashes (like force-unwrap nil) freeze the app
+                // exit(1) cleanly terminates the app, allowing crash detection on next launch
+                exit(1)
+            }
         }) {
             HStack {
                 Image(systemName: "exclamationmark.triangle.fill")

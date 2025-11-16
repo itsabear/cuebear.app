@@ -51,6 +51,27 @@ struct CBPerformanceList: View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: true) {
                 LazyVStack(spacing: 12) {
+                    // Empty state when no cues exist
+                    if songs.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "music.note.list")
+                                .font(.system(size: 60))
+                                .foregroundColor(.gray.opacity(0.5))
+
+                            Text("You still have no cues in your cue list")
+                                .font(.title3)
+                                .foregroundColor(.gray)
+
+                            Text("To add cues, click the edit button on the top right corner and then + to add your first cue")
+                                .font(.body)
+                                .foregroundColor(.gray.opacity(0.7))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 120)
+                    }
+
                     ForEach(songs) { s in
                     let key = (s.kind == .note)
                         ? MIDIKey(kind: .note, channel: s.channel, number: s.note ?? 0)
@@ -209,7 +230,7 @@ struct CBPerformanceRow: View {
         ZStack(alignment: .center) {
             RoundedRectangle(cornerRadius: corner)
                 .fill(baseColor)
-                .frame(maxWidth: .infinity, minHeight: isCued ? cueHeight * 1.2 : cueHeight)
+                .frame(maxWidth: .infinity, minHeight: isCued ? cueHeight * 1.4 : cueHeight)
                 .opacity(isCued ? 1.0 : 0.90)  // Always use normal opacity, regardless of conflicts
                 .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
 
@@ -217,7 +238,7 @@ struct CBPerformanceRow: View {
                 // Play icon - show on chosen cue or last played cue
                 if isCued || isLastPlayed {
                     Image(systemName: "play.fill")
-                        .font(.system(size: (isCued ? 28 : 24) * fontSize, weight: .bold))
+                        .font(.system(size: 24 * fontSize, weight: .bold))
                         .foregroundColor(adaptiveTextColor)
                         .opacity(isCued && isCueMode ? playIconOpacity : 1.0)  // Blink if cued in Cue mode, steady otherwise
                         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)  // Smooth size transition
@@ -226,15 +247,15 @@ struct CBPerformanceRow: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
+                    HStack(alignment: .center, spacing: 6) {
                         // Show shortcut icon for alias cues
                         if song.aliasedCueID != nil {
                             Image(systemName: "arrow.turn.down.right")
-                                .font(.system(size: (isCued ? 18 * 1.2 : 18) * fontSize, weight: .semibold))
+                                .font(.system(size: 18 * fontSize, weight: .semibold))
                                 .foregroundColor(adaptiveTextColor.opacity(0.7))
                         }
                         Text(song.name)
-                            .font(themeFont((isCued ? 22 * 1.2 : 22) * fontSize, .bold))  // 20% larger text when selected, scaled by fontSize
+                            .font(themeFont(22 * fontSize, .bold))
                             .foregroundColor(adaptiveTextColor)
                             .lineLimit(1)
 
@@ -242,7 +263,7 @@ struct CBPerformanceRow: View {
                         if let aliasedID = song.aliasedCueID {
                             if let originalCue = songLibrary.first(where: { $0.id == aliasedID }) {
                                 Text("Copy of \(originalCue.name)")
-                                    .font(themeFont((isCued ? 14 * 1.2 : 14) * fontSize, .regular))
+                                    .font(themeFont(14 * fontSize, .regular))
                                     .italic()
                                     .foregroundColor(adaptiveTextColor.opacity(0.6))
                                     .lineLimit(1)
@@ -252,7 +273,7 @@ struct CBPerformanceRow: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
                     if let sub = song.subtitle, !sub.isEmpty {
                         Text(sub)
-                            .font(isCued ? themeFont(14 * 1.2 * fontSize, .medium) : themeFont(14 * fontSize, .medium))  // 20% larger subtitle when selected, scaled by fontSize
+                            .font(themeFont(14 * fontSize, .medium))
                             .foregroundColor(adaptiveTextColor.opacity(0.85))
                             .lineLimit(1)
                             .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
@@ -271,7 +292,7 @@ struct CBPerformanceRow: View {
                             }
                         }()
                         Text(subtitle)
-                            .font(isCued ? .caption : .caption2)  // Larger info when selected
+                            .font(.caption2)
                             .foregroundColor(adaptiveTextColor.opacity(0.9))
                             .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
 
@@ -1603,7 +1624,8 @@ struct CBAddEditCueSheet: View {
                             disabled: autoAssign,
                             channel: channel,
                             currentOwnerName: currentOwnerName,
-                            editingControl: nil
+                            editingControl: nil,
+                            editingSong: editingSong
                         )
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
@@ -1868,15 +1890,46 @@ struct CBAddEditCueSheet: View {
     }
 
     private func conflictOwner() -> String? {
-        // If we're editing an existing song and the MIDI assignment hasn't changed, no conflict
-        if let edit = editingSong {
-            let editNumber = (edit.kind == .note) ? (edit.note ?? 60) : edit.cc
-            if edit.kind == kind && edit.channel == channel && editNumber == number {
+        let key = MIDIKey(kind: kind, channel: channel, number: number)
+        guard let ownersString = currentOwnerName(key) else { return nil }
+
+        // Get the cue name to filter out - try editingSong first, then fall back to form name
+        let cueNameToFilter = (editingSong?.name ?? name).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        debugPrint("🔍 [CONFLICT] Checking conflict: ownersString='\(ownersString)', editingSong?.name='\(editingSong?.name ?? "nil")', form name='\(name)', cueNameToFilter='\(cueNameToFilter)'")
+
+        // Normalize strings for comparison (case-insensitive, trimmed)
+        let normalizedOwners = ownersString.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedCueName = cueNameToFilter
+
+        // Filter out this cue's name from the conflict list
+        if !normalizedCueName.isEmpty {
+            if ownersString.contains("|||") {
+                // Multiple owners - split and filter
+                let owners = ownersString.split(separator: "|||")
+                    .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { $0 != normalizedCueName }
+                guard !owners.isEmpty else {
+                    debugPrint("✅ [CONFLICT] All owners filtered out, returning nil")
+                    return nil
+                }
+                debugPrint("⚠️ [CONFLICT] Remaining owners after filter: \(owners)")
+                if owners.count == 1 {
+                    return owners[0]
+                } else if owners.count == 2 {
+                    return "\(owners[0]) and \(owners[1])"
+                } else {
+                    return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+                }
+            } else if normalizedOwners == normalizedCueName {
+                // Single owner and it's this cue itself
+                debugPrint("✅ [CONFLICT] Single owner matches editing cue, returning nil")
                 return nil
             }
         }
-        let key = MIDIKey(kind: kind, channel: channel, number: number)
-        return currentOwnerName(key)
+
+        debugPrint("❌ [CONFLICT] Returning ownersString: '\(ownersString)'")
+        return ownersString
     }
 
     private func ownerFor(kind: MIDIKind, number: Int, channel: Int) -> String? {
@@ -2023,16 +2076,38 @@ struct CBMIDIPickerSheet: View {
 
     private func conflictOwner() -> String? {
         let key = MIDIKey(kind: kind, channel: channel, number: number)
-        guard let ownersString = conflictFor[key] else { return nil }
+        guard let ownersString = currentOwnerName(key) else {
+            debugPrint("🔍 [MIDI PICKER] No owner found for key")
+            return nil
+        }
+
+        debugPrint("🔍 [MIDI PICKER] ownersString='\(ownersString)', editingSongName='\(editingSongName ?? "nil")'")
 
         // Filter out the editing song's name if provided
-        guard let editingName = editingSongName else { return ownersString }
+        guard let editingName = editingSongName else {
+            debugPrint("❌ [MIDI PICKER] No editingSongName provided, returning ownersString")
+            return ownersString
+        }
+
+        // Trim whitespace for comparison
+        let trimmedEditingName = editingName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedOwnersString = ownersString.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        debugPrint("🔍 [MIDI PICKER] Comparing: trimmedOwners='\(trimmedOwnersString)' vs trimmedEditingName='\(trimmedEditingName)'")
+        debugPrint("🔍 [MIDI PICKER] Are they equal? \(trimmedOwnersString == trimmedEditingName)")
 
         // Check if the owners string contains the separator (multiple owners)
         if ownersString.contains("|||") {
+            debugPrint("🔍 [MIDI PICKER] Multiple owners detected")
             // Multiple owners - split and filter
-            let owners = ownersString.split(separator: "|||").map(String.init).filter { $0 != editingName }
-            guard !owners.isEmpty else { return nil }
+            let owners = ownersString.split(separator: "|||")
+                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { $0 != trimmedEditingName }
+            guard !owners.isEmpty else {
+                debugPrint("✅ [MIDI PICKER] All owners filtered, returning nil")
+                return nil
+            }
+            debugPrint("⚠️ [MIDI PICKER] Remaining owners: \(owners)")
             if owners.count == 1 {
                 return owners[0]
             } else if owners.count == 2 {
@@ -2040,11 +2115,13 @@ struct CBMIDIPickerSheet: View {
             } else {
                 return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
             }
-        } else if ownersString == editingName {
-            // Single owner and it's us
+        } else if trimmedOwnersString == trimmedEditingName {
+            // Single owner and it's the editing song
+            debugPrint("✅ [MIDI PICKER] Single owner matches editing song, returning nil")
             return nil
         }
 
+        debugPrint("❌ [MIDI PICKER] No match, returning ownersString: '\(ownersString)'")
         return ownersString
     }
 }
