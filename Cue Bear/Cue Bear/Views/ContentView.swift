@@ -2846,83 +2846,6 @@ internal struct ContentView: View {
                 }
 
                 VStack(spacing: 0) {
-                    // Search and action capsules (only in edit mode)
-                    if isEditing {
-                        HStack(spacing: 12) {
-                            // Search capsule
-                            HStack(spacing: 12) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "magnifyingglass")
-                                        .imageScale(.medium)
-                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-
-                                    TextField("Search cues...", text: $setlistQuery)
-                                        .textFieldStyle(.plain)
-                                        .font(.system(size: 16))
-                                        .foregroundStyle(currentTheme.primaryTextColor(for: colorScheme))
-                                }
-
-                                if !setlistQuery.isEmpty {
-                                    Button(action: { setlistQuery = "" }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .imageScale(.large)
-                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                    }
-                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(.regularMaterial)
-                            .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-
-                            // Select/Reorder capsule
-                            HStack(spacing: 12) {
-                                Button(action: {
-                                    setlistBatchMode.toggle()
-                                    if !setlistBatchMode {
-                                        setlistSelected.removeAll()
-                                    }
-                                    // Turn off reorder when entering select mode
-                                    if setlistBatchMode {
-                                        reorderMode = false
-                                    }
-                                }) {
-                                    Image(systemName: setlistBatchMode ? "xmark" : "checkmark.circle")
-                                        .imageScale(.large)
-                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                }
-                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-
-                                Button(action: {
-                                    reorderMode.toggle()
-                                    // Turn off select when entering reorder mode
-                                    if reorderMode {
-                                        setlistBatchMode = false
-                                        setlistSelected.removeAll()
-                                    }
-                                }) {
-                                    Image(systemName: reorderMode ? "checkmark" : "arrow.up.arrow.down")
-                                        .imageScale(.large)
-                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                }
-                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(.regularMaterial)
-                            .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 88)  // Below hamburger menu
-                        .padding(.bottom, 12)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-
                     CBPerformanceList(
                         songs: store.activeSongs,
                     songLibrary: songLibrary,  // Pass full song library for alias resolution
@@ -3013,22 +2936,109 @@ internal struct ContentView: View {
                         )
                     }
                 }
+                // No background needed - cues and capsules live on same plane
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
                 .overlay(alignment: .top) {
-                    // Gradient from top of screen to make cues fade underneath the top bar
+                    // Gradient at top of screen to fade cues underneath UI elements
                     LinearGradient(
                         gradient: Gradient(colors: [
-                            (colorScheme == .dark ? Color.black : Color.white).opacity(0.5),
-                            (colorScheme == .dark ? Color.black : Color.white).opacity(0.0)
+                            currentTheme.backgroundColor(for: colorScheme).opacity(1.0),
+                            currentTheme.backgroundColor(for: colorScheme).opacity(0.0)
                         ]),
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .frame(maxWidth: .infinity, maxHeight: 150, alignment: .top)  // Extended height to cover top bar area
+                    .frame(maxWidth: .infinity, maxHeight: 200)
                     .ignoresSafeArea(edges: .top)
                     .allowsHitTesting(false)
                 }
-                // No background needed - cues and capsules live on same plane
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
+                .overlay(alignment: .top) {
+                    // Search and action capsules overlay (only in edit mode) - cues scroll underneath
+                    if isEditing {
+                        HStack(spacing: 12) {
+                            // Search capsule - match height of select/reorder
+                            HStack(spacing: 12) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "magnifyingglass")
+                                        .imageScale(.medium)
+                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+
+                                    TextField("Search cues...", text: $setlistQuery)
+                                        .textFieldStyle(.plain)
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(currentTheme.primaryTextColor(for: colorScheme))
+                                }
+
+                                if !setlistQuery.isEmpty {
+                                    Button(action: { setlistQuery = "" }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .imageScale(.large)
+                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    }
+                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                                } else {
+                                    // Invisible spacer button to maintain height when no clear button
+                                    Button(action: {}) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .imageScale(.large)
+                                            .foregroundStyle(.clear)
+                                    }
+                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: .clear, strokeColor: .clear))
+                                    .disabled(true)
+                                    .opacity(0)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.regularMaterial)
+                            .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+
+                            // Select/Reorder capsule
+                            HStack(spacing: 12) {
+                                Button(action: {
+                                    setlistBatchMode.toggle()
+                                    if !setlistBatchMode {
+                                        setlistSelected.removeAll()
+                                    }
+                                    // Turn off reorder when entering select mode
+                                    if setlistBatchMode {
+                                        reorderMode = false
+                                    }
+                                }) {
+                                    Image(systemName: setlistBatchMode ? "xmark" : "checkmark.circle")
+                                        .imageScale(.large)
+                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                }
+                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+
+                                Button(action: {
+                                    reorderMode.toggle()
+                                    // Turn off select when entering reorder mode
+                                    if reorderMode {
+                                        setlistBatchMode = false
+                                        setlistSelected.removeAll()
+                                    }
+                                }) {
+                                    Image(systemName: reorderMode ? "checkmark" : "arrow.up.arrow.down")
+                                        .imageScale(.large)
+                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                }
+                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.regularMaterial)
+                            .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 88)  // Below hamburger menu
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
                     }
                 }
             )
