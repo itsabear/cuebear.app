@@ -53,6 +53,7 @@ struct CBPerformanceList: View {
     @State private var draggedSong: Song? = nil
     @State private var hoveredIndex: Int? = nil
     @State private var isDraggingFromHandle: Bool = false  // Track if drag started from handle
+    @State private var dragOffset: CGSize = .zero  // Track drag translation for visual feedback
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -137,7 +138,8 @@ struct CBPerformanceList: View {
                         )
                         // Apple-style drag animations
                         .opacity(isDragging ? 0.7 : 1.0)  // Dragged item slightly transparent
-                        .scaleEffect(isDragging ? 1.08 : 1.0)  // Dragged item "rises"
+                        .scaleEffect(isDragging ? 1.05 : 1.0)  // Dragged item "rises" - slightly less wide
+                        .offset(isDragging ? dragOffset : .zero)  // Follow finger during drag
                         .shadow(
                             color: isDragging ? Color.black.opacity(0.3) : Color.clear,
                             radius: isDragging ? 12 : 0,
@@ -147,6 +149,7 @@ struct CBPerformanceList: View {
                         .padding(.vertical, isHovered && reorderMode && draggedSong != nil ? 20 : 0)  // Hovered items "make room"
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
                         .animation(.spring(response: 0.15, dampingFraction: 0.8), value: isDragging)  // Faster rise animation
+                        .animation(nil, value: dragOffset)  // Don't animate offset - follow finger directly
                         .overlay(alignment: .top) {
                             // Show preview of dragged cue at drop position (iOS-style)
                             if isHovered && reorderMode && draggedSong != nil, let draggedSong = draggedSong {
@@ -194,6 +197,9 @@ struct CBPerformanceList: View {
                                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                     }
 
+                                    // Update drag offset so cue follows finger
+                                    dragOffset = value.translation
+
                                     // Calculate which index we're hovering over
                                     let cueHeightWithSpacing = CGFloat(cueHeight + 12)
                                     let offset = value.translation.height
@@ -226,6 +232,7 @@ struct CBPerformanceList: View {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                         self.draggedSong = nil
                                         self.hoveredIndex = nil
+                                        self.dragOffset = .zero
                                     }
                                 }
                             : nil
@@ -235,7 +242,7 @@ struct CBPerformanceList: View {
                     Color.clear.frame(height: 8)
                 }
                 .padding(.horizontal, 36)
-                .padding(.top, isEditing ? 130 : 80)  // Slide down in edit mode to below search bar
+                .padding(.top, isEditing ? 145 : 80)  // Slide down in edit mode - further below search bar
                 .padding(.bottom, 12)
                 .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
             }

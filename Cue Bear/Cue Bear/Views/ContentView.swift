@@ -2835,21 +2835,31 @@ internal struct ContentView: View {
             )
     }
 
+    // Filter active songs based on search query
+    private var filteredActiveSongs: [Song] {
+        if setlistQuery.isEmpty {
+            return store.activeSongs
+        }
+        return store.activeSongs.filter { song in
+            song.name.localizedCaseInsensitiveContains(setlistQuery)
+        }
+    }
+
     private func buildMiddleSectionView() -> some View {
         // Debug print removed - was causing console spam on every render
         return AnyView(
             ZStack {
-                // Background - significantly darker in edit mode for focus
+                // Background - much darker in edit mode for focus
                 if isEditing {
                     (colorScheme == .dark
                         ? Color.black
-                        : Color(white: 0.75))
+                        : Color(white: 0.60))
                         .ignoresSafeArea()
                 }
 
                 VStack(spacing: 0) {
                     CBPerformanceList(
-                        songs: store.activeSongs,
+                        songs: filteredActiveSongs,
                     songLibrary: songLibrary,  // Pass full song library for alias resolution
                     isCueMode: store.mode == .cue,
                     cuedID: store.mode == .cue ? store.cuedSong?.id : (store.mode == .regularPlusRemote && !store.activeSongs.isEmpty ? store.activeSongs[currentSongIndex()].id : nil),
@@ -2945,7 +2955,7 @@ internal struct ContentView: View {
                     if isEditing {
                         let editBgColor = colorScheme == .dark
                             ? Color.black
-                            : Color(white: 0.75)
+                            : Color(white: 0.60)
 
                         LinearGradient(
                             gradient: Gradient(colors: [
@@ -3015,8 +3025,8 @@ internal struct ContentView: View {
                                         reorderMode = false
                                     }
                                 }) {
-                                    Image(systemName: setlistBatchMode ? "xmark" : "checkmark.circle")
-                                        .imageScale(.large)
+                                    Image(systemName: setlistBatchMode ? "xmark" : "checkmark")
+                                        .font(.system(size: 20))
                                         .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                 }
                                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
@@ -3031,8 +3041,8 @@ internal struct ContentView: View {
                                         setlistSelected.removeAll()
                                     }
                                 }) {
-                                    Image(systemName: reorderMode ? "checkmark" : "list.bullet.circle")
-                                        .imageScale(.large)
+                                    Image(systemName: reorderMode ? "checkmark" : "list.bullet")
+                                        .font(.system(size: 20))
                                         .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                 }
                                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
@@ -3498,11 +3508,10 @@ internal struct ContentView: View {
 
     private var bottomSectionView: some View {
         VStack(spacing: 0) {
-            // Slide control area down and off-screen when in cue list edit mode
-            AnyView(controlSectionView)
-                .offset(y: isEditing ? 300 : 0)
-                .opacity(isEditing ? 0 : 1)
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
+            // Completely hide control area in cue list edit mode
+            if !isEditing {
+                AnyView(controlSectionView)
+            }
         }
     }
 
