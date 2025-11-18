@@ -3559,12 +3559,13 @@ internal struct ContentView: View {
 
     private var bottomSectionView: some View {
         VStack(spacing: 0) {
-            // Slide control area off screen in cue list edit mode
-            AnyView(controlSectionView)
-                .offset(y: isEditing ? 300 : 0)  // Slide down offscreen
-                .opacity(isEditing ? 0 : 1)  // Fade out
-                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
+            // Hide control area completely in cue list edit mode
+            if !isEditing {
+                AnyView(controlSectionView)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
     }
 
     // MARK: - Control functions
