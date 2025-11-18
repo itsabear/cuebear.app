@@ -3077,8 +3077,8 @@ internal struct ContentView: View {
                                     .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                     .transition(.scale.combined(with: .opacity))
 
-                                    Button("Delete") {
-                                        // Delete all selected cues
+                                    Button("Remove") {
+                                        // Remove all selected cues
                                         pushSetlistUndo()
                                         store.updateActiveSongs { songs in
                                             songs.removeAll(where: { setlistSelected.contains($0.id) })
