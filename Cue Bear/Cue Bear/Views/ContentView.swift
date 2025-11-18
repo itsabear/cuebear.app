@@ -2846,6 +2846,78 @@ internal struct ContentView: View {
                 }
 
                 VStack(spacing: 0) {
+                    // Search and action capsules (only in edit mode)
+                    if isEditing {
+                        HStack(spacing: 8) {
+                            // Search capsule
+                            HStack(spacing: 8) {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.secondary)
+                                    .font(.system(size: 14))
+
+                                TextField("Search cues...", text: $setlistQuery)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 16))
+
+                                if !setlistQuery.isEmpty {
+                                    Button(action: { setlistQuery = "" }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.secondary)
+                                            .font(.system(size: 14))
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(currentTheme.titleBarColor(for: colorScheme))
+                            .cornerRadius(20)
+
+                            // Select/Reorder capsule
+                            HStack(spacing: 0) {
+                                Button(action: {
+                                    setlistBatchMode.toggle()
+                                    if !setlistBatchMode {
+                                        setlistSelected.removeAll()
+                                    }
+                                    // Turn off reorder when entering select mode
+                                    if setlistBatchMode {
+                                        reorderMode = false
+                                    }
+                                }) {
+                                    Text(setlistBatchMode ? "Cancel" : "Select")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 10)
+                                }
+
+                                Divider()
+                                    .frame(height: 20)
+
+                                Button(action: {
+                                    reorderMode.toggle()
+                                    // Turn off select when entering reorder mode
+                                    if reorderMode {
+                                        setlistBatchMode = false
+                                        setlistSelected.removeAll()
+                                    }
+                                }) {
+                                    Text(reorderMode ? "Done" : "Reorder")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 10)
+                                }
+                            }
+                            .background(currentTheme.titleBarColor(for: colorScheme))
+                            .cornerRadius(20)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 88)  // Below hamburger menu
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
                     CBPerformanceList(
                         songs: store.activeSongs,
                     songLibrary: songLibrary,  // Pass full song library for alias resolution
