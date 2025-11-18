@@ -2850,23 +2850,25 @@ internal struct ContentView: View {
                     if isEditing {
                         HStack(spacing: 12) {
                             // Search capsule
-                            HStack(spacing: 8) {
-                                Image(systemName: "magnifyingglass")
-                                    .imageScale(.medium)
-                                    .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                            HStack(spacing: 12) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "magnifyingglass")
+                                        .imageScale(.medium)
+                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
 
-                                TextField("Search cues...", text: $setlistQuery)
-                                    .textFieldStyle(.plain)
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(currentTheme.primaryTextColor(for: colorScheme))
+                                    TextField("Search cues...", text: $setlistQuery)
+                                        .textFieldStyle(.plain)
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(currentTheme.primaryTextColor(for: colorScheme))
+                                }
 
                                 if !setlistQuery.isEmpty {
                                     Button(action: { setlistQuery = "" }) {
                                         Image(systemName: "xmark.circle.fill")
-                                            .imageScale(.small)
+                                            .imageScale(.large)
                                             .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
                                 }
                             }
                             .padding(.horizontal, 12)
@@ -2927,6 +2929,7 @@ internal struct ContentView: View {
                     isCueMode: store.mode == .cue,
                     cuedID: store.mode == .cue ? store.cuedSong?.id : (store.mode == .regularPlusRemote && !store.activeSongs.isEmpty ? store.activeSongs[currentSongIndex()].id : nil),
                     isEditing: isEditing,
+                    reorderMode: reorderMode,  // Pass reorder mode for drag handles
                     flashingCueID: flashingCueID,  // Pass flash trigger down to rows
                     lastPlayedID: lastPlayedCueID,  // Pass last played cue ID for play icon
                     accentColor: currentTheme.accentColor(for: colorScheme),  // Pass theme accent color

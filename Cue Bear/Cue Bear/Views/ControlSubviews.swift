@@ -29,6 +29,7 @@ struct CBPerformanceList: View {
     let isCueMode: Bool
     let cuedID: UUID?
     let isEditing: Bool
+    let reorderMode: Bool  // Show drag handles when true
     let flashingCueID: UUID?  // ID of cue that should flash
     let lastPlayedID: UUID?  // ID of last played cue (for steady play icon)
     let accentColor: Color  // Theme accent color for selection stroke
@@ -112,6 +113,7 @@ struct CBPerformanceList: View {
                             isCued: cuedID == s.id,  // Show stroke in both Cue and Navigator modes
                             isCueMode: isCueMode,
                             isEditing: isEditing,
+                            reorderMode: reorderMode,  // Pass reorder mode for drag handles
                             takenBy: filteredTakenBy,
                             shouldFlash: flashingCueID == s.id,  // Flash when triggered
                             isLastPlayed: lastPlayedID == s.id,  // Show steady play icon on last played
@@ -209,6 +211,7 @@ struct CBPerformanceRow: View {
     let isCued: Bool
     let isCueMode: Bool
     let isEditing: Bool
+    let reorderMode: Bool  // Show drag handles when true
     let takenBy: String?
     let shouldFlash: Bool  // Trigger from parent to flash the row
     let isLastPlayed: Bool  // Is this the last played cue?
@@ -383,6 +386,14 @@ struct CBPerformanceRow: View {
                             }
                         }
                     }
+                }
+
+                // Drag handle - show only in reorder mode
+                if reorderMode {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 20 * fontSize, weight: .semibold))
+                        .foregroundColor(adaptiveTextColor.opacity(0.5))
+                        .padding(.leading, 8)
                 }
             }
             .padding(.horizontal, 22)
