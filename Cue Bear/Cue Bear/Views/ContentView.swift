@@ -3030,7 +3030,6 @@ internal struct ContentView: View {
                 .cornerRadius(isEditing ? 16 : 0)
                 .shadow(color: Color.black.opacity(isEditing ? 0.3 : 0), radius: isEditing ? 20 : 0, x: 0, y: 0)
                 .scaleEffect(isEditing ? 1.02 : 1.0)
-                .padding(isEditing ? 12 : 0)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
                     }
                 }
