@@ -110,7 +110,26 @@ struct CBPerformanceList: View {
                         }()
 
                         let isDragging = draggedSong?.id == s.id
-                        let isHovered = hoveredIndex == index
+
+                        // Determine if this row should show the "make room" space
+                        let isHovered: Bool = {
+                            guard let hoveredIndex = hoveredIndex,
+                                  let draggedSong = draggedSong,
+                                  let fromIndex = songs.firstIndex(where: { $0.id == draggedSong.id }) else {
+                                return false
+                            }
+
+                            // When dragging downward, the space should appear BEFORE the hovered item
+                            // (because items shift up to fill the dragged item's original space)
+                            if hoveredIndex > fromIndex {
+                                // Show space before the target (which is at the previous index)
+                                return index == hoveredIndex - 1
+                            }
+                            // When dragging upward, show space at the target
+                            else {
+                                return index == hoveredIndex
+                            }
+                        }()
 
                         CBPerformanceRow(
                             song: s,
