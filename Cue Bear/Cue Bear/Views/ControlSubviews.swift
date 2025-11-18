@@ -30,6 +30,8 @@ struct CBPerformanceList: View {
     let cuedID: UUID?
     let isEditing: Bool
     let reorderMode: Bool  // Show drag handles when true
+    let batchSelectMode: Bool  // Show selection radials when true
+    let selectedSongs: Set<UUID>  // Set of selected song IDs
     let flashingCueID: UUID?  // ID of cue that should flash
     let lastPlayedID: UUID?  // ID of last played cue (for steady play icon)
     let accentColor: Color  // Theme accent color for selection stroke
@@ -47,6 +49,7 @@ struct CBPerformanceList: View {
     var onDelete: (Song) -> Void
     var onDuplicate: (Song) -> Void
     var onMove: (IndexSet, Int) -> Void  // Callback for reordering cues
+    var onToggleSelection: (Song) -> Void  // Callback for toggling selection
     let conflictFor: [MIDIKey: String]
 
     // Drag state for reordering
@@ -116,6 +119,8 @@ struct CBPerformanceList: View {
                             isCueMode: isCueMode,
                             isEditing: isEditing,
                             reorderMode: reorderMode,  // Pass reorder mode for drag handles
+                            batchSelectMode: batchSelectMode,  // Pass batch select mode
+                            isSelected: selectedSongs.contains(s.id),  // Check if selected
                             takenBy: filteredTakenBy,
                             shouldFlash: flashingCueID == s.id,  // Flash when triggered
                             isLastPlayed: lastPlayedID == s.id,  // Show steady play icon on last played
@@ -134,7 +139,8 @@ struct CBPerformanceList: View {
                             onDelete: { onDelete(s) },
                             onDuplicate: { onDuplicate(s) },
                             onDragHandleStart: { isDraggingFromHandle = true },  // Track handle drag start
-                            onDragHandleEnd: { isDraggingFromHandle = false }  // Track handle drag end
+                            onDragHandleEnd: { isDraggingFromHandle = false },  // Track handle drag end
+                            onToggleSelection: { onToggleSelection(s) }  // Toggle selection in batch mode
                         )
                         // Apple-style drag animations
                         .opacity(isDragging ? 0.7 : 1.0)  // Dragged item slightly transparent
@@ -160,6 +166,8 @@ struct CBPerformanceList: View {
                                     isCueMode: false,
                                     isEditing: isEditing,
                                     reorderMode: false,  // Hide drag handle in preview
+                                    batchSelectMode: false,  // No selection radial in preview
+                                    isSelected: false,
                                     takenBy: nil,
                                     shouldFlash: false,
                                     isLastPlayed: false,
@@ -178,7 +186,8 @@ struct CBPerformanceList: View {
                                     onDelete: {},
                                     onDuplicate: {},
                                     onDragHandleStart: {},
-                                    onDragHandleEnd: {}
+                                    onDragHandleEnd: {},
+                                    onToggleSelection: {}
                                 )
                                 .opacity(0.5)  // Semi-transparent preview
                                 .scaleEffect(0.95)  // Slightly smaller
@@ -270,6 +279,8 @@ struct CBPerformanceRow: View {
     let isCueMode: Bool
     let isEditing: Bool
     let reorderMode: Bool  // Show drag handles when true
+    let batchSelectMode: Bool  // Show selection radials when true
+    let isSelected: Bool  // Is this cue selected in batch mode?
     let takenBy: String?
     let shouldFlash: Bool  // Trigger from parent to flash the row
     let isLastPlayed: Bool  // Is this the last played cue?
@@ -289,6 +300,7 @@ struct CBPerformanceRow: View {
     var onDuplicate: () -> Void
     var onDragHandleStart: () -> Void  // Called when drag starts from handle
     var onDragHandleEnd: () -> Void  // Called when drag ends from handle
+    var onToggleSelection: () -> Void  // Called when selection radial is tapped
 
     @GestureState private var isPressed = false
     @State private var didDrag = false
@@ -329,8 +341,14 @@ struct CBPerformanceRow: View {
                 }
             }
             .onEnded { _ in
-                // In edit mode: no action (cues not clickable)
-                if isEditing {
+                // In batch select mode: toggle selection
+                if batchSelectMode {
+                    if !didDrag {
+                        onToggleSelection()
+                    }
+                }
+                // In edit mode (not batch select): no action (cues not clickable)
+                else if isEditing {
                     // Do nothing - cues are not interactive in edit mode
                 } else {
                     // Normal mode: send MIDI on quick tap (allow taps even with conflicts)
@@ -366,6 +384,21 @@ struct CBPerformanceRow: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
 
             HStack(spacing: 14) {
+                // Selection radial - show in batch select mode
+                if batchSelectMode {
+                    ZStack {
+                        Circle()
+                            .strokeBorder(adaptiveTextColor.opacity(0.5), lineWidth: 2)
+                            .frame(width: 24, height: 24)
+                        if isSelected {
+                            Circle()
+                                .fill(adaptiveTextColor)
+                                .frame(width: 16, height: 16)
+                        }
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+
                 // Play icon - show on chosen cue or last played cue
                 if isCued || isLastPlayed {
                     Image(systemName: "play.fill")

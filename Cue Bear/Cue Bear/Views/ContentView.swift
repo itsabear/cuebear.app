@@ -2865,6 +2865,8 @@ internal struct ContentView: View {
                     cuedID: store.mode == .cue ? store.cuedSong?.id : (store.mode == .regularPlusRemote && !store.activeSongs.isEmpty ? store.activeSongs[currentSongIndex()].id : nil),
                     isEditing: isEditing,
                     reorderMode: reorderMode,  // Pass reorder mode for drag handles
+                    batchSelectMode: setlistBatchMode,  // Pass batch select mode
+                    selectedSongs: setlistSelected,  // Pass selected song IDs
                     flashingCueID: flashingCueID,  // Pass flash trigger down to rows
                     lastPlayedID: lastPlayedCueID,  // Pass last played cue ID for play icon
                     accentColor: currentTheme.accentColor(for: colorScheme),  // Pass theme accent color
@@ -2903,6 +2905,13 @@ internal struct ContentView: View {
                             songs.move(fromOffsets: indices, toOffset: newOffset)
                         }
                         saveCurrentProject(overwrite: true)
+                    },
+                    onToggleSelection: { song in
+                        if setlistSelected.contains(song.id) {
+                            setlistSelected.remove(song.id)
+                        } else {
+                            setlistSelected.insert(song.id)
+                        }
                     },
                     conflictFor: conflictLookup()
                 )
@@ -3013,8 +3022,9 @@ internal struct ContentView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
 
-                            // Select/Reorder capsule
+                            // Select/Reorder capsule with action buttons
                             HStack(spacing: 12) {
+                                // Mode toggle buttons (always visible)
                                 Button(action: {
                                     setlistBatchMode.toggle()
                                     if !setlistBatchMode {
@@ -3046,6 +3056,42 @@ internal struct ContentView: View {
                                         .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                 }
                                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+
+                                // Action buttons (only visible in batch select mode)
+                                if setlistBatchMode {
+                                    Divider()
+                                        .frame(height: 24)
+                                        .transition(.scale.combined(with: .opacity))
+
+                                    Button("Clear") {
+                                        setlistSelected.removeAll()
+                                    }
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    .transition(.scale.combined(with: .opacity))
+
+                                    Button("Select All") {
+                                        setlistSelected = Set(filteredActiveSongs.map { $0.id })
+                                    }
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    .transition(.scale.combined(with: .opacity))
+
+                                    Button("Delete") {
+                                        // Delete all selected cues
+                                        pushSetlistUndo()
+                                        store.updateActiveSongs { songs in
+                                            songs.removeAll(where: { setlistSelected.contains($0.id) })
+                                        }
+                                        setlistSelected.removeAll()
+                                        saveCurrentProject(overwrite: true)
+                                    }
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.red)
+                                    .disabled(setlistSelected.isEmpty)
+                                    .opacity(setlistSelected.isEmpty ? 0.5 : 1.0)
+                                    .transition(.scale.combined(with: .opacity))
+                                }
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
