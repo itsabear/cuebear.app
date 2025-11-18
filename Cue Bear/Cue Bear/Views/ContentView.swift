@@ -2585,6 +2585,7 @@ internal struct ContentView: View {
     @State private var reorderMode = false  // v1.0.9: Reorder mode for cue list
     @State private var setlistBatchMode = false  // Batch select mode for cue list
     @State private var setlistSelected: Set<UUID> = []  // Selected cues in batch mode
+    @State private var showLibraryPopover = false  // Show song library popover
 
     // Library state
     @State private var songLibrary: [Song] = []
@@ -2738,6 +2739,7 @@ internal struct ContentView: View {
                 isEditing: $isEditing,
                 isGlobalChannel: $isGlobalChannel,
                 globalChannel: $globalChannel,
+                showLibraryPopover: $showLibraryPopover,
                 projectTitle: projectName,
                 connectionTint: connectionTint,
                 connectionCoordinator: connectionCoordinator,
@@ -3848,6 +3850,28 @@ internal struct ContentView: View {
                 },
                 onCancel: { showAddEditMIDIOnly = false },
                 editingSongName: editingSong?.name
+            )
+        }
+        .sheet(isPresented: $showLibraryPopover) {
+            SongLibraryPopover(
+                library: $songLibrary,
+                activeCueListSongs: Binding(
+                    get: { store.activeSongs },
+                    set: { _ in }
+                ),
+                libAddedAt: libAddedAt,
+                selectedThemeID: selectedThemeID,
+                onAddToCueList: { song in
+                    addToSetlist(song)
+                },
+                onDelete: { song in
+                    deleteFromLibrary(song)
+                },
+                onEdit: { song in
+                    editingSong = song
+                    showAddEdit = true
+                    showLibraryPopover = false
+                }
             )
         }
         .sheet(isPresented: $showControlEditor) {
@@ -5546,6 +5570,7 @@ private struct CBTopBar: View {
     @Binding var isEditing: Bool
     @Binding var isGlobalChannel: Bool
     @Binding var globalChannel: Int
+    @Binding var showLibraryPopover: Bool  // Control library popover visibility
     let projectTitle: String
     let connectionTint: Color
     let connectionCoordinator: ConnectionCoordinator
@@ -5683,9 +5708,9 @@ private struct CBTopBar: View {
 
             // Edit mode controls (show when editing)
             if isEditing {
-                // Library button (placeholder - will open library later)
+                // Library button - opens song library popover
                 Button(action: {
-                    // TODO: Open cue library sheet
+                    showLibraryPopover = true
                 }) {
                     Image(systemName: "book")
                         .imageScale(.large)

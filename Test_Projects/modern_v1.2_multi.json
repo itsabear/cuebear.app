@@ -1,0 +1,80 @@
+{
+  "cueLists": [
+    {
+      "id": "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+      "name": "Main Show",
+      "songs": [
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Song 1",
+          "number": 1,
+          "channel": 1,
+          "outputNumber": 1,
+          "outputChannel": 1,
+          "owners": ["Song 1"]
+        },
+        {
+          "id": "22222222-2222-2222-2222-222222222222",
+          "name": "Song 2",
+          "number": 2,
+          "channel": 1,
+          "outputNumber": 2,
+          "outputChannel": 1,
+          "owners": ["Song 2"]
+        }
+      ],
+      "createdAt": "2025-01-16T12:00:00Z",
+      "modifiedAt": "2025-01-16T12:00:00Z"
+    },
+    {
+      "id": "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB",
+      "name": "Rehearsal",
+      "songs": [
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Song 1",
+          "number": 1,
+          "channel": 1,
+          "outputNumber": 1,
+          "outputChannel": 1,
+          "owners": ["Song 1"]
+        }
+      ],
+      "createdAt": "2025-01-16T12:05:00Z",
+      "modifiedAt": "2025-01-16T12:05:00Z"
+    },
+    {
+      "id": "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC",
+      "name": "Backup",
+      "songs": [],
+      "createdAt": "2025-01-16T12:10:00Z",
+      "modifiedAt": "2025-01-16T12:10:00Z"
+    }
+  ],
+  "activeCueListID": "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+  "songLibrary": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Song 1",
+      "number": 1,
+      "channel": 1,
+      "outputNumber": 1,
+      "outputChannel": 1,
+      "owners": ["Song 1"]
+    },
+    {
+      "id": "22222222-2222-2222-2222-222222222222",
+      "name": "Song 2",
+      "number": 2,
+      "channel": 1,
+      "outputNumber": 2,
+      "outputChannel": 1,
+      "owners": ["Song 2"]
+    }
+  ],
+  "controlButtons": [],
+  "globalChannel": 1,
+  "isGlobalChannelEnabled": false,
+  "theme": "default",
+  "projectVersion": "1.2.0"
+}

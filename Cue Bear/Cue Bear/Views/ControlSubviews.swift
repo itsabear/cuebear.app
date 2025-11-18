@@ -2408,3 +2408,297 @@ extension Color {
     }
 }
 
+// MARK: - Song Library Popover
+
+/// Sort options for the song library
+enum LibrarySortOption: String, CaseIterable, Identifiable {
+    case nameAZ = "A-Z"
+    case nameZA = "Z-A"
+    case oldest = "Oldest First"
+    case newest = "Newest First"
+
+    var id: String { rawValue }
+}
+
+/// Popover view for managing the song library
+struct SongLibraryPopover: View {
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dismiss) var dismiss
+
+    // Data
+    @Binding var library: [Song]
+    @Binding var activeCueListSongs: [Song]
+    let libAddedAt: [UUID: Date]
+    let selectedThemeID: String
+
+    // Callbacks
+    let onAddToCueList: (Song) -> Void
+    let onDelete: (Song) -> Void
+    let onEdit: (Song) -> Void
+
+    // State
+    @State private var searchQuery: String = ""
+    @State private var sortOption: LibrarySortOption = .nameAZ
+    @State private var selectedSongs: Set<UUID> = []
+    @State private var batchSelectMode: Bool = false
+    @State private var songToDelete: Song? = nil
+    @State private var showDeleteConfirmation: Bool = false
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
+    private var backgroundColor: Color {
+        selectedTheme.backgroundColor(for: colorScheme)
+    }
+
+    private var titleBarColor: Color {
+        selectedTheme.titleBarColor(for: colorScheme)
+    }
+
+    private var textColor: Color {
+        selectedTheme.primaryTextColor(for: colorScheme)
+    }
+
+    private var defaultCueColor: Color {
+        selectedTheme.defaultCueColor(for: colorScheme)
+    }
+
+    // Get IDs of songs already in active cue list
+    private var activeSongIDs: Set<UUID> {
+        Set(activeCueListSongs.map { $0.id })
+    }
+
+    // Filtered and sorted library songs
+    private var filteredSongs: [Song] {
+        let filtered = library.filter { song in
+            if searchQuery.isEmpty {
+                return true
+            }
+            return song.name.localizedCaseInsensitiveContains(searchQuery) ||
+                   (song.subtitle ?? "").localizedCaseInsensitiveContains(searchQuery)
+        }
+
+        return sortedSongs(filtered)
+    }
+
+    private func sortedSongs(_ songs: [Song]) -> [Song] {
+        switch sortOption {
+        case .nameAZ:
+            return songs.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .nameZA:
+            return songs.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+        case .newest:
+            return songs.sorted { (libAddedAt[$0.id] ?? .distantPast) > (libAddedAt[$1.id] ?? .distantPast) }
+        case .oldest:
+            return songs.sorted { (libAddedAt[$0.id] ?? .distantPast) < (libAddedAt[$1.id] ?? .distantPast) }
+        }
+    }
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Search bar and controls
+                headerView
+
+                // Song list
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(filteredSongs) { song in
+                            libraryRowView(for: song)
+                        }
+                    }
+                }
+            }
+            .background(backgroundColor)
+            .navigationTitle("Song Library")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .alert("Delete Song", isPresented: $showDeleteConfirmation, presenting: songToDelete) { song in
+            Button("Cancel", role: .cancel) {
+                songToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                onDelete(song)
+                songToDelete = nil
+            }
+        } message: { song in
+            Text("Are you sure you want to delete \"\(song.name)\" from the library?")
+        }
+    }
+
+    private var headerView: some View {
+        VStack(spacing: 12) {
+            // Search bar
+            HStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(textColor.opacity(0.5))
+
+                    TextField("Search songs...", text: $searchQuery)
+                        .foregroundColor(textColor)
+
+                    if !searchQuery.isEmpty {
+                        Button(action: { searchQuery = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(textColor.opacity(0.5))
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.regularMaterial)
+                .background(titleBarColor.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .padding(.horizontal, 16)
+
+            // Sort and Select buttons
+            HStack(spacing: 12) {
+                // Sort menu
+                Menu {
+                    ForEach(LibrarySortOption.allCases) { option in
+                        Button(action: { sortOption = option }) {
+                            HStack {
+                                Text(option.rawValue)
+                                if sortOption == option {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.arrow.down")
+                        Text(sortOption.rawValue)
+                    }
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.regularMaterial)
+                    .background(titleBarColor.opacity(0.5))
+                    .foregroundColor(defaultCueColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+
+                Spacer()
+
+                // Select button
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        batchSelectMode.toggle()
+                        if !batchSelectMode {
+                            selectedSongs.removeAll()
+                        }
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: batchSelectMode ? "xmark" : "checklist")
+                        Text(batchSelectMode ? "Cancel" : "Select")
+                    }
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.regularMaterial)
+                    .background(titleBarColor.opacity(0.5))
+                    .foregroundColor(defaultCueColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.vertical, 12)
+        .background(backgroundColor)
+    }
+
+    private func libraryRowView(for song: Song) -> some View {
+        let isInCueList = activeSongIDs.contains(song.id)
+        let isSelected = selectedSongs.contains(song.id)
+
+        return HStack(spacing: 0) {
+            // Selection radial (in batch select mode)
+            if batchSelectMode {
+                Button(action: {
+                    if selectedSongs.contains(song.id) {
+                        selectedSongs.remove(song.id)
+                    } else {
+                        selectedSongs.insert(song.id)
+                    }
+                }) {
+                    ZStack {
+                        Circle()
+                            .strokeBorder(defaultCueColor.opacity(0.5), lineWidth: 2)
+                            .frame(width: 24, height: 24)
+                        if isSelected {
+                            Circle()
+                                .fill(defaultCueColor)
+                                .frame(width: 16, height: 16)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 16)
+                .padding(.trailing, 12)
+            }
+
+            // Song info
+            Button(action: {
+                if batchSelectMode {
+                    if selectedSongs.contains(song.id) {
+                        selectedSongs.remove(song.id)
+                    } else {
+                        selectedSongs.insert(song.id)
+                    }
+                } else {
+                    onEdit(song)
+                }
+            }) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(song.name)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundColor(isInCueList ? textColor.opacity(0.4) : textColor)
+
+                    if let subtitle = song.subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: 14))
+                            .foregroundColor(isInCueList ? textColor.opacity(0.3) : textColor.opacity(0.6))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 12)
+                .padding(.leading, batchSelectMode ? 0 : 16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .background(backgroundColor)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            // Delete action
+            Button(role: .destructive) {
+                songToDelete = song
+                showDeleteConfirmation = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            // Add to cue list action (disabled if already in cue list)
+            if !isInCueList {
+                Button {
+                    onAddToCueList(song)
+                    UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
+                } label: {
+                    Label("Add", systemImage: "plus.circle")
+                }
+                .tint(.green)
+            }
+        }
+    }
+}
