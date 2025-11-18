@@ -3024,13 +3024,7 @@ internal struct ContentView: View {
                     .ignoresSafeArea(edges: .top)
                     .allowsHitTesting(false)
                 }
-                // Edit mode elevation effects (no rounded corners or scale - cues reach edges)
-                .background(
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .opacity(isEditing ? 1 : 0)
-                )
-                .shadow(color: Color.black.opacity(isEditing ? 0.15 : 0), radius: isEditing ? 30 : 0, x: 0, y: 0)
+                // No background needed - cues and capsules live on same plane
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
                     }
                 }
