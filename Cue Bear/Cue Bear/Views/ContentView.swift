@@ -3022,14 +3022,16 @@ internal struct ContentView: View {
                                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
 
                                 Button(action: {
-                                    reorderMode.toggle()
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        reorderMode.toggle()
+                                    }
                                     // Turn off select when entering reorder mode
                                     if reorderMode {
                                         setlistBatchMode = false
                                         setlistSelected.removeAll()
                                     }
                                 }) {
-                                    Image(systemName: reorderMode ? "checkmark" : "arrow.up.arrow.down")
+                                    Image(systemName: reorderMode ? "checkmark" : "line.3.horizontaldecrease.circle")
                                         .imageScale(.large)
                                         .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                 }

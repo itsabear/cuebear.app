@@ -133,12 +133,12 @@ struct CBPerformanceList: View {
                             onDuplicate: { onDuplicate(s) }
                         )
                         .opacity(isDragging ? 0.5 : 1.0)
-                        .scaleEffect(isHovered && isEditing ? 1.02 : 1.0)
+                        .scaleEffect(isHovered && reorderMode ? 1.02 : 1.0)
                         .animation(.easeInOut(duration: 0.2), value: isHovered)
                         .animation(.easeInOut(duration: 0.2), value: isDragging)
                         .overlay(alignment: .top) {
-                            // Drop indicator line
-                            if isHovered && isEditing && draggedSong != nil {
+                            // Drop indicator line - only in reorder mode
+                            if isHovered && reorderMode && draggedSong != nil {
                                 Rectangle()
                                     .fill(accentColor)
                                     .frame(height: 3)
@@ -148,7 +148,7 @@ struct CBPerformanceList: View {
                             }
                         }
                         .gesture(
-                            isEditing ? DragGesture(minimumDistance: 20)
+                            reorderMode ? DragGesture(minimumDistance: 20)
                                 .onChanged { value in
                                     if draggedSong == nil {
                                         draggedSong = s
@@ -256,7 +256,12 @@ struct CBPerformanceRow: View {
 
     var body: some View {
         let press = DragGesture(minimumDistance: 0)
-            .updating($isPressed) { _, state, _ in if !state { state = true } }
+            .updating($isPressed) { _, state, _ in
+                // Only allow press animation if not in edit mode
+                if !isEditing && !state {
+                    state = true
+                }
+            }
             .onChanged { value in
                 let delta = abs(value.translation.width) + abs(value.translation.height)
                 if delta > 8 {
@@ -264,11 +269,9 @@ struct CBPerformanceRow: View {
                 }
             }
             .onEnded { _ in
-                // In edit mode: tap opens edit sheet
+                // In edit mode: no action (cues not clickable)
                 if isEditing {
-                    if !didDrag {
-                        onRename()
-                    }
+                    // Do nothing - cues are not interactive in edit mode
                 } else {
                     // Normal mode: send MIDI on quick tap (allow taps even with conflicts)
                     if !didDrag {
@@ -371,33 +374,21 @@ struct CBPerformanceRow: View {
                                 .foregroundColor(adaptiveTextColor.opacity(0.8))
                                 .lineLimit(1)
                         }
-
-                        // Color indicator circle - only show in edit mode
-                        if isEditing {
-                            let displayColor = song.colorHex ?? defaultCueColorHex
-                            HStack(spacing: 4) {
-                                Text("Color:")
-                                    .font(.caption2)
-                                    .foregroundColor(adaptiveTextColor.opacity(0.7))
-                                Circle()
-                                    .fill(Color(hex: displayColor))
-                                    .frame(width: 16, height: 16)
-                                    .overlay(Circle().stroke(adaptiveTextColor.opacity(0.3), lineWidth: 1))
-                            }
-                        }
                     }
                 }
 
-                // Drag handle - show only in reorder mode
+                // Drag handle - show only in reorder mode with slide-in animation
                 if reorderMode {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 20 * fontSize, weight: .semibold))
-                        .foregroundColor(adaptiveTextColor.opacity(0.5))
+                    Image(systemName: "line.3.horizontaldecrease.circle")
+                        .font(.system(size: 24 * fontSize, weight: .regular))
+                        .foregroundColor(adaptiveTextColor.opacity(0.6))
                         .padding(.leading, 8)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 16)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: reorderMode)
 
             RoundedRectangle(cornerRadius: corner)
                 .fill(Color(uiColor: .systemBackground))
