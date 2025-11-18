@@ -146,6 +146,7 @@ struct CBPerformanceList: View {
                         .opacity(isDragging ? 0.7 : 1.0)  // Dragged item slightly transparent
                         .scaleEffect(isDragging ? 1.05 : 1.0)  // Dragged item "rises" - slightly less wide
                         .offset(isDragging ? dragOffset : .zero)  // Follow finger during drag
+                        .zIndex(isDragging ? 1000 : 0)  // Dragged item appears above all others
                         .shadow(
                             color: isDragging ? Color.black.opacity(0.3) : Color.clear,
                             radius: isDragging ? 12 : 0,
