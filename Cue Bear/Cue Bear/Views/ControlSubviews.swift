@@ -559,7 +559,20 @@ struct CBPerformanceRow: View {
         )
         .zIndex(isCued ? 1 : 0)  // Elevate selected cue above others
         .simultaneousGesture(press)
-        // No context menu in either mode (Option A: disabled in both normal and edit mode)
+        .contextMenu {
+            // Show context menu only in edit mode (not in batch select or reorder mode)
+            if isEditing && !batchSelectMode && !reorderMode {
+                Button(action: onRename) {
+                    Label("Edit", systemImage: "pencil")
+                }
+                Button(action: onDuplicate) {
+                    Label("Duplicate", systemImage: "doc.on.doc")
+                }
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
         .accessibilityLabel("\(song.name), \(song.kind == .cc ? "CC \(song.cc)" : "Note \(song.note ?? 0)")")
         .onChange(of: shouldFlash) { _, newValue in
             if newValue {

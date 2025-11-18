@@ -3559,10 +3559,11 @@ internal struct ContentView: View {
 
     private var bottomSectionView: some View {
         VStack(spacing: 0) {
-            // Completely hide control area in cue list edit mode
-            if !isEditing {
-                AnyView(controlSectionView)
-            }
+            // Slide control area off screen in cue list edit mode
+            AnyView(controlSectionView)
+                .offset(y: isEditing ? 300 : 0)  // Slide down offscreen
+                .opacity(isEditing ? 0 : 1)  // Fade out
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
         }
     }
 
@@ -4871,7 +4872,7 @@ internal struct ContentView: View {
             sourceSong = s
         }
 
-        var copy = Song(name: sourceSong.name + " (Copy)", subtitle: sourceSong.subtitle, cc: sourceSong.cc, channel: sourceSong.channel)
+        var copy = Song(name: "Copy of " + sourceSong.name, subtitle: sourceSong.subtitle, cc: sourceSong.cc, channel: sourceSong.channel)
         copy.kind = sourceSong.kind
         copy.note = sourceSong.note
         copy.velocity = sourceSong.velocity
