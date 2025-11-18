@@ -379,16 +379,16 @@ struct CBPerformanceRow: View {
 
                 // Drag handle - show only in reorder mode with slide-in animation
                 if reorderMode {
-                    Image(systemName: "line.3.horizontaldecrease.circle")
-                        .font(.system(size: 24 * fontSize, weight: .regular))
-                        .foregroundColor(adaptiveTextColor.opacity(0.6))
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 20 * fontSize, weight: .semibold))
+                        .foregroundColor(adaptiveTextColor.opacity(0.5))
                         .padding(.leading, 8)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 16)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: reorderMode)
+            .animation(.spring(response: 0.25, dampingFraction: 0.85), value: reorderMode)
 
             RoundedRectangle(cornerRadius: corner)
                 .fill(Color(uiColor: .systemBackground))

@@ -2839,11 +2839,11 @@ internal struct ContentView: View {
         // Debug print removed - was causing console spam on every render
         return AnyView(
             ZStack {
-                // Background - darker color in edit mode
+                // Background - much darker in edit mode for focus
                 if isEditing {
                     (colorScheme == .dark
-                        ? Color.black.opacity(0.85)
-                        : Color(white: 0.92))
+                        ? Color.black.opacity(0.95)
+                        : Color(white: 0.85))
                         .ignoresSafeArea()
                 }
 
@@ -2941,22 +2941,22 @@ internal struct ContentView: View {
                 // No background needed - cues and capsules live on same plane
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
                 .overlay(alignment: .top) {
-                    // Gradient below search bar to fade cues underneath (only in edit mode)
+                    // Gradient from below search bar UP to top of screen (only in edit mode)
                     if isEditing {
                         let editBgColor = colorScheme == .dark
-                            ? Color.black.opacity(0.85)
-                            : Color(white: 0.92)
+                            ? Color.black.opacity(0.95)
+                            : Color(white: 0.85)
 
                         LinearGradient(
                             gradient: Gradient(colors: [
-                                editBgColor,
-                                editBgColor.opacity(0.0)
+                                editBgColor.opacity(0.0),
+                                editBgColor
                             ]),
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(maxWidth: .infinity, maxHeight: 80)
-                        .padding(.top, 138)  // Below hamburger (88pt) + search capsule height (~50pt)
+                        .frame(maxWidth: .infinity, maxHeight: 138)  // From top to below search bar
+                        .ignoresSafeArea(edges: .top)
                         .allowsHitTesting(false)
                     }
                 }
@@ -3022,7 +3022,7 @@ internal struct ContentView: View {
                                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
 
                                 Button(action: {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                                         reorderMode.toggle()
                                     }
                                     // Turn off select when entering reorder mode
@@ -3031,7 +3031,7 @@ internal struct ContentView: View {
                                         setlistSelected.removeAll()
                                     }
                                 }) {
-                                    Image(systemName: reorderMode ? "checkmark" : "line.3.horizontaldecrease.circle")
+                                    Image(systemName: reorderMode ? "checkmark" : "arrow.up.arrow.down")
                                         .imageScale(.large)
                                         .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                 }
@@ -3047,6 +3047,7 @@ internal struct ContentView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 88)  // Below hamburger menu
                         .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
                     }
                 }
                     }
