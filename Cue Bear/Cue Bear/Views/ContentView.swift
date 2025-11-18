@@ -3025,7 +3025,7 @@ internal struct ContentView: View {
                             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
 
                             // Select/Reorder capsule with action buttons
-                            HStack(spacing: 12) {
+                            HStack(spacing: 0) {
                                 if setlistBatchMode {
                                     // Select mode: action buttons on left, X on right
                                     Button("Clear") {
@@ -3035,12 +3035,18 @@ internal struct ContentView: View {
                                     .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                     .transition(.scale.combined(with: .opacity))
 
+                                    Spacer()
+                                        .frame(width: 16)
+
                                     Button("Select All") {
                                         setlistSelected = Set(filteredActiveSongs.map { $0.id })
                                     }
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                     .transition(.scale.combined(with: .opacity))
+
+                                    Spacer()
+                                        .frame(width: 16)
 
                                     Button("Remove") {
                                         // Remove all selected cues
@@ -3057,9 +3063,15 @@ internal struct ContentView: View {
                                     .opacity(setlistSelected.isEmpty ? 0.5 : 1.0)
                                     .transition(.scale.combined(with: .opacity))
 
+                                    Spacer()
+                                        .frame(width: 20)
+
                                     Divider()
                                         .frame(height: 24)
                                         .transition(.scale.combined(with: .opacity))
+
+                                    Spacer()
+                                        .frame(width: 12)
 
                                     // X button on the right
                                     Button(action: {
