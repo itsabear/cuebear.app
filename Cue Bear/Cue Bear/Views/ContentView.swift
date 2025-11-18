@@ -3024,46 +3024,8 @@ internal struct ContentView: View {
 
                             // Select/Reorder capsule with action buttons
                             HStack(spacing: 12) {
-                                // Reorder button (hide when in select mode)
-                                if !setlistBatchMode {
-                                    Button(action: {
-                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                                            reorderMode.toggle()
-                                        }
-                                    }) {
-                                        Image(systemName: reorderMode ? "checkmark" : "list.bullet")
-                                            .font(.system(size: 20))
-                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                    }
-                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-                                    .transition(.scale.combined(with: .opacity))
-                                }
-
-                                // Select button (always visible)
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                        setlistBatchMode.toggle()
-                                    }
-                                    if !setlistBatchMode {
-                                        setlistSelected.removeAll()
-                                    }
-                                    // Turn off reorder when entering select mode
-                                    if setlistBatchMode {
-                                        reorderMode = false
-                                    }
-                                }) {
-                                    Image(systemName: setlistBatchMode ? "xmark" : "checklist")
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                }
-                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-
-                                // Action buttons (only visible in batch select mode)
                                 if setlistBatchMode {
-                                    Divider()
-                                        .frame(height: 24)
-                                        .transition(.scale.combined(with: .opacity))
-
+                                    // Select mode: action buttons on left, X on right
                                     Button("Clear") {
                                         setlistSelected.removeAll()
                                     }
@@ -3092,6 +3054,48 @@ internal struct ContentView: View {
                                     .disabled(setlistSelected.isEmpty)
                                     .opacity(setlistSelected.isEmpty ? 0.5 : 1.0)
                                     .transition(.scale.combined(with: .opacity))
+
+                                    Divider()
+                                        .frame(height: 24)
+                                        .transition(.scale.combined(with: .opacity))
+
+                                    // X button on the right
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                            setlistBatchMode = false
+                                            setlistSelected.removeAll()
+                                        }
+                                    }) {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    }
+                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                                } else {
+                                    // Normal mode: reorder and select buttons
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                                            reorderMode.toggle()
+                                        }
+                                    }) {
+                                        Image(systemName: reorderMode ? "checkmark" : "list.bullet")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    }
+                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                                    .transition(.scale.combined(with: .opacity))
+
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                            setlistBatchMode = true
+                                            reorderMode = false
+                                        }
+                                    }) {
+                                        Image(systemName: "checklist")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    }
+                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
                                 }
                             }
                             .padding(.horizontal, 12)
