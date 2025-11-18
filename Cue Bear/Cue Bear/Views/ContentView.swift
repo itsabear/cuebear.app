@@ -2955,7 +2955,7 @@ internal struct ContentView: View {
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(maxWidth: .infinity, maxHeight: 138)  // From top to below search bar
+                        .frame(maxWidth: .infinity, maxHeight: 118)  // From top to below search bar
                         .ignoresSafeArea(edges: .top)
                         .allowsHitTesting(false)
                     }
@@ -3031,7 +3031,7 @@ internal struct ContentView: View {
                                         setlistSelected.removeAll()
                                     }
                                 }) {
-                                    Image(systemName: reorderMode ? "checkmark" : "arrow.up.arrow.down")
+                                    Image(systemName: reorderMode ? "checkmark" : "list.bullet.circle")
                                         .imageScale(.large)
                                         .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                 }
@@ -3045,7 +3045,7 @@ internal struct ContentView: View {
                             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         }
                         .padding(.horizontal, 16)
-                        .padding(.top, 88)  // Below hamburger menu
+                        .padding(.top, 68)  // Closer to hamburger menu
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
                     }

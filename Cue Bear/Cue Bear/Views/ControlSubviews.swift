@@ -210,7 +210,7 @@ struct CBPerformanceList: View {
                     Color.clear.frame(height: 8)
                 }
                 .padding(.horizontal, 36)
-                .padding(.top, isEditing ? 150 : 80)  // Slide down in edit mode to below search bar
+                .padding(.top, isEditing ? 130 : 80)  // Slide down in edit mode to below search bar
                 .padding(.bottom, 12)
                 .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
             }
