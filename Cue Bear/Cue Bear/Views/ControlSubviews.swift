@@ -146,16 +146,41 @@ struct CBPerformanceList: View {
                         )
                         .padding(.vertical, isHovered && reorderMode && draggedSong != nil ? 20 : 0)  // Hovered items "make room"
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDragging)
+                        .animation(.spring(response: 0.15, dampingFraction: 0.8), value: isDragging)  // Faster rise animation
                         .overlay(alignment: .top) {
-                            // Drop indicator line - only in reorder mode
-                            if isHovered && reorderMode && draggedSong != nil {
-                                Rectangle()
-                                    .fill(accentColor)
-                                    .frame(height: 3)
-                                    .cornerRadius(1.5)
-                                    .padding(.horizontal, 40)
-                                    .offset(y: -6)
+                            // Show preview of dragged cue at drop position (iOS-style)
+                            if isHovered && reorderMode && draggedSong != nil, let draggedSong = draggedSong {
+                                CBPerformanceRow(
+                                    song: draggedSong,
+                                    songLibrary: songLibrary,
+                                    isCued: false,
+                                    isCueMode: false,
+                                    isEditing: isEditing,
+                                    reorderMode: false,  // Hide drag handle in preview
+                                    takenBy: nil,
+                                    shouldFlash: false,
+                                    isLastPlayed: false,
+                                    accentColor: accentColor,
+                                    defaultCueColor: defaultCueColor,
+                                    themeFont: themeFont,
+                                    selectionStrokeColor: selectionStrokeColor(draggedSong.colorHex),
+                                    backgroundColorHex: backgroundColorHex,
+                                    defaultCueColorHex: defaultCueColorHex,
+                                    showMIDIData: showMIDIData,
+                                    cueHeight: cueHeight,
+                                    fontSize: fontSize,
+                                    onTap: {},
+                                    onLongPressChangeMIDI: {},
+                                    onRename: {},
+                                    onDelete: {},
+                                    onDuplicate: {},
+                                    onDragHandleStart: {},
+                                    onDragHandleEnd: {}
+                                )
+                                .opacity(0.5)  // Semi-transparent preview
+                                .scaleEffect(0.95)  // Slightly smaller
+                                .allowsHitTesting(false)  // Don't intercept touches
+                                .offset(y: -CGFloat(cueHeight + 12) / 2)  // Center at drop position
                             }
                         }
                         .simultaneousGesture(
