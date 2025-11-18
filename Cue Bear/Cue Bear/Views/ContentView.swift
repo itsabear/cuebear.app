@@ -2751,7 +2751,19 @@ internal struct ContentView: View {
                     if isEditing { isEditing = false }
                     showConnections = true
                 },
-                onEditToggle: { withAnimation(.easeInOut) { isEditing.toggle() } },
+                onEditToggle: {
+                    withAnimation(.easeInOut) {
+                        isEditing.toggle()
+
+                        // Reset selection when entering edit mode
+                        if isEditing {
+                            store.cuedSong = nil
+                            if store.mode == .cue {
+                                store.mode = .regular
+                            }
+                        }
+                    }
+                },
                 onAdd: {
                     // Don't exit edit mode when adding a new cue
                     editingSong = nil
@@ -3026,8 +3038,15 @@ internal struct ContentView: View {
             } else {
             // Debug print removed - was causing console spam on every render
             return AnyView(
-                VStack(spacing: 0) {
-                    CBPerformanceList(
+                ZStack {
+                    // Background - only show frosted glass in edit mode
+                    if isEditing {
+                        currentTheme.backgroundColor(for: colorScheme)
+                            .ignoresSafeArea()
+                    }
+
+                    VStack(spacing: 0) {
+                        CBPerformanceList(
                     songs: store.activeSongs,
                     songLibrary: songLibrary,  // Pass full song library for alias resolution
                     isCueMode: store.mode == .cue,
@@ -3130,6 +3149,18 @@ internal struct ContentView: View {
                     .ignoresSafeArea(edges: .top)
                     .allowsHitTesting(false)
                 }
+                // Edit mode elevation effects
+                .background(
+                    RoundedRectangle(cornerRadius: isEditing ? 16 : 0)
+                        .fill(.ultraThinMaterial)
+                        .opacity(isEditing ? 1 : 0)
+                )
+                .cornerRadius(isEditing ? 16 : 0)
+                .shadow(color: Color.black.opacity(isEditing ? 0.3 : 0), radius: isEditing ? 20 : 0, x: 0, y: 0)
+                .scaleEffect(isEditing ? 1.02 : 1.0)
+                .padding(isEditing ? 12 : 0)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
+                    }
                 }
             )
         }
@@ -3578,11 +3609,11 @@ internal struct ContentView: View {
 
     private var bottomSectionView: some View {
         VStack(spacing: 0) {
-            // Hide control area completely when in cue list edit mode
-            if !isEditing {
-                AnyView(controlSectionView)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            // Slide control area down and off-screen when in cue list edit mode
+            AnyView(controlSectionView)
+                .offset(y: isEditing ? 300 : 0)
+                .opacity(isEditing ? 0 : 1)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
         }
     }
 
@@ -5672,6 +5703,16 @@ private struct CBTopBar: View {
 
             // Edit mode controls (show when editing)
             if isEditing {
+                // Library button (placeholder - will open library later)
+                Button(action: {
+                    // TODO: Open cue library sheet
+                }) {
+                    Image(systemName: "book")
+                        .imageScale(.large)
+                }
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                .transition(.opacity.combined(with: .scale))
+
                 Button(action: onUndo) {
                     Image(systemName: "arrow.uturn.backward")
                         .imageScale(.large)
