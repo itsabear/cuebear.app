@@ -2836,218 +2836,18 @@ internal struct ContentView: View {
     }
 
     private func buildMiddleSectionView() -> some View {
-            if isEditing {
-                // iPhone: Tab-based edit mode, iPad: Side-by-side
-                let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-
-                if isPhone {
-                    // iPhone: Conditional view with modal picker
-                    return AnyView(
-                        VStack(spacing: 0) {
-                            // View selector button below title bar capsule
-                            Button(action: {
-                                showEditModeViewPicker = true
-                            }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: editModeTab == 0 ? "music.note" : "list.bullet")
-                                        .font(.system(size: 14))
-                                    Text(editModeTab == 0 ? "Song Library" : "Cue List")
-                                        .font(.system(size: 16, weight: .medium))
-                                    Image(systemName: "chevron.down")
-                                        .font(.system(size: 11, weight: .semibold))
-                                }
-                                .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 60)  // Push below the floating title bar capsule
-                            .background(currentTheme.backgroundColor(for: colorScheme))
-                            .sheet(isPresented: $showEditModeViewPicker) {
-                                VStack(spacing: 0) {
-                                    // Sheet header
-                                    HStack {
-                                        Spacer()
-                                        Text("Switch View")
-                                            .font(.headline)
-                                        Spacer()
-                                    }
-                                    .padding()
-                                    .background(currentTheme.titleBarColor(for: colorScheme))
-
-                                    // View options
-                                    VStack(spacing: 0) {
-                                        Button(action: {
-                                            withAnimation(.easeInOut) {
-                                                editModeTab = 0
-                                                showEditModeViewPicker = false
-                                            }
-                                        }) {
-                                            HStack {
-                                                Image(systemName: "music.note")
-                                                    .font(.system(size: 20))
-                                                    .frame(width: 30)
-                                                Text("Song Library")
-                                                    .font(.system(size: 17))
-                                                Spacer()
-                                                if editModeTab == 0 {
-                                                    Image(systemName: "checkmark")
-                                                        .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
-                                                }
-                                            }
-                                            .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
-                                            .padding()
-                                        }
-
-                                        Divider()
-
-                                        Button(action: {
-                                            withAnimation(.easeInOut) {
-                                                editModeTab = 1
-                                                showEditModeViewPicker = false
-                                            }
-                                        }) {
-                                            HStack {
-                                                Image(systemName: "list.bullet")
-                                                    .font(.system(size: 20))
-                                                    .frame(width: 30)
-                                                Text("Cue List")
-                                                    .font(.system(size: 17))
-                                                Spacer()
-                                                if editModeTab == 1 {
-                                                    Image(systemName: "checkmark")
-                                                        .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
-                                                }
-                                            }
-                                            .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
-                                            .padding()
-                                        }
-                                    }
-                                    .background(currentTheme.backgroundColor(for: colorScheme))
-
-                                    Spacer()
-                                }
-                                .presentationDetents([.height(200)])
-                                .presentationDragIndicator(.visible)
-                            }
-
-                            // Content area
-                            if editModeTab == 0 {
-                                // Library
-                                CBLibraryColumn(
-                                    rows: filteredLibraryRows(),
-                                    themeFont: currentTheme.font,
-                                    conflictFor: conflictLookup(),
-                                    isEditing: $isEditing,
-                                    batchMode: $libBatchMode,
-                                    selected: $libSelected,
-                                    sortMode: $sortMode,
-                                    searchText: $libraryQuery,
-                                    onToggleSelect: { id in toggleLibSelection(id) },
-                                    onAddToSetlist: { s in addToSetlist(s) },
-                                    onDeleteFromLibrary: { s in deleteFromLibrary(s) },
-                                    onRename: { s in editingSong = s; showAddEdit = true },
-                                    onSelectAll: selectAllLibrary,
-                                    onClearSelection: { libSelected.removeAll() },
-                                    onBatchAddToSetlist: addSelectedToSetlist,
-                                    onBatchDelete: deleteSelectedFromLibrary
-                                )
-                                .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading)))
-                            } else {
-                                // Cue List
-                                CBSetlistColumn(
-                                    songs: filteredSetlistSongs(),
-                                    themeFont: currentTheme.font,
-                                    conflictFor: conflictLookup(),
-                                    searchText: $setlistQuery,
-                                    reorderMode: $reorderMode,
-                                    batchMode: $setlistBatchMode,
-                                    selected: $setlistSelected,
-                                    onRename: { s in editingSong = s; showAddEdit = true },
-                                    onRemove: { s in removeFromSetlist(s) },
-                                    onMove: { inds, newOffset in
-                                        pushSetlistUndo()
-                                        store.updateActiveSongs { $0.move(fromOffsets: inds, toOffset: newOffset) }
-                                    },
-                                    onAdd: { editingSong = nil; showAddEdit = true },
-                                    onToggleSelect: { id in toggleSetlistSelection(id) },
-                                    onSelectAll: selectAllSetlist,
-                                    onClearSelection: { setlistSelected.removeAll() },
-                                    onBatchRemove: removeSelectedFromSetlist,
-                                    onDuplicate: { s in duplicateSong(s) }
-                                )
-                                .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .trailing)))
-                            }
-                        }
-                    )
-                } else {
-                    // iPad: Original side-by-side layout
-                    return AnyView(
-                        VStack(spacing: 0) {
-                            HStack(spacing: 0) {
-                                // v1.0.8: Swapped order - library on left, cue list on right
-                                // Logical flow: Song Library → Cue List
-                                CBLibraryColumn(
-                                    rows: filteredLibraryRows(),
-                                    themeFont: currentTheme.font,
-                                    conflictFor: conflictLookup(),
-                                    isEditing: $isEditing,
-                                    batchMode: $libBatchMode,
-                                    selected: $libSelected,
-                                    sortMode: $sortMode,
-                                    searchText: $libraryQuery,
-                                    onToggleSelect: { id in toggleLibSelection(id) },
-                                    onAddToSetlist: { s in addToSetlist(s) },
-                                    onDeleteFromLibrary: { s in deleteFromLibrary(s) },
-                                    onRename: { s in editingSong = s; showAddEdit = true },
-                                    onSelectAll: selectAllLibrary,
-                                    onClearSelection: { libSelected.removeAll() },
-                                    onBatchAddToSetlist: addSelectedToSetlist,
-                                    onBatchDelete: deleteSelectedFromLibrary
-                                )
-                                .padding(.top, 88)
-
-                                Divider()
-
-                                CBSetlistColumn(
-                                    songs: filteredSetlistSongs(),
-                                    themeFont: currentTheme.font,
-                                    conflictFor: conflictLookup(),
-                                    searchText: $setlistQuery,
-                                    reorderMode: $reorderMode,
-                                    batchMode: $setlistBatchMode,
-                                    selected: $setlistSelected,
-                                    onRename: { s in editingSong = s; showAddEdit = true },
-                                    onRemove: { s in removeFromSetlist(s) },
-                                    onMove: { inds, newOffset in
-                                        pushSetlistUndo()
-                                        store.updateActiveSongs { $0.move(fromOffsets: inds, toOffset: newOffset) }
-                                    },
-                                    onAdd: { editingSong = nil; showAddEdit = true },
-                                    onToggleSelect: { id in toggleSetlistSelection(id) },
-                                    onSelectAll: selectAllSetlist,
-                                    onClearSelection: { setlistSelected.removeAll() },
-                                    onBatchRemove: removeSelectedFromSetlist,
-                                    onDuplicate: { s in duplicateSong(s) }
-                                )
-                                .padding(.top, 88)
-                            }
-                        }
-                    )
+        // Debug print removed - was causing console spam on every render
+        return AnyView(
+            ZStack {
+                // Background - only show frosted glass in edit mode
+                if isEditing {
+                    currentTheme.backgroundColor(for: colorScheme)
+                        .ignoresSafeArea()
                 }
-            } else {
-            // Debug print removed - was causing console spam on every render
-            return AnyView(
-                ZStack {
-                    // Background - only show frosted glass in edit mode
-                    if isEditing {
-                        currentTheme.backgroundColor(for: colorScheme)
-                            .ignoresSafeArea()
-                    }
 
-                    VStack(spacing: 0) {
-                        CBPerformanceList(
-                    songs: store.activeSongs,
+                VStack(spacing: 0) {
+                    CBPerformanceList(
+                        songs: store.activeSongs,
                     songLibrary: songLibrary,  // Pass full song library for alias resolution
                     isCueMode: store.mode == .cue,
                     cuedID: store.mode == .cue ? store.cuedSong?.id : (store.mode == .regularPlusRemote && !store.activeSongs.isEmpty ? store.activeSongs[currentSongIndex()].id : nil),
@@ -3163,7 +2963,6 @@ internal struct ContentView: View {
                     }
                 }
             )
-        }
     }
 
     private var controlSectionView: some View {
