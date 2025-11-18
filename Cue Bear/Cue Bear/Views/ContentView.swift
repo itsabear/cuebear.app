@@ -3024,9 +3024,26 @@ internal struct ContentView: View {
 
                             // Select/Reorder capsule with action buttons
                             HStack(spacing: 12) {
-                                // Mode toggle buttons (always visible)
+                                // Reorder button (hide when in select mode)
+                                if !setlistBatchMode {
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                                            reorderMode.toggle()
+                                        }
+                                    }) {
+                                        Image(systemName: reorderMode ? "checkmark" : "list.bullet")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    }
+                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                                    .transition(.scale.combined(with: .opacity))
+                                }
+
+                                // Select button (always visible)
                                 Button(action: {
-                                    setlistBatchMode.toggle()
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                        setlistBatchMode.toggle()
+                                    }
                                     if !setlistBatchMode {
                                         setlistSelected.removeAll()
                                     }
@@ -3035,23 +3052,7 @@ internal struct ContentView: View {
                                         reorderMode = false
                                     }
                                 }) {
-                                    Image(systemName: setlistBatchMode ? "xmark" : "checkmark")
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                }
-                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                                        reorderMode.toggle()
-                                    }
-                                    // Turn off select when entering reorder mode
-                                    if reorderMode {
-                                        setlistBatchMode = false
-                                        setlistSelected.removeAll()
-                                    }
-                                }) {
-                                    Image(systemName: reorderMode ? "checkmark" : "list.bullet")
+                                    Image(systemName: setlistBatchMode ? "xmark" : "checklist")
                                         .font(.system(size: 20))
                                         .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                 }

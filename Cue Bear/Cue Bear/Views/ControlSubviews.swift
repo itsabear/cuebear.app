@@ -347,9 +347,13 @@ struct CBPerformanceRow: View {
                         onToggleSelection()
                     }
                 }
-                // In edit mode (not batch select): no action (cues not clickable)
-                else if isEditing {
-                    // Do nothing - cues are not interactive in edit mode
+                // In edit mode (not batch select or reorder): open Edit Cue sheet
+                else if isEditing && !reorderMode {
+                    if !didDrag {
+                        onRename()
+                    }
+                } else if isEditing {
+                    // Reorder mode: do nothing (handled by drag handles)
                 } else {
                     // Normal mode: send MIDI on quick tap (allow taps even with conflicts)
                     if !didDrag {
