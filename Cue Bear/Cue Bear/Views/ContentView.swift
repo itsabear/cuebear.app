@@ -2839,9 +2839,11 @@ internal struct ContentView: View {
         // Debug print removed - was causing console spam on every render
         return AnyView(
             ZStack {
-                // Background - only show frosted glass in edit mode
+                // Background - darker color in edit mode
                 if isEditing {
-                    currentTheme.backgroundColor(for: colorScheme)
+                    (colorScheme == .dark
+                        ? Color.black.opacity(0.85)
+                        : Color(white: 0.92))
                         .ignoresSafeArea()
                 }
 
@@ -2939,18 +2941,24 @@ internal struct ContentView: View {
                 // No background needed - cues and capsules live on same plane
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
                 .overlay(alignment: .top) {
-                    // Gradient at top of screen to fade cues underneath UI elements
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            currentTheme.backgroundColor(for: colorScheme).opacity(1.0),
-                            currentTheme.backgroundColor(for: colorScheme).opacity(0.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: 200)
-                    .ignoresSafeArea(edges: .top)
-                    .allowsHitTesting(false)
+                    // Gradient below search bar to fade cues underneath (only in edit mode)
+                    if isEditing {
+                        let editBgColor = colorScheme == .dark
+                            ? Color.black.opacity(0.85)
+                            : Color(white: 0.92)
+
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                editBgColor,
+                                editBgColor.opacity(0.0)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: 80)
+                        .padding(.top, 138)  // Below hamburger (88pt) + search capsule height (~50pt)
+                        .allowsHitTesting(false)
+                    }
                 }
                 .overlay(alignment: .top) {
                     // Search and action capsules overlay (only in edit mode) - cues scroll underneath
