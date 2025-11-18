@@ -2848,32 +2848,36 @@ internal struct ContentView: View {
                 VStack(spacing: 0) {
                     // Search and action capsules (only in edit mode)
                     if isEditing {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 12) {
                             // Search capsule
                             HStack(spacing: 8) {
                                 Image(systemName: "magnifyingglass")
-                                    .foregroundColor(.secondary)
-                                    .font(.system(size: 14))
+                                    .imageScale(.medium)
+                                    .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
 
                                 TextField("Search cues...", text: $setlistQuery)
                                     .textFieldStyle(.plain)
                                     .font(.system(size: 16))
+                                    .foregroundStyle(currentTheme.primaryTextColor(for: colorScheme))
 
                                 if !setlistQuery.isEmpty {
                                     Button(action: { setlistQuery = "" }) {
                                         Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(.secondary)
-                                            .font(.system(size: 14))
+                                            .imageScale(.small)
+                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                     }
+                                    .buttonStyle(.plain)
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(currentTheme.titleBarColor(for: colorScheme))
-                            .cornerRadius(20)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.regularMaterial)
+                            .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
 
                             // Select/Reorder capsule
-                            HStack(spacing: 0) {
+                            HStack(spacing: 12) {
                                 Button(action: {
                                     setlistBatchMode.toggle()
                                     if !setlistBatchMode {
@@ -2884,15 +2888,11 @@ internal struct ContentView: View {
                                         reorderMode = false
                                     }
                                 }) {
-                                    Text(setlistBatchMode ? "Cancel" : "Select")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 10)
+                                    Image(systemName: setlistBatchMode ? "xmark" : "checkmark.circle")
+                                        .imageScale(.large)
+                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                 }
-
-                                Divider()
-                                    .frame(height: 20)
+                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
 
                                 Button(action: {
                                     reorderMode.toggle()
@@ -2902,15 +2902,18 @@ internal struct ContentView: View {
                                         setlistSelected.removeAll()
                                     }
                                 }) {
-                                    Text(reorderMode ? "Done" : "Reorder")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 10)
+                                    Image(systemName: reorderMode ? "checkmark" : "arrow.up.arrow.down")
+                                        .imageScale(.large)
+                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                 }
+                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
                             }
-                            .background(currentTheme.titleBarColor(for: colorScheme))
-                            .cornerRadius(20)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.regularMaterial)
+                            .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 88)  // Below hamburger menu
@@ -3021,15 +3024,13 @@ internal struct ContentView: View {
                     .ignoresSafeArea(edges: .top)
                     .allowsHitTesting(false)
                 }
-                // Edit mode elevation effects
+                // Edit mode elevation effects (no rounded corners or scale - cues reach edges)
                 .background(
-                    RoundedRectangle(cornerRadius: isEditing ? 16 : 0)
+                    Rectangle()
                         .fill(.ultraThinMaterial)
                         .opacity(isEditing ? 1 : 0)
                 )
-                .cornerRadius(isEditing ? 16 : 0)
-                .shadow(color: Color.black.opacity(isEditing ? 0.3 : 0), radius: isEditing ? 20 : 0, x: 0, y: 0)
-                .scaleEffect(isEditing ? 1.02 : 1.0)
+                .shadow(color: Color.black.opacity(isEditing ? 0.15 : 0), radius: isEditing ? 30 : 0, x: 0, y: 0)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
                     }
                 }
