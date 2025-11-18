@@ -150,9 +150,12 @@ struct CBPerformanceList: View {
                                     .offset(y: -6)
                             }
                         }
-                        .gesture(
-                            (reorderMode && isDraggingFromHandle) ? DragGesture(minimumDistance: 5)
+                        .simultaneousGesture(
+                            reorderMode ? DragGesture(minimumDistance: 5)
                                 .onChanged { value in
+                                    // Only process if drag started from handle
+                                    guard isDraggingFromHandle else { return }
+
                                     if draggedSong == nil {
                                         draggedSong = s
                                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -170,6 +173,9 @@ struct CBPerformanceList: View {
                                     }
                                 }
                                 .onEnded { _ in
+                                    // Only process if drag started from handle
+                                    guard isDraggingFromHandle else { return }
+
                                     // Perform the move
                                     if let draggedSong = draggedSong,
                                        let fromIndex = songs.firstIndex(where: { $0.id == draggedSong.id }),
@@ -204,6 +210,14 @@ struct CBPerformanceList: View {
                 // Scroll to selected cue in both Cue mode and Nav mode
                 guard let id = newID else { return }
                 withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(id, anchor: .center) }
+            }
+            .onChange(of: isEditing) { _, isNowEditing in
+                // Scroll to top when entering edit mode
+                if isNowEditing, let firstSong = songs.first {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        proxy.scrollTo(firstSong.id, anchor: .top)
+                    }
+                }
             }
         }
     }
@@ -393,7 +407,7 @@ struct CBPerformanceRow: View {
                         .padding(.trailing, -8)  // Compensate for added padding
                         .contentShape(Rectangle())  // Make entire padded area tappable
                         .transition(.move(edge: .trailing).combined(with: .opacity))
-                        .gesture(
+                        .highPriorityGesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { _ in
                                     onDragHandleStart()
