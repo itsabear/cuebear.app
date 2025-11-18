@@ -52,6 +52,7 @@ struct CBPerformanceList: View {
     // Drag state for reordering
     @State private var draggedSong: Song? = nil
     @State private var hoveredIndex: Int? = nil
+    @State private var isDraggingFromHandle: Bool = false  // Track if drag started from handle
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -130,7 +131,9 @@ struct CBPerformanceList: View {
                             onLongPressChangeMIDI: { onLongPressChangeMIDI(s) },
                             onRename: { onRename(s) },
                             onDelete: { onDelete(s) },
-                            onDuplicate: { onDuplicate(s) }
+                            onDuplicate: { onDuplicate(s) },
+                            onDragHandleStart: { isDraggingFromHandle = true },  // Track handle drag start
+                            onDragHandleEnd: { isDraggingFromHandle = false }  // Track handle drag end
                         )
                         .opacity(isDragging ? 0.5 : 1.0)
                         .scaleEffect(isHovered && reorderMode ? 1.02 : 1.0)
@@ -148,7 +151,7 @@ struct CBPerformanceList: View {
                             }
                         }
                         .gesture(
-                            reorderMode ? DragGesture(minimumDistance: 20)
+                            (reorderMode && isDraggingFromHandle) ? DragGesture(minimumDistance: 5)
                                 .onChanged { value in
                                     if draggedSong == nil {
                                         draggedSong = s
@@ -193,8 +196,9 @@ struct CBPerformanceList: View {
                     Color.clear.frame(height: 8)
                 }
                 .padding(.horizontal, 36)
-                .padding(.top, 80)
+                .padding(.top, isEditing ? 150 : 80)  // Slide down in edit mode to below search bar
                 .padding(.bottom, 12)
+                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
             }
             .onChange(of: cuedID) { _, newID in
                 // Scroll to selected cue in both Cue mode and Nav mode
@@ -229,6 +233,8 @@ struct CBPerformanceRow: View {
     var onRename: () -> Void
     var onDelete: () -> Void
     var onDuplicate: () -> Void
+    var onDragHandleStart: () -> Void  // Called when drag starts from handle
+    var onDragHandleEnd: () -> Void  // Called when drag ends from handle
 
     @GestureState private var isPressed = false
     @State private var didDrag = false
@@ -383,7 +389,19 @@ struct CBPerformanceRow: View {
                         .font(.system(size: 20 * fontSize, weight: .semibold))
                         .foregroundColor(adaptiveTextColor.opacity(0.5))
                         .padding(.leading, 8)
+                        .padding(.vertical, 8)  // Increase touch target
+                        .padding(.trailing, -8)  // Compensate for added padding
+                        .contentShape(Rectangle())  // Make entire padded area tappable
                         .transition(.move(edge: .trailing).combined(with: .opacity))
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { _ in
+                                    onDragHandleStart()
+                                }
+                                .onEnded { _ in
+                                    onDragHandleEnd()
+                                }
+                        )
                 }
             }
             .padding(.horizontal, 22)

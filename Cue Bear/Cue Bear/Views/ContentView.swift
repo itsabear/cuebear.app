@@ -2941,7 +2941,7 @@ internal struct ContentView: View {
                 // No background needed - cues and capsules live on same plane
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
                 .overlay(alignment: .top) {
-                    // Gradient from below search bar UP to top of screen (only in edit mode)
+                    // Gradient from top of screen (solid) to below search bar (transparent) - improves scrolled cue visibility
                     if isEditing {
                         let editBgColor = colorScheme == .dark
                             ? Color.black.opacity(0.95)
@@ -2949,8 +2949,8 @@ internal struct ContentView: View {
 
                         LinearGradient(
                             gradient: Gradient(colors: [
-                                editBgColor.opacity(0.0),
-                                editBgColor
+                                editBgColor,  // Solid at top
+                                editBgColor.opacity(0.0)  // Transparent at bottom (below search bar)
                             ]),
                             startPoint: .top,
                             endPoint: .bottom
