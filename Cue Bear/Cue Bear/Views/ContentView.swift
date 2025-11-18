@@ -2779,7 +2779,7 @@ internal struct ContentView: View {
                 onSave: {
                     if isEditing { isEditing = false }
                     do {
-                        try ProjectIO.save(name: projectName, setlist: store.setlist.songs, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel)
+                        try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
                     } catch {
                         debugPrint("Save failed: \(error)")
                     }
@@ -2955,7 +2955,7 @@ internal struct ContentView: View {
                                     onRemove: { s in removeFromSetlist(s) },
                                     onMove: { inds, newOffset in
                                         pushSetlistUndo()
-                                        store.setlist.songs.move(fromOffsets: inds, toOffset: newOffset)
+                                        store.updateActiveSongs { $0.move(fromOffsets: inds, toOffset: newOffset) }
                                     },
                                     onAdd: { editingSong = nil; showAddEdit = true },
                                     onToggleSelect: { id in toggleSetlistSelection(id) },
@@ -3009,7 +3009,7 @@ internal struct ContentView: View {
                                     onRemove: { s in removeFromSetlist(s) },
                                     onMove: { inds, newOffset in
                                         pushSetlistUndo()
-                                        store.setlist.songs.move(fromOffsets: inds, toOffset: newOffset)
+                                        store.updateActiveSongs { $0.move(fromOffsets: inds, toOffset: newOffset) }
                                     },
                                     onAdd: { editingSong = nil; showAddEdit = true },
                                     onToggleSelect: { id in toggleSetlistSelection(id) },
@@ -3028,10 +3028,10 @@ internal struct ContentView: View {
             return AnyView(
                 VStack(spacing: 0) {
                     CBPerformanceList(
-                    songs: store.setlist.songs,
+                    songs: store.activeSongs,
                     songLibrary: songLibrary,  // Pass full song library for alias resolution
                     isCueMode: store.mode == .cue,
-                    cuedID: store.mode == .cue ? store.cuedSong?.id : (store.mode == .regularPlusRemote && !store.setlist.songs.isEmpty ? store.setlist.songs[currentSongIndex()].id : nil),
+                    cuedID: store.mode == .cue ? store.cuedSong?.id : (store.mode == .regularPlusRemote && !store.activeSongs.isEmpty ? store.activeSongs[currentSongIndex()].id : nil),
                     isEditing: isEditing,
                     flashingCueID: flashingCueID,  // Pass flash trigger down to rows
                     lastPlayedID: lastPlayedCueID,  // Pass last played cue ID for play icon
@@ -3048,7 +3048,7 @@ internal struct ContentView: View {
                         if store.mode == .regular || store.mode == .regularPlusRemote {
                             // In Navigator mode, update the index to match the tapped song
                             if store.mode == .regularPlusRemote {
-                                if let index = store.setlist.songs.firstIndex(where: { $0.id == song.id }) {
+                                if let index = store.activeSongs.firstIndex(where: { $0.id == song.id }) {
                                     lastTriggeredSongIndex = index
                                 }
                             }
@@ -3065,6 +3065,13 @@ internal struct ContentView: View {
                     onRename: { s in editingSong = s; showAddEdit = true },
                     onDelete: { s in removeFromSetlist(s) },
                     onDuplicate: { s in duplicateSong(s) },
+                    onMove: { indices, newOffset in
+                        pushSetlistUndo()
+                        store.updateActiveSongs { songs in
+                            songs.move(fromOffsets: indices, toOffset: newOffset)
+                        }
+                        saveCurrentProject(overwrite: true)
+                    },
                     conflictFor: conflictLookup()
                 )
                 .onAppear { /* Start with blank data for shipping */ }
@@ -3072,7 +3079,7 @@ internal struct ContentView: View {
                 .overlay(alignment: .center) {
                     // Show draggable transport dock in cue mode
                     if store.mode == .cue {
-                        let songs = store.setlist.songs
+                        let songs = store.activeSongs
                         let cued = store.cuedSong
                         let cuedIndex = cued.flatMap { s in songs.firstIndex(where: { $0.id == s.id }) }
                         let canPrev = (cuedIndex ?? 0) > 0
@@ -3094,7 +3101,7 @@ internal struct ContentView: View {
 
                     // Show draggable navigation capsule in regularPlusRemote mode
                     if store.mode == .regularPlusRemote {
-                        let songs = store.setlist.songs
+                        let songs = store.activeSongs
                         let currentIndex = currentSongIndex()
                         let canPrev = currentIndex > 0
                         let canNext = currentIndex < songs.count - 1
@@ -3362,7 +3369,7 @@ internal struct ContentView: View {
                         sideMenuButton("Save", icon: "square.and.arrow.down", action: {
                             if isEditing { isEditing = false }
                             do {
-                                try ProjectIO.save(name: projectName, setlist: store.setlist.songs, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel)
+                                try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
                             } catch {
                                 debugPrint("Save failed: \(error)")
                             }
@@ -3737,7 +3744,7 @@ internal struct ContentView: View {
                                 if isDirty && projectName != "Untitled" {
                                     debugPrint("💾 App going to background, saving project: \(projectName)")
                                     do {
-                                        try ProjectIO.save(name: projectName, setlist: store.setlist.songs, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel)
+                                        try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
                                         isDirty = false
                                         debugPrint("✅ Background save completed: \(projectName)")
                                     } catch {
@@ -3770,7 +3777,7 @@ internal struct ContentView: View {
         }
         .sheet(isPresented: $showMidiTable) {
             MidiTableSheet(
-                setlist: store.setlist.songs,
+                setlist: store.activeSongs,
                 controlButtons: controlButtons,
                 isGlobalChannel: $isGlobalChannel,
                 globalChannel: $globalChannel,
@@ -3779,15 +3786,15 @@ internal struct ContentView: View {
                 onDismiss: { showMidiTable = false },
                 onApply: { items in
                     // Write changes back to setlist and controls by id
-                    var set = store.setlist.songs
-                    for i in 0..<set.count {
-                        if let edited = items.first(where: { $0.id == set[i].id }) {
-                            set[i].kind = edited.midiType
-                            set[i].channel = edited.channel
-                            if edited.midiType == .note { set[i].note = edited.value } else { set[i].cc = edited.value }
+                    store.updateActiveSongs { songs in
+                        for i in 0..<songs.count {
+                            if let edited = items.first(where: { $0.id == songs[i].id }) {
+                                songs[i].kind = edited.midiType
+                                songs[i].channel = edited.channel
+                                if edited.midiType == .note { songs[i].note = edited.value } else { songs[i].cc = edited.value }
+                            }
                         }
                     }
-                    store.setlist.songs = set
 
                     var controls = controlButtons
                     for i in 0..<controls.count {
@@ -3831,7 +3838,7 @@ internal struct ContentView: View {
                     aliasCue.aliasedCueID = song.id  // Reference to original cue
 
                     // Add to setlist
-                    store.setlist.songs.append(aliasCue)
+                    store.updateActiveSongs { $0.append(aliasCue) }
                     showAddEdit = false
                 },
                 isGlobalChannel: isGlobalChannel,
@@ -4173,7 +4180,7 @@ internal struct ContentView: View {
             // Clear any existing data for shipping - start completely blank (only on first launch)
             if !hasInitialized {
                 debugPrint("🔄 First launch - clearing all data")
-                store.setlist.songs.removeAll()
+                store.updateActiveSongs { $0.removeAll() }
                 songLibrary.removeAll()
                 controlButtons.removeAll()
                 libAddedAt.removeAll()
@@ -4242,7 +4249,7 @@ internal struct ContentView: View {
             if store.mode == .regular || store.mode == .regularPlusRemote { store.cuedSong = nil }
             updateConflictCache()
         }
-        .task(id: store.setlist.songs) {
+        .task(id: store.activeSongs.map(\.id)) {
             updateConflictCache()
             markDirty()
         }
@@ -4329,7 +4336,7 @@ internal struct ContentView: View {
 
         // Songs in setlist + library (deduplicate by ID to avoid counting same song twice)
         var seenSongIDs = Set<UUID>()
-        for s in (store.setlist.songs + songLibrary) {
+        for s in (store.activeSongs + songLibrary) {
             // Skip if we've already processed this song ID
             guard !seenSongIDs.contains(s.id) else { continue }
             seenSongIDs.insert(s.id)
@@ -4436,7 +4443,7 @@ internal struct ContentView: View {
 
             // Save song channels
             savedSongChannels.removeAll()
-            for song in store.setlist.songs {
+            for song in store.activeSongs {
                 savedSongChannels[song.id] = song.channel
             }
             for song in songLibrary {
@@ -4458,9 +4465,11 @@ internal struct ContentView: View {
             debugPrint("🌍 Disabling global MIDI channel mode - restoring original channels")
 
             // Restore song channels
-            for i in 0..<store.setlist.songs.count {
-                if let savedChannel = savedSongChannels[store.setlist.songs[i].id] {
-                    store.setlist.songs[i].channel = savedChannel
+            store.updateActiveSongs { songs in
+                for i in 0..<songs.count {
+                    if let savedChannel = savedSongChannels[songs[i].id] {
+                        songs[i].channel = savedChannel
+                    }
                 }
             }
             for i in 0..<songLibrary.count {
@@ -4492,8 +4501,10 @@ internal struct ContentView: View {
         debugPrint("🌍 Applying global channel \(globalChannel) to all items")
 
         // Apply to songs in setlist
-        for i in 0..<store.setlist.songs.count {
-            store.setlist.songs[i].channel = globalChannel
+        store.updateActiveSongs { songs in
+            for i in 0..<songs.count {
+                songs[i].channel = globalChannel
+            }
         }
 
         // Apply to songs in library
@@ -4506,7 +4517,7 @@ internal struct ContentView: View {
             controlButtons[i].channel = globalChannel
         }
 
-        debugPrint("✅ Applied global channel to \(store.setlist.songs.count + songLibrary.count) songs and \(controlButtons.count) controls")
+        debugPrint("✅ Applied global channel to \(store.activeSongs.count + songLibrary.count) songs and \(controlButtons.count) controls")
     }
 
     // MARK: - Actions
@@ -4568,54 +4579,54 @@ internal struct ContentView: View {
     private func cueGo() {
         guard let s = store.cuedSong else { return }
         trigger(s)
-        if let i = store.setlist.songs.firstIndex(where: { $0.id == s.id }),
-           i + 1 < store.setlist.songs.count {
-            store.cuedSong = store.setlist.songs[i + 1]
+        if let i = store.activeSongs.firstIndex(where: { $0.id == s.id }),
+           i + 1 < store.activeSongs.count {
+            store.cuedSong = store.activeSongs[i + 1]
         }
         // If on last song, stay on it (don't set to nil)
     }
 
     private func selectPreviousCued() {
         guard let cued = store.cuedSong,
-              let i = store.setlist.songs.firstIndex(where: { $0.id == cued.id }),
+              let i = store.activeSongs.firstIndex(where: { $0.id == cued.id }),
               i > 0 else { return }
-        store.cuedSong = store.setlist.songs[i - 1]
+        store.cuedSong = store.activeSongs[i - 1]
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
     private func selectNextCued() {
-        if let cued = store.cuedSong, let i = store.setlist.songs.firstIndex(where: { $0.id == cued.id }) {
-            guard i + 1 < store.setlist.songs.count else { return }
-            store.cuedSong = store.setlist.songs[i + 1]
-        } else if !store.setlist.songs.isEmpty {
+        if let cued = store.cuedSong, let i = store.activeSongs.firstIndex(where: { $0.id == cued.id }) {
+            guard i + 1 < store.activeSongs.count else { return }
+            store.cuedSong = store.activeSongs[i + 1]
+        } else if !store.activeSongs.isEmpty {
             // If nothing cued yet, select first
-            store.cuedSong = store.setlist.songs.first
+            store.cuedSong = store.activeSongs.first
         }
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
     // MARK: - Regular Mode Navigation (for Navigation Capsule)
     private func currentSongIndex() -> Int {
-        return max(0, min(lastTriggeredSongIndex, store.setlist.songs.count - 1))
+        return max(0, min(lastTriggeredSongIndex, store.activeSongs.count - 1))
     }
 
     private func triggerNext() {
-        guard !store.setlist.songs.isEmpty else { return }
+        guard !store.activeSongs.isEmpty else { return }
         // Prevent going past the last song
-        guard lastTriggeredSongIndex < store.setlist.songs.count - 1 else { return }
+        guard lastTriggeredSongIndex < store.activeSongs.count - 1 else { return }
         let nextIndex = lastTriggeredSongIndex + 1
         lastTriggeredSongIndex = nextIndex
-        let song = store.setlist.songs[nextIndex]
+        let song = store.activeSongs[nextIndex]
         trigger(song)
     }
 
     private func triggerPrevious() {
-        guard !store.setlist.songs.isEmpty else { return }
+        guard !store.activeSongs.isEmpty else { return }
         // Prevent going before the first song
         guard lastTriggeredSongIndex > 0 else { return }
         let prevIndex = lastTriggeredSongIndex - 1
         lastTriggeredSongIndex = prevIndex
-        let song = store.setlist.songs[prevIndex]
+        let song = store.activeSongs[prevIndex]
         trigger(song)
     }
 
@@ -4646,17 +4657,17 @@ internal struct ContentView: View {
     private func usedCCNumbers() -> Set<Int> {
         // Always compute fresh to avoid state modification during view updates
         var taken: Set<Int> = [CBTransportCC.play, CBTransportCC.stop, CBTransportCC.prev, CBTransportCC.next]
-        taken.formUnion(store.setlist.songs.filter{ $0.kind == .cc }.map { $0.cc })
+        taken.formUnion(store.activeSongs.filter{ $0.kind == .cc }.map { $0.cc })
         taken.formUnion(songLibrary.filter{ $0.kind == .cc }.map { $0.cc })
         taken.formUnion(controlButtons.filter{ $0.kind == .cc }.map { $0.number })
-        
+
         return taken
     }
 
     private func nextDefaultCueName() -> String {
         let prefix = "Cue "
         var maxN = 0
-        for s in store.setlist.songs {
+        for s in store.activeSongs {
             if s.name.hasPrefix(prefix) {
                 let rest = s.name.dropFirst(prefix.count)
                 if let n = Int(rest) { maxN = max(maxN, n) }
@@ -4679,7 +4690,7 @@ internal struct ContentView: View {
     }
 
     private func libraryDecorated() -> [CBLibraryRow] {
-        let setIDs = Set(store.setlist.songs.map { $0.id })
+        let setIDs = Set(store.activeSongs.map { $0.id })
         return sortedLibrary().map { s in
             CBLibraryRow(id: s.id, song: s, isInSetlist: setIDs.contains(s.id), isSelected: libSelected.contains(s.id))
         }
@@ -4697,7 +4708,7 @@ internal struct ContentView: View {
     }
 
     private func filteredSetlistSongs() -> [Song] {
-        let songs = store.setlist.songs
+        let songs = store.activeSongs
         let q = setlistQueryDebounced.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return songs }
         return songs.filter { song in
@@ -4736,7 +4747,7 @@ internal struct ContentView: View {
 
         // Remove from both library and cue list
         songLibrary.removeAll { libSelected.contains($0.id) }
-        store.setlist.songs.removeAll { libSelected.contains($0.id) }
+        store.updateActiveSongs { $0.removeAll { libSelected.contains($0.id) } }
 
         // Clean up metadata for deleted songs
         libSelected.forEach { libAddedAt[$0] = nil }
@@ -4750,7 +4761,7 @@ internal struct ContentView: View {
     // MARK: - Setlist Batch Operations
 
     private func toggleSetlistSelection(_ id: UUID) {
-        let songName = store.setlist.songs.first(where: { $0.id == id })?.name ?? "Unknown"
+        let songName = store.activeSongs.first(where: { $0.id == id })?.name ?? "Unknown"
         let wasSelected = setlistSelected.contains(id)
         debugPrint("🔵 toggleSetlistSelection called for: \(songName) (ID: \(id)), wasSelected: \(wasSelected)")
         if setlistSelected.contains(id) { setlistSelected.remove(id) } else { setlistSelected.insert(id) }
@@ -4768,7 +4779,7 @@ internal struct ContentView: View {
         pushSetlistUndo()
 
         // Remove from cue list only
-        store.setlist.songs.removeAll { setlistSelected.contains($0.id) }
+        store.updateActiveSongs { $0.removeAll { setlistSelected.contains($0.id) } }
 
         invalidateConflictCache()
         isDirty = true
@@ -4780,7 +4791,7 @@ internal struct ContentView: View {
     private func addToSetlist(_ s: Song) {
         debugPrint("➕ addToSetlist called for: \(s.name) (ID: \(s.id))")
         pushSetlistUndo()
-        let alreadyInSetlist = store.setlist.songs.contains(where: { $0.id == s.id })
+        let alreadyInSetlist = store.activeSongs.contains(where: { $0.id == s.id })
         debugPrint("➕ Already in setlist: \(alreadyInSetlist)")
         guard !alreadyInSetlist else {
             debugPrint("➕ Skipping add - song already in setlist")
@@ -4801,10 +4812,10 @@ internal struct ContentView: View {
         }
 
         debugPrint("➕ Appending \(s.name) to setlist")
-        store.setlist.songs.append(songToAdd)
+        store.updateActiveSongs { $0.append(songToAdd) }
         invalidateConflictCache()
         isDirty = true
-        debugPrint("➕ addToSetlist completed for: \(s.name), setlist now has \(store.setlist.songs.count) songs")
+        debugPrint("➕ addToSetlist completed for: \(s.name), setlist now has \(store.activeSongs.count) songs")
     }
 
     private func firstFreeCC() -> Int {
@@ -4819,11 +4830,11 @@ internal struct ContentView: View {
 
     private func removeFromSetlist(_ s: Song) {
         debugPrint("🔴 removeFromSetlist called for: \(s.name) (ID: \(s.id))")
-        let countBefore = store.setlist.songs.count
+        let countBefore = store.activeSongs.count
         debugPrint("🔴 Setlist size before removal: \(countBefore)")
         pushSetlistUndo()
-        store.setlist.songs.removeAll { $0.id == s.id }
-        let countAfter = store.setlist.songs.count
+        store.updateActiveSongs { $0.removeAll { $0.id == s.id } }
+        let countAfter = store.activeSongs.count
         debugPrint("🔴 Setlist size after removal: \(countAfter)")
         isDirty = true
         debugPrint("🔴 removeFromSetlist completed for: \(s.name), removed: \(countBefore - countAfter) song(s)")
@@ -4831,8 +4842,8 @@ internal struct ContentView: View {
 
     private func deleteFromLibrary(_ s: Song) {
         // Check if song is also in cue list
-        let isInCueList = store.setlist.songs.contains(where: { $0.id == s.id })
-        
+        let isInCueList = store.activeSongs.contains(where: { $0.id == s.id })
+
         if isInCueList {
             // Show confirmation popup
             songToDelete = s
@@ -4848,16 +4859,18 @@ internal struct ContentView: View {
         pushLibraryUndo()
 
         // Convert any alias cues pointing to this song into regular cues
-        for i in 0..<store.setlist.songs.count {
-            if store.setlist.songs[i].aliasedCueID == s.id {
-                store.setlist.songs[i].aliasedCueID = nil
-                debugPrint("🔄 Converted alias cue '\(store.setlist.songs[i].name)' to regular cue (original deleted)")
+        store.updateActiveSongs { songs in
+            for i in 0..<songs.count {
+                if songs[i].aliasedCueID == s.id {
+                    songs[i].aliasedCueID = nil
+                    debugPrint("🔄 Converted alias cue '\(songs[i].name)' to regular cue (original deleted)")
+                }
             }
         }
 
         // Remove from both library and cue list
         songLibrary.removeAll { $0.id == s.id }
-        store.setlist.songs.removeAll { $0.id == s.id }
+        store.updateActiveSongs { $0.removeAll { $0.id == s.id } }
         libAddedAt[s.id] = nil
         invalidateConflictCache()
         isDirty = true
@@ -4894,27 +4907,29 @@ internal struct ContentView: View {
     private func saveSong(_ song: Song) {
         pushSetlistUndo()
         pushLibraryUndo()
-        
+
         let isNewSong = !songLibrary.contains(where: { $0.id == song.id })
-        
+
         // Update existing song in setlist if it's there
-        if let i = store.setlist.songs.firstIndex(where: { $0.id == song.id }) { 
-            store.setlist.songs[i] = song 
+        store.updateActiveSongs { songs in
+            if let i = songs.firstIndex(where: { $0.id == song.id }) {
+                songs[i] = song
+            }
         }
-        
+
         // Add or update in library
         if let j = songLibrary.firstIndex(where: { $0.id == song.id }) {
             songLibrary[j] = song
         } else {
             songLibrary.append(song)
             libAddedAt[song.id] = Date()
-            
+
             // For new songs, also add directly to cue list for better UX
-            if isNewSong && !store.setlist.songs.contains(where: { $0.id == song.id }) {
-                store.setlist.songs.append(song)
+            if isNewSong && !store.activeSongs.contains(where: { $0.id == song.id }) {
+                store.updateActiveSongs { $0.append(song) }
         }
         }
-        
+
         // Invalidate conflict cache since MIDI assignments may have changed
         invalidateConflictCache()
         isDirty = true
@@ -4927,7 +4942,7 @@ internal struct ContentView: View {
 
     private func snapshotAndSave(as name: String, overwrite: Bool) {
         do {
-            try ProjectIO.save(name: name, setlist: store.setlist.songs, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel)
+            try ProjectIO.save(name: name, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
             projectName = name
             isDirty = false
             projectsList = ProjectIO.list()
@@ -4954,19 +4969,19 @@ internal struct ContentView: View {
 
     // MARK: - Undo/Redo helpers
     private func pushSetlistUndo() {
-        setlistUndoStack.append(store.setlist.songs)
+        setlistUndoStack.append(store.activeSongs)
         setlistRedoStack.removeAll()
     }
     private func undoSetlist() {
         guard let last = setlistUndoStack.popLast() else { return }
-        setlistRedoStack.append(store.setlist.songs)
-        store.setlist.songs = last
+        setlistRedoStack.append(store.activeSongs)
+        store.updateActiveSongs { $0 = last }
         isDirty = true
     }
     private func redoSetlist() {
         guard let next = setlistRedoStack.popLast() else { return }
-        setlistUndoStack.append(store.setlist.songs)
-        store.setlist.songs = next
+        setlistUndoStack.append(store.activeSongs)
+        store.updateActiveSongs { $0 = next }
         isDirty = true
     }
     
@@ -5063,13 +5078,14 @@ internal struct ContentView: View {
         do {
             debugPrint("🔄 Loading project: \(named)")
             let payload = try ProjectIO.load(name: named)
-            debugPrint("📦 Project payload loaded - setlist: \(payload.setlist.count) songs, library: \(payload.library.count) songs, controls: \(payload.controls.count) buttons")
+            debugPrint("📦 Project payload loaded - cueLists: \(payload.cueLists?.count ?? 0), library: \(payload.library.count) songs, controls: \(payload.controls.count) buttons")
 
             // Set loading flag to prevent global channel toggle from triggering backup/restore
             isLoadingProject = true
 
             projectName = payload.name
-            store.setlist.songs = payload.setlist
+            store.cueLists = payload.cueLists ?? [CueList.defaultMain]
+            store.activeCueListID = payload.activeCueListID ?? store.cueLists.first?.id
             songLibrary = payload.library
             controlButtons = payload.controls
             isGlobalChannel = payload.isGlobalChannel ?? false
@@ -5083,7 +5099,7 @@ internal struct ContentView: View {
             // Migrate controls that are beyond the 4-row limit (rows 0-3)
             migrateOutOfBoundsControls()
 
-            debugPrint("✅ Project data assigned - setlist: \(store.setlist.songs.count) songs, library: \(songLibrary.count) songs, controls: \(controlButtons.count) buttons")
+            debugPrint("✅ Project data assigned - cueLists: \(store.cueLists.count), activeSongs: \(store.activeSongs.count) songs, library: \(songLibrary.count) songs, controls: \(controlButtons.count) buttons")
             
             let now = Date()
             for s in songLibrary where libAddedAt[s.id] == nil { libAddedAt[s.id] = now }
@@ -5105,15 +5121,15 @@ internal struct ContentView: View {
     /// This copies all songs from setlist to library and marks project as dirty for save
     private func recoverEmptyLibrary() {
         // Only recover if library is empty AND setlist has songs
-        guard songLibrary.isEmpty && !store.setlist.songs.isEmpty else {
+        guard songLibrary.isEmpty && !store.activeSongs.isEmpty else {
             return
         }
 
-        debugPrint("🔧 RECOVERY: Detected empty library with \(store.setlist.songs.count) songs in setlist")
+        debugPrint("🔧 RECOVERY: Detected empty library with \(store.activeSongs.count) songs in setlist")
         debugPrint("🔧 RECOVERY: Auto-populating library from setlist...")
 
         // Copy all songs from setlist to library
-        songLibrary = store.setlist.songs
+        songLibrary = store.activeSongs
 
         // Set timestamps for all recovered songs
         let now = Date()
@@ -5252,7 +5268,7 @@ internal struct ContentView: View {
                 if isDirty && projectName != "Untitled" {
                     debugPrint("💾 Auto-saving project: \(projectName)")
                     do {
-                        try ProjectIO.save(name: projectName, setlist: store.setlist.songs, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel)
+                        try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
                         isDirty = false
                         debugPrint("✅ Auto-save completed: \(projectName)")
                     } catch {
@@ -5300,13 +5316,14 @@ internal struct ContentView: View {
         do {
             let payload = try ProjectIO.load(name: projectName)
             debugPrint("🔄 Auto-opening last project: \(projectName)")
-            debugPrint("📦 Auto-open payload - setlist: \(payload.setlist.count) songs, library: \(payload.library.count) songs, controls: \(payload.controls.count) buttons")
+            debugPrint("📦 Auto-open payload - cueLists: \(payload.cueLists?.count ?? 0), library: \(payload.library.count) songs, controls: \(payload.controls.count) buttons")
 
             // Set loading flag to prevent global channel toggle from triggering backup/restore
             isLoadingProject = true
 
             // Load the project data
-            store.setlist.songs = payload.setlist
+            store.cueLists = payload.cueLists ?? [CueList.defaultMain]
+            store.activeCueListID = payload.activeCueListID ?? store.cueLists.first?.id
             songLibrary = payload.library
             controlButtons = payload.controls
             isGlobalChannel = payload.isGlobalChannel ?? false
@@ -5372,7 +5389,8 @@ internal struct ContentView: View {
                         self.isLoadingProject = true
 
                         self.projectName = uniqueName
-                        self.store.setlist.songs = payload.setlist
+                        self.store.cueLists = payload.cueLists ?? [CueList.defaultMain]
+                        self.store.activeCueListID = payload.activeCueListID ?? self.store.cueLists.first?.id
                         self.songLibrary = payload.library
                         self.controlButtons = payload.controls
                         self.isGlobalChannel = payload.isGlobalChannel ?? false
@@ -5412,11 +5430,13 @@ internal struct ContentView: View {
         // Create payload from current state
         let payload = ProjectPayload(
             name: projectName,
-            setlist: store.setlist.songs,
+            cueLists: store.cueLists,
+            activeCueListID: store.activeCueListID,
             library: songLibrary,
             controls: controlButtons,
             isGlobalChannel: isGlobalChannel,
-            globalChannel: globalChannel
+            globalChannel: globalChannel,
+            theme: selectedThemeID
         )
 
         // Present share sheet
@@ -5440,7 +5460,7 @@ internal struct ContentView: View {
     
     private func createNewProject() {
         projectName = "Untitled"
-        store.setlist.songs.removeAll()
+        store.updateActiveSongs { $0.removeAll() }
         songLibrary.removeAll()
         controlButtons.removeAll()
         libAddedAt.removeAll()

@@ -120,18 +120,36 @@ struct CueBearApp: App {
             let data = try Data(contentsOf: url)
             let payload = try JSONDecoder().decode(ProjectPayload.self, from: data)
 
+            // Migrate legacy demo projects to modern format
+            let cueLists: [CueList]
+            let activeCueListID: UUID
+
+            if payload.isLegacyFormat {
+                // Convert legacy setlist to "Main" cue list
+                let mainList = CueList(name: "Main", songs: payload.setlist ?? [])
+                cueLists = [mainList]
+                activeCueListID = mainList.id
+                debugPrint("📦 Migrating legacy demo project '\(demoName)' to v1.2.0 format")
+            } else {
+                // Use modern format as-is
+                cueLists = payload.cueLists ?? [CueList.defaultMain]
+                activeCueListID = payload.activeCueListID ?? cueLists.first!.id
+            }
+
             // Save using ProjectIO (saves as .cuebear format in Documents)
             try ProjectIO.save(
                 name: payload.name,
-                setlist: payload.setlist,
+                cueLists: cueLists,
+                activeCueListID: activeCueListID,
                 library: payload.library,
                 controls: payload.controls,
                 isGlobalChannel: payload.isGlobalChannel,
-                globalChannel: payload.globalChannel
+                globalChannel: payload.globalChannel,
+                theme: payload.theme
             )
 
             debugPrint("✅ Installed demo project: \(demoName)")
-            debugPrint("📊 Demo content: \(payload.setlist.count) cues, \(payload.library.count) library songs, \(payload.controls.count) controls")
+            debugPrint("📊 Demo content: \(cueLists.count) cue lists, \(cueLists.first?.songs.count ?? 0) songs in main list, \(payload.library.count) library songs, \(payload.controls.count) controls")
 
             // Only set flag if installation succeeded
             UserDefaults.standard.set(true, forKey: "hasInstalledDemoProjects")

@@ -45,7 +45,12 @@ struct CBPerformanceList: View {
     var onRename: (Song) -> Void
     var onDelete: (Song) -> Void
     var onDuplicate: (Song) -> Void
+    var onMove: (IndexSet, Int) -> Void  // Callback for reordering cues
     let conflictFor: [MIDIKey: String]
+
+    // Drag state for reordering
+    @State private var draggedSong: Song? = nil
+    @State private var hoveredIndex: Int? = nil
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -72,54 +77,114 @@ struct CBPerformanceList: View {
                         .padding(.top, 120)
                     }
 
-                    ForEach(songs) { s in
-                    let key = (s.kind == .note)
-                        ? MIDIKey(kind: .note, channel: s.channel, number: s.note ?? 0)
-                        : MIDIKey(kind: .cc,   channel: s.channel, number: s.cc)
-                    let takenBy = conflictFor[key]
-                    let filteredTakenBy: String? = {
-                        guard let takenBy = takenBy else { return nil }
-                        // Filter out current song's name from the conflict list
-                        if takenBy.contains("|||") {
-                            // Multiple owners - split and filter
-                            let owners = takenBy.split(separator: "|||").map(String.init).filter { $0 != s.name }
-                            guard !owners.isEmpty else { return nil }
-                            if owners.count == 1 {
-                                return owners[0]
-                            } else if owners.count == 2 {
-                                return "\(owners[0]) and \(owners[1])"
-                            } else {
-                                return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+                    ForEach(Array(songs.enumerated()), id: \.element.id) { index, s in
+                        let key = (s.kind == .note)
+                            ? MIDIKey(kind: .note, channel: s.channel, number: s.note ?? 0)
+                            : MIDIKey(kind: .cc,   channel: s.channel, number: s.cc)
+                        let takenBy = conflictFor[key]
+                        let filteredTakenBy: String? = {
+                            guard let takenBy = takenBy else { return nil }
+                            // Filter out current song's name from the conflict list
+                            if takenBy.contains("|||") {
+                                // Multiple owners - split and filter
+                                let owners = takenBy.split(separator: "|||").map(String.init).filter { $0 != s.name }
+                                guard !owners.isEmpty else { return nil }
+                                if owners.count == 1 {
+                                    return owners[0]
+                                } else if owners.count == 2 {
+                                    return "\(owners[0]) and \(owners[1])"
+                                } else {
+                                    return owners.dropLast().joined(separator: ", ") + ", and " + owners.last!
+                                }
+                            } else if takenBy == s.name {
+                                // Single owner and it's us
+                                return nil
                             }
-                        } else if takenBy == s.name {
-                            // Single owner and it's us
-                            return nil
+                            return takenBy
+                        }()
+
+                        let isDragging = draggedSong?.id == s.id
+                        let isHovered = hoveredIndex == index
+
+                        CBPerformanceRow(
+                            song: s,
+                            songLibrary: songLibrary,  // Pass full song library for alias resolution
+                            isCued: cuedID == s.id,  // Show stroke in both Cue and Navigator modes
+                            isCueMode: isCueMode,
+                            isEditing: isEditing,
+                            takenBy: filteredTakenBy,
+                            shouldFlash: flashingCueID == s.id,  // Flash when triggered
+                            isLastPlayed: lastPlayedID == s.id,  // Show steady play icon on last played
+                            accentColor: accentColor,  // Pass theme accent color
+                            defaultCueColor: defaultCueColor,  // Pass theme default cue color
+                            themeFont: themeFont,  // Pass theme font function
+                            selectionStrokeColor: selectionStrokeColor(s.colorHex),  // Compute contrasting selection stroke color
+                            backgroundColorHex: backgroundColorHex,  // Pass background color hex for contrast
+                            defaultCueColorHex: defaultCueColorHex,  // Pass default cue color hex for preview
+                            showMIDIData: showMIDIData,  // Pass MIDI data visibility setting
+                            cueHeight: cueHeight,  // Pass customizable cue height
+                            fontSize: fontSize,  // Pass font size multiplier
+                            onTap: { onTapSong(s) },
+                            onLongPressChangeMIDI: { onLongPressChangeMIDI(s) },
+                            onRename: { onRename(s) },
+                            onDelete: { onDelete(s) },
+                            onDuplicate: { onDuplicate(s) }
+                        )
+                        .opacity(isDragging ? 0.5 : 1.0)
+                        .scaleEffect(isHovered && isEditing ? 1.02 : 1.0)
+                        .animation(.easeInOut(duration: 0.2), value: isHovered)
+                        .animation(.easeInOut(duration: 0.2), value: isDragging)
+                        .overlay(alignment: .top) {
+                            // Drop indicator line
+                            if isHovered && isEditing && draggedSong != nil {
+                                Rectangle()
+                                    .fill(accentColor)
+                                    .frame(height: 3)
+                                    .cornerRadius(1.5)
+                                    .padding(.horizontal, 40)
+                                    .offset(y: -6)
+                            }
                         }
-                        return takenBy
-                    }()
-                    CBPerformanceRow(
-                        song: s,
-                        songLibrary: songLibrary,  // Pass full song library for alias resolution
-                        isCued: cuedID == s.id,  // Show stroke in both Cue and Navigator modes
-                        isCueMode: isCueMode,
-                        isEditing: isEditing,
-                        takenBy: filteredTakenBy,
-                        shouldFlash: flashingCueID == s.id,  // Flash when triggered
-                        isLastPlayed: lastPlayedID == s.id,  // Show steady play icon on last played
-                        accentColor: accentColor,  // Pass theme accent color
-                        defaultCueColor: defaultCueColor,  // Pass theme default cue color
-                        themeFont: themeFont,  // Pass theme font function
-                        selectionStrokeColor: selectionStrokeColor(s.colorHex),  // Compute contrasting selection stroke color
-                        backgroundColorHex: backgroundColorHex,  // Pass background color hex for contrast
-                        defaultCueColorHex: defaultCueColorHex,  // Pass default cue color hex for preview
-                        showMIDIData: showMIDIData,  // Pass MIDI data visibility setting
-                        cueHeight: cueHeight,  // Pass customizable cue height
-                        fontSize: fontSize,  // Pass font size multiplier
-                        onTap: { onTapSong(s) },
-                        onLongPressChangeMIDI: { onLongPressChangeMIDI(s) },
-                        onRename: { onRename(s) },
-                        onDelete: { onDelete(s) },
-                        onDuplicate: { onDuplicate(s) }
+                        .gesture(
+                            isEditing ? DragGesture(minimumDistance: 20)
+                                .onChanged { value in
+                                    if draggedSong == nil {
+                                        draggedSong = s
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    }
+
+                                    // Calculate which index we're hovering over
+                                    let cueHeightWithSpacing = CGFloat(cueHeight + 12)
+                                    let offset = value.translation.height
+                                    let indexOffset = Int(round(offset / cueHeightWithSpacing))
+                                    let newIndex = max(0, min(songs.count - 1, index + indexOffset))
+
+                                    if hoveredIndex != newIndex {
+                                        hoveredIndex = newIndex
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    }
+                                }
+                                .onEnded { _ in
+                                    // Perform the move
+                                    if let draggedSong = draggedSong,
+                                       let fromIndex = songs.firstIndex(where: { $0.id == draggedSong.id }),
+                                       let toIndex = hoveredIndex,
+                                       fromIndex != toIndex {
+
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            onMove(IndexSet(integer: fromIndex), toIndex > fromIndex ? toIndex + 1 : toIndex)
+                                        }
+
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    }
+
+                                    // Reset drag state
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        self.draggedSong = nil
+                                        self.hoveredIndex = nil
+                                    }
+                                }
+                            : nil
                         )
                         .id(s.id)
                     }
@@ -1356,22 +1421,6 @@ struct CBConnectionsSheet: View {
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         }
                     }
-                }
-
-                Section {
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 4) {
-                            Text("Cue Bear for iPad")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.2") (\(gitCommitHash()))")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .listRowBackground(Color.clear)
                 }
 
             }

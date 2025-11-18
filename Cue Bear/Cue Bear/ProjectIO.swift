@@ -43,10 +43,36 @@ enum ProjectIO {
         try baseFolder().appendingPathComponent("\(name).cuebear", conformingTo: .data) 
     }
 
-    static func save(name: String, setlist: [Song], library: [Song], controls: [ControlButton], isGlobalChannel: Bool? = nil, globalChannel: Int? = nil) throws {
+    // MARK: - Modern Format Save (v1.2.0+)
+
+    /// Save project in modern format with multiple cue lists
+    static func save(name: String, cueLists: [CueList], activeCueListID: UUID?, library: [Song], controls: [ControlButton], isGlobalChannel: Bool? = nil, globalChannel: Int? = nil, theme: String? = nil) throws {
+        let payload = ProjectPayload(
+            name: name,
+            cueLists: cueLists,
+            activeCueListID: activeCueListID,
+            library: library,
+            controls: controls,
+            isGlobalChannel: isGlobalChannel,
+            globalChannel: globalChannel,
+            theme: theme,
+            projectVersion: "1.2.0"
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        let data = try encoder.encode(payload)
+        try data.write(to: try path(for: name), options: .atomic)
+        debugPrint("💾 Saved project '\(name)' in v1.2.0 format with \(cueLists.count) cue lists")
+    }
+
+    // MARK: - Legacy Format Save (for compatibility)
+
+    /// Save project in legacy format (single setlist) - for backward compatibility only
+    static func saveLegacy(name: String, setlist: [Song], library: [Song], controls: [ControlButton], isGlobalChannel: Bool? = nil, globalChannel: Int? = nil) throws {
         let payload = ProjectPayload(name: name, setlist: setlist, library: library, controls: controls, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel)
         let data = try JSONEncoder().encode(payload)
         try data.write(to: try path(for: name), options: .atomic)
+        debugPrint("💾 Saved project '\(name)' in legacy format")
     }
 
     static func load(name: String) throws -> ProjectPayload {
