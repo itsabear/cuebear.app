@@ -5115,8 +5115,19 @@ internal struct ContentView: View {
             isLoadingProject = true
 
             projectName = payload.name
-            store.cueLists = payload.cueLists ?? [CueList.defaultMain]
-            store.activeCueListID = payload.activeCueListID ?? store.cueLists.first?.id
+
+            // Migrate legacy format: convert setlist to "Main" cue list
+            if payload.isLegacyFormat, let legacySetlist = payload.setlist {
+                debugPrint("🔄 Migrating legacy project format to v1.2.0")
+                let mainList = CueList(name: "Main", songs: legacySetlist)
+                store.cueLists = [mainList]
+                store.activeCueListID = mainList.id
+                debugPrint("✅ Migrated \(legacySetlist.count) songs to 'Main' cue list")
+            } else {
+                // Modern format or empty legacy
+                store.cueLists = payload.cueLists ?? [CueList.defaultMain]
+                store.activeCueListID = payload.activeCueListID ?? store.cueLists.first?.id
+            }
             songLibrary = payload.library
             controlButtons = payload.controls
             isGlobalChannel = payload.isGlobalChannel ?? false
@@ -5352,9 +5363,17 @@ internal struct ContentView: View {
             // Set loading flag to prevent global channel toggle from triggering backup/restore
             isLoadingProject = true
 
-            // Load the project data
-            store.cueLists = payload.cueLists ?? [CueList.defaultMain]
-            store.activeCueListID = payload.activeCueListID ?? store.cueLists.first?.id
+            // Load the project data - migrate legacy format if needed
+            if payload.isLegacyFormat, let legacySetlist = payload.setlist {
+                debugPrint("🔄 Migrating legacy auto-open project to v1.2.0")
+                let mainList = CueList(name: "Main", songs: legacySetlist)
+                store.cueLists = [mainList]
+                store.activeCueListID = mainList.id
+                debugPrint("✅ Migrated \(legacySetlist.count) songs to 'Main' cue list")
+            } else {
+                store.cueLists = payload.cueLists ?? [CueList.defaultMain]
+                store.activeCueListID = payload.activeCueListID ?? store.cueLists.first?.id
+            }
             songLibrary = payload.library
             controlButtons = payload.controls
             isGlobalChannel = payload.isGlobalChannel ?? false
@@ -5420,8 +5439,18 @@ internal struct ContentView: View {
                         self.isLoadingProject = true
 
                         self.projectName = uniqueName
-                        self.store.cueLists = payload.cueLists ?? [CueList.defaultMain]
-                        self.store.activeCueListID = payload.activeCueListID ?? self.store.cueLists.first?.id
+
+                        // Migrate legacy format if needed
+                        if payload.isLegacyFormat, let legacySetlist = payload.setlist {
+                            debugPrint("🔄 Migrating imported legacy project to v1.2.0")
+                            let mainList = CueList(name: "Main", songs: legacySetlist)
+                            self.store.cueLists = [mainList]
+                            self.store.activeCueListID = mainList.id
+                            debugPrint("✅ Migrated \(legacySetlist.count) songs to 'Main' cue list")
+                        } else {
+                            self.store.cueLists = payload.cueLists ?? [CueList.defaultMain]
+                            self.store.activeCueListID = payload.activeCueListID ?? self.store.cueLists.first?.id
+                        }
                         self.songLibrary = payload.library
                         self.controlButtons = payload.controls
                         self.isGlobalChannel = payload.isGlobalChannel ?? false
