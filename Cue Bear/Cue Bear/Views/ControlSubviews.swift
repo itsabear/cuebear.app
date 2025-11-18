@@ -135,10 +135,18 @@ struct CBPerformanceList: View {
                             onDragHandleStart: { isDraggingFromHandle = true },  // Track handle drag start
                             onDragHandleEnd: { isDraggingFromHandle = false }  // Track handle drag end
                         )
-                        .opacity(isDragging ? 0.5 : 1.0)
-                        .scaleEffect(isHovered && reorderMode ? 1.02 : 1.0)
-                        .animation(.easeInOut(duration: 0.2), value: isHovered)
-                        .animation(.easeInOut(duration: 0.2), value: isDragging)
+                        // Apple-style drag animations
+                        .opacity(isDragging ? 0.7 : 1.0)  // Dragged item slightly transparent
+                        .scaleEffect(isDragging ? 1.08 : 1.0)  // Dragged item "rises"
+                        .shadow(
+                            color: isDragging ? Color.black.opacity(0.3) : Color.clear,
+                            radius: isDragging ? 12 : 0,
+                            x: 0,
+                            y: isDragging ? 8 : 0
+                        )
+                        .padding(.vertical, isHovered && reorderMode && draggedSong != nil ? 20 : 0)  // Hovered items "make room"
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDragging)
                         .overlay(alignment: .top) {
                             // Drop indicator line - only in reorder mode
                             if isHovered && reorderMode && draggedSong != nil {
@@ -212,10 +220,10 @@ struct CBPerformanceList: View {
                 withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(id, anchor: .center) }
             }
             .onChange(of: isEditing) { _, isNowEditing in
-                // Scroll to top when entering edit mode
+                // Scroll so first cue appears below search bar when entering edit mode
                 if isNowEditing, let firstSong = songs.first {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        proxy.scrollTo(firstSong.id, anchor: .top)
+                        proxy.scrollTo(firstSong.id, anchor: .center)
                     }
                 }
             }

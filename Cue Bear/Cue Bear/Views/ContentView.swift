@@ -2839,11 +2839,11 @@ internal struct ContentView: View {
         // Debug print removed - was causing console spam on every render
         return AnyView(
             ZStack {
-                // Background - much darker in edit mode for focus
+                // Background - significantly darker in edit mode for focus
                 if isEditing {
                     (colorScheme == .dark
-                        ? Color.black.opacity(0.95)
-                        : Color(white: 0.85))
+                        ? Color.black
+                        : Color(white: 0.75))
                         .ignoresSafeArea()
                 }
 
@@ -2944,8 +2944,8 @@ internal struct ContentView: View {
                     // Gradient from top of screen (solid) to below search bar (transparent) - improves scrolled cue visibility
                     if isEditing {
                         let editBgColor = colorScheme == .dark
-                            ? Color.black.opacity(0.95)
-                            : Color(white: 0.85)
+                            ? Color.black
+                            : Color(white: 0.75)
 
                         LinearGradient(
                             gradient: Gradient(colors: [
