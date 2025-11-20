@@ -82,9 +82,29 @@ final class SetlistStore: ObservableObject {
         activeCueListID = cueListID
     }
 
-    /// Create a new cue list
-    func createCueList(name: String) -> UUID {
-        let newList = CueList(name: name, songs: [])
+    /// Check if a cue list name already exists (case-insensitive)
+    func cueListNameExists(_ name: String, excluding cueListID: UUID? = nil) -> Bool {
+        let existingNamesLowercase = cueLists
+            .filter { $0.id != cueListID }  // Exclude the specified cue list
+            .map { $0.name.lowercased() }
+        return Set(existingNamesLowercase).contains(name.lowercased())
+    }
+
+    /// Create a new cue list with the given name (optionally force creation with number suffix)
+    func createCueList(name: String, forceNumbered: Bool = false) -> UUID {
+        var finalName = name
+
+        if forceNumbered {
+            // Find next available number for duplicate
+            let existingNamesLowercase = Set(cueLists.map { $0.name.lowercased() })
+            var counter = 1
+            while existingNamesLowercase.contains("\(name) (\(counter))".lowercased()) {
+                counter += 1
+            }
+            finalName = "\(name) (\(counter))"
+        }
+
+        let newList = CueList(name: finalName, songs: [])
         cueLists.append(newList)
         return newList.id
     }

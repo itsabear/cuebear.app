@@ -56,6 +56,18 @@ struct AppTheme: Identifiable, Codable, Equatable {
         return shouldUseDarkMode(for: colorScheme) ? darkBackgroundColorHex : backgroundColorHex
     }
 
+    func sheetBackgroundColor(for colorScheme: ColorScheme) -> Color {
+        // Use title bar color for sheets/popovers (same as side menu)
+        // This provides consistent visual hierarchy across the app
+        if shouldUseDarkMode(for: colorScheme) {
+            // In dark mode, explicitly use the dark title bar color
+            return Color(hex: darkTitleBarColorHex)
+        } else {
+            // In light mode, use light title bar color
+            return Color(hex: titleBarColorHex)
+        }
+    }
+
     func defaultCueColor(for colorScheme: ColorScheme) -> Color {
         let hex = shouldUseDarkMode(for: colorScheme) ? darkDefaultCueColorHex : defaultCueColorHex
         return Color(hex: hex)

@@ -549,6 +549,8 @@ struct IconPicker: View {
         }
         .popover(isPresented: $showingPopover) {
             IconGridView(symbol: $symbol, icons: icons, showingPopover: $showingPopover)
+                .presentationCompactAdaptation(.popover)
+                .presentationBackground(selectedTheme.sheetBackgroundColor(for: colorScheme))
         }
     }
 }
@@ -2480,7 +2482,8 @@ internal struct ContentView: View {
         "stop.circle.fill", "stop.fill",
 
         // Music & Performance - Strings & Keys
-        "guitars.fill",
+        "guitars", "guitars.fill",
+        "music.note.house", "music.note.house.fill",
         "pianokeys", "pianokeys.inverse",
 
         // Music & Performance - Brass & Winds
@@ -2502,16 +2505,13 @@ internal struct ContentView: View {
         "radio", "radio.fill",
         "hifispeaker", "hifispeaker.fill",
         "hifispeaker.2", "hifispeaker.2.fill",
-        "amplifier",
-        "beats.headphones",
-        "beats.earphones",
-        "beats.powerbeatspro.left",
+        "homepod", "homepod.fill",
+        "homepod.2", "homepod.2.fill",
+        "headphones", "headphones.circle.fill",
 
         // Audio & Mixing
         "dial.max",
         "ear.fill",
-        "headphones.circle.fill",
-        "mic.fill",
         "slider.horizontal.3",
         "speaker.slash.fill",
         "speaker.wave.2.fill", "speaker.wave.3.fill",
@@ -2586,6 +2586,7 @@ internal struct ContentView: View {
     @State private var setlistBatchMode = false  // Batch select mode for cue list
     @State private var setlistSelected: Set<UUID> = []  // Selected cues in batch mode
     @State private var showLibraryPopover = false  // Show song library popover
+    @State private var showCueListChooser = false  // Show cue list chooser popover
 
     // Library state
     @State private var songLibrary: [Song] = []
@@ -2621,6 +2622,19 @@ internal struct ContentView: View {
     @State private var tempName: String = ""
     @State private var showSaveChangesAlert: Bool = false
     @State private var pendingAction: (() -> Void)? = nil
+
+    // Cue list renaming
+    @State private var showCueListRenamePrompt: Bool = false
+    @State private var cueListToRename: UUID? = nil
+    @State private var tempCueListName: String = ""
+    @State private var showDuplicateRenameAlert: Bool = false
+    @State private var duplicateRenameNewName: String = ""
+
+    // Cue list creation
+    @State private var showNewCueListPrompt: Bool = false
+    @State private var newCueListName: String = ""
+    @State private var showDuplicateCueListAlert: Bool = false
+    @State private var duplicateCueListName: String = ""
 
     // Navigation capsule (Regular + Remote mode)
     @State private var lastTriggeredSongIndex: Int = 0
@@ -2740,6 +2754,18 @@ internal struct ContentView: View {
                 isGlobalChannel: $isGlobalChannel,
                 globalChannel: $globalChannel,
                 showLibraryPopover: $showLibraryPopover,
+                songLibrary: $songLibrary,
+                activeCueListSongs: Binding(
+                    get: { store.activeSongs },
+                    set: { _ in }
+                ),
+                editingSong: $editingSong,
+                showAddEdit: $showAddEdit,
+                cueLists: $store.cueLists,
+                activeCueListID: $store.activeCueListID,
+                showCueListChooser: $showCueListChooser,
+                libAddedAt: libAddedAt,
+                selectedThemeID: selectedThemeID,
                 projectTitle: projectName,
                 connectionTint: connectionTint,
                 connectionCoordinator: connectionCoordinator,
@@ -2778,7 +2804,17 @@ internal struct ContentView: View {
                 onMenuToggle: {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showSideMenu.toggle()
+                        // Exit edit mode when opening side menu
+                        if showSideMenu {
+                            isEditing = false
+                        }
                     }
+                },
+                onAddToSetlist: { song in
+                    addToSetlist(song)
+                },
+                onDeleteFromLibrary: { song in
+                    deleteFromLibrary(song)
                 },
                 // Menu actions
                 onRenameProject: {
@@ -2804,8 +2840,7 @@ internal struct ContentView: View {
                 },
                 onOpenProject: {
                     if isEditing { isEditing = false }
-                    projectsList = ProjectIO.list()
-                    showProjects = true
+                    openProjectFlow()
                 },
                 onImport: {
                     if isEditing { isEditing = false }
@@ -2833,6 +2868,35 @@ internal struct ContentView: View {
                 onShowAbout: {
                     if isEditing { isEditing = false }
                     showAboutSheet = true
+                },
+                // Cue list actions
+                onSwitchCueList: { cueListID in
+                    store.switchToCueList(cueListID)
+                    isDirty = true
+                    saveCurrentProject(overwrite: true)
+                },
+                onDuplicateCueList: { cueListID in
+                    if let newID = store.duplicateCueList(cueListID) {
+                        store.switchToCueList(newID)
+                        isDirty = true
+                        saveCurrentProject(overwrite: true)
+                    }
+                },
+                onRenameCueList: { cueListID in
+                    // Pre-fill with current cue list name
+                    if let cueList = store.cueLists.first(where: { $0.id == cueListID }) {
+                        cueListToRename = cueListID
+                        tempCueListName = cueList.name
+                        showCueListRenamePrompt = true
+                    }
+                },
+                onDeleteCueList: { cueListID in
+                    store.deleteCueList(cueListID)
+                    isDirty = true
+                },
+                onCreateCueList: {
+                    newCueListName = "New Cue List"
+                    showNewCueListPrompt = true
                 }
             )
     }
@@ -2851,13 +2915,7 @@ internal struct ContentView: View {
         // Debug print removed - was causing console spam on every render
         return AnyView(
             ZStack {
-                // Background - much darker in edit mode for focus
-                if isEditing {
-                    (colorScheme == .dark
-                        ? Color.black
-                        : Color(white: 0.60))
-                        .ignoresSafeArea()
-                }
+                // Background - same in all modes
 
                 VStack(spacing: 0) {
                     CBPerformanceList(
@@ -2906,7 +2964,7 @@ internal struct ContentView: View {
                         store.updateActiveSongs { songs in
                             songs.move(fromOffsets: indices, toOffset: newOffset)
                         }
-                        saveCurrentProject(overwrite: true)
+                        isDirty = true
                     },
                     onToggleSelection: { song in
                         if setlistSelected.contains(song.id) {
@@ -2920,8 +2978,8 @@ internal struct ContentView: View {
                 .onAppear { /* Start with blank data for shipping */ }
             .contentShape(Rectangle())
                 .overlay(alignment: .center) {
-                    // Show draggable transport dock in cue mode
-                    if store.mode == .cue {
+                    // Show draggable transport dock in cue mode (hide in edit mode)
+                    if store.mode == .cue && !isEditing {
                         let songs = store.activeSongs
                         let cued = store.cuedSong
                         let cuedIndex = cued.flatMap { s in songs.firstIndex(where: { $0.id == s.id }) }
@@ -2942,8 +3000,8 @@ internal struct ContentView: View {
                         )
                     }
 
-                    // Show draggable navigation capsule in regularPlusRemote mode
-                    if store.mode == .regularPlusRemote {
+                    // Show draggable navigation capsule in regularPlusRemote mode (hide in edit mode)
+                    if store.mode == .regularPlusRemote && !isEditing {
                         let songs = store.activeSongs
                         let currentIndex = currentSongIndex()
                         let canPrev = currentIndex > 0
@@ -2962,24 +3020,24 @@ internal struct ContentView: View {
                 // No background needed - cues and capsules live on same plane
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
                 .overlay(alignment: .top) {
-                    // Gradient from top of screen (solid) to below search bar (transparent) - improves scrolled cue visibility
-                    if isEditing {
-                        let editBgColor = colorScheme == .dark
-                            ? Color.black
-                            : Color(white: 0.60)
+                    // Gradient from top of screen (solid background) to below title/search bar (fades to transparent) - improves scrolled cue visibility
+                    let gradientHeight: CGFloat = isEditing ? 118 : 60  // Taller in edit mode (title + search), shorter in normal mode (title only)
+                    let bgColor = currentTheme.backgroundColor(for: colorScheme)
 
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                editBgColor,  // Solid at top
-                                editBgColor.opacity(0.0)  // Transparent at bottom (below search bar)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: 118)  // From top to below search bar
-                        .ignoresSafeArea(edges: .top)
-                        .allowsHitTesting(false)
-                    }
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: bgColor, location: 0.0),                  // Solid background at top
+                            .init(color: bgColor.opacity(0.7), location: 0.25),   // More visible
+                            .init(color: bgColor.opacity(0.3), location: 0.5),    // Slight fade
+                            .init(color: bgColor.opacity(0.0), location: 1.0)     // Transparent at bottom
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: gradientHeight)
+                    .ignoresSafeArea(edges: .top)
+                    .allowsHitTesting(false)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
                 }
                 .overlay(alignment: .top) {
                     // Search and action capsules overlay (only in edit mode) - cues scroll underneath
@@ -3055,7 +3113,7 @@ internal struct ContentView: View {
                                             songs.removeAll(where: { setlistSelected.contains($0.id) })
                                         }
                                         setlistSelected.removeAll()
-                                        saveCurrentProject(overwrite: true)
+                                        isDirty = true
                                     }
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundStyle(.red)
@@ -3120,7 +3178,7 @@ internal struct ContentView: View {
                             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         }
                         .padding(.horizontal, 16)
-                        .padding(.top, 68)  // Closer to hamburger menu
+                        .padding(.top, 88)  // Position below the top bar (increased from 68)
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
                     }
@@ -3363,16 +3421,12 @@ internal struct ContentView: View {
                         })
                         sideMenuButton("Save", icon: "square.and.arrow.down", action: {
                             if isEditing { isEditing = false }
-                            do {
-                                try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
-                            } catch {
-                                debugPrint("Save failed: \(error)")
-                            }
+                            saveCurrentProject(overwrite: true)
                             closeMenu()
                         })
                         sideMenuButton("Save As...", icon: "square.and.arrow.down.on.square", action: {
                             if isEditing { isEditing = false }
-                            showNamePrompt = true
+                            saveCurrentProject(overwrite: false)
                             closeMenu()
                         })
                         sideMenuButton("Open...", icon: "folder", action: {
@@ -3509,9 +3563,9 @@ internal struct ContentView: View {
     private func mainStack() -> AnyView {
         AnyView(
             ZStack(alignment: .leading) {
-                // Theme background color
+                // Theme background color - extends to all edges including safe areas
                 currentTheme.backgroundColor(for: colorScheme)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(edges: .all)
 
                 // Main content (without top bar - it will overlay)
                 VStack(spacing: 0) {
@@ -3737,7 +3791,7 @@ internal struct ContentView: View {
                                 }
                             } else if phase == .background {
                                 // Save project when app goes to background
-                                if isDirty && projectName != "Untitled" {
+                                if isDirty && !isUntitledProject(projectName) {
                                     debugPrint("💾 App going to background, saving project: \(projectName)")
                                     do {
                                         try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
@@ -3770,6 +3824,8 @@ internal struct ContentView: View {
                     connectionCoordinator.connectToWiFi(bridge: item)
                 }
             )
+            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showMidiTable) {
             MidiTableSheet(
@@ -3804,6 +3860,8 @@ internal struct ContentView: View {
                     markDirty()
                 }
             )
+            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showAddEdit) {
             CBAddEditCueSheet(
@@ -3824,7 +3882,14 @@ internal struct ContentView: View {
                     showAddEdit = false
                 },
                 onDelete: { song in
-                    deleteFromLibrary(song)
+                    // Determine context based on whether we're in edit mode
+                    // If in edit mode (from cue list), just remove from cue list
+                    // Otherwise (from library or add button), delete from library
+                    if isEditing {
+                        removeFromSetlist(song)
+                    } else {
+                        deleteFromLibrary(song)
+                    }
                     showAddEdit = false
                 },
                 onDuplicate: { song in
@@ -3837,10 +3902,13 @@ internal struct ContentView: View {
                     store.updateActiveSongs { $0.append(aliasCue) }
                     showAddEdit = false
                 },
+                editContext: isEditing ? .cueList : .library,
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
                 midiFilter: midiFilter
             )
+            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showAddEditMIDIOnly) {
             CBMIDIPickerSheet(
@@ -3863,28 +3931,8 @@ internal struct ContentView: View {
                 onCancel: { showAddEditMIDIOnly = false },
                 editingSongName: editingSong?.name
             )
-        }
-        .sheet(isPresented: $showLibraryPopover) {
-            SongLibraryPopover(
-                library: $songLibrary,
-                activeCueListSongs: Binding(
-                    get: { store.activeSongs },
-                    set: { _ in }
-                ),
-                libAddedAt: libAddedAt,
-                selectedThemeID: selectedThemeID,
-                onAddToCueList: { song in
-                    addToSetlist(song)
-                },
-                onDelete: { song in
-                    deleteFromLibrary(song)
-                },
-                onEdit: { song in
-                    editingSong = song
-                    showAddEdit = true
-                    showLibraryPopover = false
-                }
-            )
+            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showControlEditor) {
             CBControlEditorSheet(
@@ -3975,6 +4023,8 @@ internal struct ContentView: View {
                 canAddMore: $canAddMoreControlsToGrid,
                 draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
+            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showEditControlSheet) {
             CBControlEditorSheet(
@@ -4019,6 +4069,8 @@ internal struct ContentView: View {
                 canAddMore: $canAddMoreControlsToGrid,
                 draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
+            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showProjects) {
             CBProjectsSheet(
@@ -4042,10 +4094,12 @@ internal struct ContentView: View {
                     debugPrint("🗑️ Projects list after deletion: \(projectsList)")
                 }
             )
+            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView()
-                .presentationBackground(Color(.systemBackground))
+                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
                 .presentationCornerRadius(20)
                 .interactiveDismissDisabled(false)
                 // TODO: Integrate tutorial when ready
@@ -4060,19 +4114,29 @@ internal struct ContentView: View {
         }
         .sheet(isPresented: $showAboutSheet) {
             AboutSheet()
+                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showAppearanceSheet) {
             AppearanceSheet()
+                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showAppearanceSettingsSheet) {
             AppearanceSettingsSheet()
+                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showDesignPreview) {
             DesignPreviewSheet()
+                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationCornerRadius(20)
         }
         #if DEBUG
         .sheet(isPresented: $showAdminPanel) {
             ThemeAdminPanel()
+                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationCornerRadius(20)
         }
         #endif
         // Force default theme on every app launch
@@ -4099,6 +4163,67 @@ internal struct ContentView: View {
                 showProjects = false
             }
         }, message: { Text("Enter a name for your project.") })
+        .alert("Rename Cue List", isPresented: $showCueListRenamePrompt, actions: {
+            TextField("Name", text: $tempCueListName)
+            Button("Cancel", role: .cancel) {
+                cueListToRename = nil
+            }
+            Button("Save") {
+                let final = tempCueListName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !final.isEmpty, let cueListID = cueListToRename else { return }
+
+                // Check if name already exists (excluding current cue list being renamed)
+                if store.cueListNameExists(final, excluding: cueListID) {
+                    duplicateRenameNewName = final
+                    showDuplicateRenameAlert = true
+                } else {
+                    store.renameCueList(cueListID, to: final)
+                    isDirty = true
+                    cueListToRename = nil
+                }
+            }
+        }, message: { Text("Enter a new name for this cue list.") })
+        .alert("Duplicate Name", isPresented: $showDuplicateRenameAlert, actions: {
+            Button("Cancel", role: .cancel) {
+                // Keep rename dialog open by not clearing cueListToRename
+            }
+            Button("Use Anyway") {
+                guard let cueListID = cueListToRename else { return }
+                store.renameCueList(cueListID, to: duplicateRenameNewName)
+                isDirty = true
+                cueListToRename = nil
+            }
+        }, message: {
+            Text("A cue list named \"\(duplicateRenameNewName)\" already exists. Do you want to use this name anyway?")
+        })
+        .alert("New Cue List", isPresented: $showNewCueListPrompt, actions: {
+            TextField("Name", text: $newCueListName)
+            Button("Cancel", role: .cancel) { }
+            Button("Create") {
+                let final = newCueListName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !final.isEmpty else { return }
+
+                // Check if name already exists
+                if store.cueListNameExists(final) {
+                    duplicateCueListName = final
+                    showDuplicateCueListAlert = true
+                } else {
+                    let newID = store.createCueList(name: final)
+                    store.switchToCueList(newID)
+                    isDirty = true
+                }
+            }
+        }, message: { Text("Enter a name for the new cue list.") })
+        .alert("Duplicate Name", isPresented: $showDuplicateCueListAlert, actions: {
+            Button("Cancel", role: .cancel) { }
+            Button("Create A Copy") {
+                let newID = store.createCueList(name: duplicateCueListName, forceNumbered: true)
+                store.switchToCueList(newID)
+                isDirty = true
+            }
+        }, message: {
+            Text("A cue list named \"\(duplicateCueListName)\" already exists in your song library.")
+        })
         .alert("Save Changes", isPresented: $showSaveChangesAlert, actions: {
             Button("Save", role: .none) {
                 saveCurrentProject(overwrite: true)
@@ -4168,11 +4293,11 @@ internal struct ContentView: View {
 
                 // CRITICAL FIX: If view was recreated by iOS, data might be empty
                 // Reload the current project if library is empty but project has a name
-                if songLibrary.isEmpty && projectName != "Untitled" && !projectName.isEmpty {
+                if songLibrary.isEmpty && !isUntitledProject(projectName) && !projectName.isEmpty {
                     debugPrint("⚠️ Library is empty but project is '\(projectName)' - reloading from disk")
                     autoOpenLastProject()
-                } else if songLibrary.isEmpty && projectName == "Untitled" {
-                    // For "Untitled" projects, try to restore from autosave
+                } else if songLibrary.isEmpty && isUntitledProject(projectName) {
+                    // For "Untitled Project" projects, try to restore from autosave
                     if let saved = ProjectIO.loadLibraryAutosave() {
                         songLibrary = saved
                         debugPrint("📂 Restored library from autosave for Untitled project")
@@ -4269,11 +4394,15 @@ internal struct ContentView: View {
         }
         .task(id: store.activeSongs.map(\.id)) {
             updateConflictCache()
-            markDirty()
+            if !isLoadingProject {
+                markDirty()
+            }
         }
         .task(id: songLibrary) {
             updateConflictCache()
-            markDirty()
+            if !isLoadingProject {
+                markDirty()
+            }
         }
         .onChange(of: isGlobalChannel) { oldValue, newValue in
             handleGlobalChannelToggle(wasEnabled: oldValue, isEnabled: newValue)
@@ -4289,11 +4418,13 @@ internal struct ContentView: View {
         }
         .task(id: controlButtons) {
             updateConflictCache()
-            markDirty()
+            if !isLoadingProject {
+                markDirty()
+            }
         }
             .onChange(of: isDirty) { _, newValue in
                 // FIX #4: Use DispatchWorkItem instead of .task to prevent task churn
-                guard newValue, projectName != "Untitled" else { return }
+                guard newValue, !isUntitledProject(projectName) else { return }
                 autosaveWorkItem?.cancel()
                 let currentProjectName = projectName
                 let workItem = DispatchWorkItem {
@@ -4685,7 +4816,8 @@ internal struct ContentView: View {
     private func nextDefaultCueName() -> String {
         let prefix = "Cue "
         var maxN = 0
-        for s in store.activeSongs {
+        // Check all songs in the library (not just active cue list) for unique naming
+        for s in songLibrary {
             if s.name.hasPrefix(prefix) {
                 let rest = s.name.dropFirst(prefix.count)
                 if let n = Int(rest) { maxN = max(maxN, n) }
@@ -4859,10 +4991,12 @@ internal struct ContentView: View {
     }
 
     private func deleteFromLibrary(_ s: Song) {
-        // Check if song is also in cue list
-        let isInCueList = store.activeSongs.contains(where: { $0.id == s.id })
+        // Check if song is in ANY cue list
+        let isInAnyCueList = store.cueLists.contains { cueList in
+            cueList.songs.contains(where: { $0.id == s.id })
+        }
 
-        if isInCueList {
+        if isInAnyCueList {
             // Show confirmation popup
             songToDelete = s
             showDeleteConfirmation = true
@@ -4876,19 +5010,33 @@ internal struct ContentView: View {
         pushSetlistUndo()
         pushLibraryUndo()
 
-        // Convert any alias cues pointing to this song into regular cues
-        store.updateActiveSongs { songs in
-            for i in 0..<songs.count {
-                if songs[i].aliasedCueID == s.id {
-                    songs[i].aliasedCueID = nil
-                    debugPrint("🔄 Converted alias cue '\(songs[i].name)' to regular cue (original deleted)")
+        // Convert any alias cues pointing to this song into regular cues AND remove song from ALL cue lists
+        for i in 0..<store.cueLists.count {
+            var updated = false
+            for j in 0..<store.cueLists[i].songs.count {
+                // Convert aliases to regular cues
+                if store.cueLists[i].songs[j].aliasedCueID == s.id {
+                    store.cueLists[i].songs[j].aliasedCueID = nil
+                    debugPrint("🔄 Converted alias cue '\(store.cueLists[i].songs[j].name)' to regular cue (original deleted)")
+                    updated = true
                 }
+            }
+            // Remove the song from this cue list
+            let beforeCount = store.cueLists[i].songs.count
+            store.cueLists[i].songs.removeAll { $0.id == s.id }
+            let afterCount = store.cueLists[i].songs.count
+            if beforeCount != afterCount {
+                updated = true
+                debugPrint("🗑️ Removed song '\(s.name)' from cue list '\(store.cueLists[i].name)'")
+            }
+            // Update timestamp if modified
+            if updated {
+                store.cueLists[i].touch()
             }
         }
 
-        // Remove from both library and cue list
+        // Remove from library
         songLibrary.removeAll { $0.id == s.id }
-        store.updateActiveSongs { $0.removeAll { $0.id == s.id } }
         libAddedAt[s.id] = nil
         invalidateConflictCache()
         isDirty = true
@@ -4909,7 +5057,8 @@ internal struct ContentView: View {
             sourceSong = s
         }
 
-        var copy = Song(name: "Copy of " + sourceSong.name, subtitle: sourceSong.subtitle, cc: sourceSong.cc, channel: sourceSong.channel)
+        // Create copy with same name but "copy of [name]" as subtitle
+        var copy = Song(name: sourceSong.name, subtitle: "copy of \(sourceSong.name)", cc: sourceSong.cc, channel: sourceSong.channel)
         copy.kind = sourceSong.kind
         copy.note = sourceSong.note
         copy.velocity = sourceSong.velocity
@@ -4918,8 +5067,17 @@ internal struct ContentView: View {
         // Don't copy aliasedCueID - this is a real duplicate, not an alias
         songLibrary.append(copy)
         libAddedAt[copy.id] = Date()
+
+        // Add the copy to the cue list right after the original song
+        store.updateActiveSongs { songs in
+            if let index = songs.firstIndex(where: { $0.id == s.id }) {
+                songs.insert(copy, at: index + 1)
+            }
+        }
+
         UIImpactFeedbackGenerator().impactOccurred(intensity: 0.5)
         isDirty = true
+        saveCurrentProject(overwrite: true)
     }
 
     private func saveSong(_ song: Song) {
@@ -5084,11 +5242,16 @@ internal struct ContentView: View {
 
     private func saveCurrentProject(overwrite: Bool) {
         let trimmed = projectName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty || trimmed == "Untitled" {
-            tempName = trimmed.isEmpty ? "My Show" : trimmed
+
+        // Show name prompt for "Save As" OR when saving an untitled project for the first time
+        if !overwrite || trimmed.isEmpty || isUntitledProject(trimmed) {
+            // Pre-fill with current name for "Save As", or suggest active cue list name for new projects
+            tempName = trimmed.isEmpty || isUntitledProject(trimmed) ? (store.activeCueList?.name ?? "My Show") : trimmed
             showNamePrompt = true
             return
         }
+
+        // For projects with a name, save directly
         snapshotAndSave(as: trimmed, overwrite: overwrite)
     }
 
@@ -5282,19 +5445,19 @@ internal struct ContentView: View {
     private func startAutosave() {
         // Cancel existing autosave task
         autosaveTask?.cancel()
-        
-        // Only autosave if project has a name (not "Untitled")
-        guard projectName != "Untitled" && !projectName.isEmpty else { return }
-        
+
+        // Only autosave if project has a name (not "Untitled Project")
+        guard !isUntitledProject(projectName) && !projectName.isEmpty else { return }
+
         autosaveTask = Task {
             // Wait 2 seconds before saving to debounce rapid changes
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            
+
             // Check if task was cancelled
             guard !Task.isCancelled else { return }
-            
+
             await MainActor.run {
-                if isDirty && projectName != "Untitled" {
+                if isDirty && !isUntitledProject(projectName) {
                     debugPrint("💾 Auto-saving project: \(projectName)")
                     do {
                         try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
@@ -5331,9 +5494,9 @@ internal struct ContentView: View {
         }
 
         // For subsequent launches, load the last opened project
-        guard projectName != "Untitled" && !projectName.isEmpty else {
-            debugPrint("⏭️ Skipping auto-open - projectName is 'Untitled' or empty")
-            // For "Untitled" projects, try to restore library from autosave
+        guard !isUntitledProject(projectName) && !projectName.isEmpty else {
+            debugPrint("⏭️ Skipping auto-open - projectName is 'Untitled Project' or empty")
+            // For "Untitled Project" projects, try to restore library from autosave
             if let saved = ProjectIO.loadLibraryAutosave() {
                 songLibrary = saved
                 debugPrint("📂 Restored library from autosave for Untitled project (\(saved.count) songs)")
@@ -5504,10 +5667,23 @@ internal struct ContentView: View {
             createNewProject()
         }
     }
-    
+
+    private func openProjectFlow() {
+        if isDirty {
+            showSaveChangesAlert = true
+            pendingAction = { [self] in
+                projectsList = ProjectIO.list()
+                showProjects = true
+            }
+        } else {
+            projectsList = ProjectIO.list()
+            showProjects = true
+        }
+    }
+
     private func createNewProject() {
-        projectName = "Untitled"
-        store.updateActiveSongs { $0.removeAll() }
+        projectName = "Untitled Project"
+        store.reset()  // Reset to single "Untitled Cue List"
         songLibrary.removeAll()
         controlButtons.removeAll()
         libAddedAt.removeAll()
@@ -5519,14 +5695,20 @@ internal struct ContentView: View {
     }
     
     private func checkUnsavedChangesBeforeAction(_ action: @escaping () -> Void) {
-        // v1.0.8: Only show save prompt for projects that have been saved before (not "Untitled")
+        // v1.0.8: Only show save prompt for projects that have been saved before (not "Untitled Project")
         // Matches autosave behavior pattern used throughout the app
-        if isDirty && projectName != "Untitled" {
+        if isDirty && !isUntitledProject(projectName) {
             showSaveChangesAlert = true
             pendingAction = action
         } else {
             action()
         }
+    }
+
+    // Helper function to check if project name is untitled
+    private func isUntitledProject(_ name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed == "Untitled" || trimmed == "Untitled Project"
     }
 
     // MARK: - Ready for Shipping
@@ -5583,6 +5765,15 @@ private struct CBTopBar: View {
     @Binding var isGlobalChannel: Bool
     @Binding var globalChannel: Int
     @Binding var showLibraryPopover: Bool  // Control library popover visibility
+    @Binding var songLibrary: [Song]  // Song library for popover
+    @Binding var activeCueListSongs: [Song]  // Active cue list songs
+    @Binding var editingSong: Song?  // Currently editing song
+    @Binding var showAddEdit: Bool  // Show add/edit sheet
+    @Binding var cueLists: [CueList]  // All cue lists
+    @Binding var activeCueListID: UUID?  // Active cue list ID
+    @Binding var showCueListChooser: Bool  // Show cue list chooser popover
+    let libAddedAt: [UUID: Date]  // Timestamps for library songs
+    let selectedThemeID: String  // Theme ID for popover
     let projectTitle: String
     let connectionTint: Color
     let connectionCoordinator: ConnectionCoordinator
@@ -5601,6 +5792,8 @@ private struct CBTopBar: View {
     var canUndo: Bool = false
     var canRedo: Bool = false
     var onMenuToggle: () -> Void
+    var onAddToSetlist: (Song) -> Void  // Add song to setlist callback
+    var onDeleteFromLibrary: (Song) -> Void  // Delete from library callback
 
     // Menu actions
     var onRenameProject: () -> Void
@@ -5614,6 +5807,19 @@ private struct CBTopBar: View {
     var onShowAppearance: () -> Void = {}
     var onShowOnboarding: () -> Void = {}
     var onShowAbout: () -> Void = {}
+
+    // Cue list actions
+    var onSwitchCueList: (UUID) -> Void = { _ in }
+    var onDuplicateCueList: (UUID) -> Void = { _ in }
+    var onRenameCueList: (UUID) -> Void = { _ in }
+    var onDeleteCueList: (UUID) -> Void = { _ in }
+    var onCreateCueList: () -> Void = {}
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
 
     var body: some View {
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
@@ -5656,14 +5862,55 @@ private struct CBTopBar: View {
     // MARK: - Subviews
 
     private var projectNameButton: some View {
-        Button(action: onRenameProject) {
-            Text(projectTitle)
-                .font(themeFont(17, .semibold))  // Use theme font (headline equivalent size)
-                .foregroundStyle(textColor)
-                .lineLimit(1)
-                .truncationMode(.tail)
+        Button(action: { showCueListChooser.toggle() }) {
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(projectTitle)
+                        .font(themeFont(17, .semibold))
+                        .foregroundStyle(textColor)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Text(activeCueList?.name ?? "Untitled")
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(textColor.opacity(0.6))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+
+                Image(systemName: showCueListChooser ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(textColor.opacity(0.7))
+            }
         }
         .buttonStyle(.plain)
+        .popover(isPresented: $showCueListChooser, arrowEdge: .top) {
+            CueListChooserPopover(
+                cueLists: $cueLists,
+                activeCueListID: $activeCueListID,
+                selectedThemeID: selectedThemeID,
+                projectName: projectTitle,
+                onSwitchCueList: { id in
+                    // If clicking the already-active cue list, just close chooser
+                    if id != activeCueListID {
+                        onSwitchCueList(id)
+                    }
+                    showCueListChooser = false
+                },
+                onDuplicate: onDuplicateCueList,
+                onRename: onRenameCueList,
+                onDelete: onDeleteCueList,
+                onCreateNew: onCreateCueList,
+                onRenameProject: onRenameProject
+            )
+            .presentationCompactAdaptation(.popover)
+            .presentationBackground(selectedTheme.sheetBackgroundColor(for: colorScheme))
+        }
+    }
+
+    private var activeCueList: CueList? {
+        guard let id = activeCueListID else { return cueLists.first }
+        return cueLists.first(where: { $0.id == id })
     }
 
     private var mainMenuButton: some View {
@@ -5677,7 +5924,7 @@ private struct CBTopBar: View {
 
     // Unified right capsule that morphs between performance and edit modes
     private var rightCapsuleControls: some View {
-        return HStack(spacing: 12) {
+        HStack(spacing: 12) {
             // Connections button (hide when editing)
             if !isEditing {
                 Button(action: onConnections) {
@@ -5729,6 +5976,23 @@ private struct CBTopBar: View {
                 }
                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
                 .transition(.opacity.combined(with: .scale))
+                .id("libraryButton")
+                .popover(isPresented: $showLibraryPopover, arrowEdge: .top) {
+                    SongLibraryPopover(
+                        library: $songLibrary,
+                        activeCueListSongs: $activeCueListSongs,
+                        libAddedAt: libAddedAt,
+                        selectedThemeID: selectedThemeID,
+                        onAddToCueList: onAddToSetlist,
+                        onDelete: onDeleteFromLibrary,
+                        onEdit: { song in
+                            editingSong = song
+                            showAddEdit = true
+                        }
+                    )
+                    .presentationCompactAdaptation(.popover)
+                    .presentationBackground(selectedTheme.sheetBackgroundColor(for: colorScheme))
+                }
 
                 Button(action: onUndo) {
                     Image(systemName: "arrow.uturn.backward")
@@ -5755,16 +6019,22 @@ private struct CBTopBar: View {
             }
 
             // Edit/Done button (morphs between states)
-            if isEditing {
-                Button("Done", action: onEditToggle)
-                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-                    .transition(.opacity.combined(with: .scale))
-            } else {
-                Button("Edit", action: onEditToggle)
-                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-                    .transition(.opacity.combined(with: .scale))
+            Group {
+                if isEditing {
+                    Button("Done", action: onEditToggle)
+                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                        .transition(.opacity.combined(with: .scale))
+                        .id("doneButton")
+                } else {
+                    Button("Edit", action: onEditToggle)
+                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                        .transition(.opacity.combined(with: .scale))
+                        .id("editButton")
+                }
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(minHeight: 32)
     }
 
     private var performanceModeControls: some View {
@@ -9786,6 +10056,7 @@ struct MidiAssignmentsView: View {
     @Binding var globalChannel: Int
     var onApply: (([MidiTableItem]) -> Void)? = nil
 
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
@@ -9900,6 +10171,15 @@ struct MidiAssignmentsView: View {
         .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .tint(selectedTheme.defaultCueColor(for: colorScheme))
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    onApply?(editableItems)
+                    dismiss()
+                }
+                .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+            }
+        }
     }
     
     private func buildMidiTableItems() {
@@ -10339,10 +10619,15 @@ struct MidiAssignmentEditSheet: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") {
                     let channel = isGlobalChannel ? globalChannel : editedChannel
+                    // Update the binding directly
+                    item.midiType = editedType
+                    item.channel = channel
+                    item.value = editedValue
+                    // Also call the callback to handle conflicts and update parent
                     onMidiChange(item, editedType, channel, editedValue)
                     dismiss()
                 }
-                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
             }
         }
     }

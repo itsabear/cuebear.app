@@ -56,7 +56,9 @@ struct CBPerformanceList: View {
     @State private var draggedSong: Song? = nil
     @State private var hoveredIndex: Int? = nil
     @State private var isDraggingFromHandle: Bool = false  // Track if drag started from handle
-    @State private var dragOffset: CGSize = .zero  // Track drag translation for visual feedback
+    @State private var dragOffset: CGSize = .zero  // Track drag offset for preview
+    @State private var dragStartY: CGFloat = 0  // Track initial Y position of dragged item
+    @State private var dragCurrentY: CGFloat = 0  // Track current Y position during drag
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -109,26 +111,24 @@ struct CBPerformanceList: View {
                             return takenBy
                         }()
 
-                        let isDragging = draggedSong?.id == s.id
-
-                        // Determine if this row should show the "make room" space
-                        let isHovered: Bool = {
+                        // Determine if this row should show the drop indicator line
+                        let showDropIndicator: Bool = {
                             guard let hoveredIndex = hoveredIndex,
                                   let draggedSong = draggedSong,
                                   let fromIndex = songs.firstIndex(where: { $0.id == draggedSong.id }) else {
                                 return false
                             }
 
-                            // When dragging downward, the space should appear BEFORE the hovered item
-                            // (because items shift up to fill the dragged item's original space)
+                            // Show line below the cue that will be BEFORE the dropped cue
+                            // When dragging downward, show line below hoveredIndex (which is where it will land after)
                             if hoveredIndex > fromIndex {
-                                // Show space before the target (which is at the previous index)
-                                return index == hoveredIndex - 1
-                            }
-                            // When dragging upward, show space at the target
-                            else {
                                 return index == hoveredIndex
                             }
+                            // When dragging upward, show line below hoveredIndex - 1 (the cue before drop position)
+                            else if hoveredIndex < fromIndex {
+                                return hoveredIndex > 0 && index == hoveredIndex - 1
+                            }
+                            return false
                         }()
 
                         CBPerformanceRow(
@@ -161,58 +161,19 @@ struct CBPerformanceList: View {
                             onDragHandleEnd: { isDraggingFromHandle = false },  // Track handle drag end
                             onToggleSelection: { onToggleSelection(s) }  // Toggle selection in batch mode
                         )
-                        // Apple-style drag animations
-                        .opacity(isDragging ? 0.7 : 1.0)  // Dragged item slightly transparent
-                        .scaleEffect(isDragging ? 1.05 : 1.0)  // Dragged item "rises" - slightly less wide
-                        .offset(isDragging ? dragOffset : .zero)  // Follow finger during drag
-                        .zIndex(isDragging ? 1000 : 0)  // Dragged item appears above all others
-                        .shadow(
-                            color: isDragging ? Color.black.opacity(0.3) : Color.clear,
-                            radius: isDragging ? 12 : 0,
-                            x: 0,
-                            y: isDragging ? 8 : 0
-                        )
-                        .padding(.vertical, isHovered && reorderMode && draggedSong != nil ? 20 : 0)  // Hovered items "make room"
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-                        .animation(.spring(response: 0.15, dampingFraction: 0.8), value: isDragging)  // Faster rise animation
-                        .animation(nil, value: dragOffset)  // Don't animate offset - follow finger directly
-                        .overlay(alignment: .top) {
-                            // Show preview of dragged cue at drop position (iOS-style)
-                            if isHovered && reorderMode && draggedSong != nil, let draggedSong = draggedSong {
-                                CBPerformanceRow(
-                                    song: draggedSong,
-                                    songLibrary: songLibrary,
-                                    isCued: false,
-                                    isCueMode: false,
-                                    isEditing: isEditing,
-                                    reorderMode: false,  // Hide drag handle in preview
-                                    batchSelectMode: false,  // No selection radial in preview
-                                    isSelected: false,
-                                    takenBy: nil,
-                                    shouldFlash: false,
-                                    isLastPlayed: false,
-                                    accentColor: accentColor,
-                                    defaultCueColor: defaultCueColor,
-                                    themeFont: themeFont,
-                                    selectionStrokeColor: selectionStrokeColor(draggedSong.colorHex),
-                                    backgroundColorHex: backgroundColorHex,
-                                    defaultCueColorHex: defaultCueColorHex,
-                                    showMIDIData: showMIDIData,
-                                    cueHeight: cueHeight,
-                                    fontSize: fontSize,
-                                    onTap: {},
-                                    onLongPressChangeMIDI: {},
-                                    onRename: {},
-                                    onDelete: {},
-                                    onDuplicate: {},
-                                    onDragHandleStart: {},
-                                    onDragHandleEnd: {},
-                                    onToggleSelection: {}
-                                )
-                                .opacity(0.5)  // Semi-transparent preview
-                                .scaleEffect(0.95)  // Slightly smaller
-                                .allowsHitTesting(false)  // Don't intercept touches
-                                .offset(y: -CGFloat(cueHeight + 12) / 2)  // Center at drop position
+                        // Make dragged item semi-transparent in place
+                        .opacity(draggedSong?.id == s.id ? 0.3 : 1.0)
+                        // Keep dragged item in place - show drop location with line indicator only
+                        .overlay(alignment: .bottom) {
+                            // Show line indicator at drop position (centered between cues)
+                            if showDropIndicator && reorderMode && draggedSong != nil {
+                                Rectangle()
+                                    .fill(defaultCueColor)
+                                    .frame(height: 4)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 16)
+                                    .offset(y: 8)  // Position line in middle of gap (spacing is 12, so offset by 12/2 + height/2 = 6 + 2 = 8)
+                                    .shadow(color: defaultCueColor.opacity(0.5), radius: 3, x: 0, y: 0)
                             }
                         }
                         .simultaneousGesture(
@@ -223,11 +184,14 @@ struct CBPerformanceList: View {
 
                                     if draggedSong == nil {
                                         draggedSong = s
+                                        dragStartY = value.startLocation.y
+                                        dragCurrentY = value.startLocation.y
                                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                     }
 
-                                    // Update drag offset so cue follows finger
+                                    // Update drag offset and current location for preview
                                     dragOffset = value.translation
+                                    dragCurrentY = value.location.y
 
                                     // Calculate which index we're hovering over
                                     let cueHeightWithSpacing = CGFloat(cueHeight + 12)
@@ -262,6 +226,8 @@ struct CBPerformanceList: View {
                                         self.draggedSong = nil
                                         self.hoveredIndex = nil
                                         self.dragOffset = .zero
+                                        self.dragStartY = 0
+                                        self.dragCurrentY = 0
                                     }
                                 }
                             : nil
@@ -287,6 +253,69 @@ struct CBPerformanceList: View {
                         proxy.scrollTo(firstSong.id, anchor: .center)
                     }
                 }
+            }
+            .overlay {
+                // Drag preview - raised semi-transparent copy that follows drag
+                if let draggedSong = draggedSong, dragOffset != .zero {
+                    dragPreviewView(for: draggedSong)
+                }
+            }
+        }
+    }
+
+    // Helper to build drag preview
+    @ViewBuilder
+    private func dragPreviewView(for song: Song) -> some View {
+        // Check if the song exists in the list
+        if songs.contains(where: { $0.id == song.id }) {
+            // Find the index of the dragged song to calculate its original position
+            if let index = songs.firstIndex(where: { $0.id == song.id }) {
+                let cueHeightWithSpacing = CGFloat(cueHeight + 12)
+                let topPadding: CGFloat = isEditing ? 145 : 80
+
+                // Calculate the center Y position of the original cue
+                let originalCenterY = topPadding + (CGFloat(index) * cueHeightWithSpacing) + (CGFloat(cueHeight) / 2)
+
+                // Add the drag translation to get the current center position
+                let currentCenterY = originalCenterY + dragOffset.height
+
+                CBPerformanceRow(
+                    song: song,
+                    songLibrary: songLibrary,
+                    isCued: false,
+                    isCueMode: isCueMode,
+                    isEditing: isEditing,
+                    reorderMode: reorderMode,
+                    batchSelectMode: false,
+                    isSelected: false,
+                    takenBy: nil,
+                    shouldFlash: false,
+                    isLastPlayed: false,
+                    accentColor: accentColor,
+                    defaultCueColor: defaultCueColor,
+                    themeFont: themeFont,
+                    selectionStrokeColor: defaultCueColor,
+                    backgroundColorHex: backgroundColorHex,
+                    defaultCueColorHex: defaultCueColorHex,
+                    showMIDIData: showMIDIData,
+                    cueHeight: cueHeight,
+                    fontSize: fontSize,
+                    onTap: {},
+                    onLongPressChangeMIDI: {},
+                    onRename: {},
+                    onDelete: {},
+                    onDuplicate: {},
+                    onDragHandleStart: {},
+                    onDragHandleEnd: {},
+                    onToggleSelection: {}
+                )
+                .frame(height: CGFloat(cueHeight))
+                .padding(.horizontal, 36)
+                .opacity(0.7)
+                .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 4)
+                .position(x: UIScreen.main.bounds.width / 2, y: currentCenterY)
+                .allowsHitTesting(false)
+                .zIndex(1000)
             }
         }
     }
@@ -403,9 +432,10 @@ struct CBPerformanceRow: View {
         ZStack(alignment: .center) {
             RoundedRectangle(cornerRadius: corner)
                 .fill(baseColor)
-                .frame(maxWidth: .infinity, minHeight: isCued ? cueHeight * 1.4 : cueHeight)
-                .opacity(isCued ? 1.0 : 0.90)  // Always use normal opacity, regardless of conflicts
+                .frame(maxWidth: .infinity, minHeight: (isCued && !isEditing) ? cueHeight * 1.4 : cueHeight)
+                .opacity((isCued && !isEditing) ? 1.0 : 0.90)  // Always use normal opacity, regardless of conflicts
                 .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
+                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isEditing)
 
             HStack(spacing: 14) {
                 // Selection radial - show in batch select mode
@@ -423,8 +453,8 @@ struct CBPerformanceRow: View {
                     .transition(.scale.combined(with: .opacity))
                 }
 
-                // Play icon - show on chosen cue or last played cue
-                if isCued || isLastPlayed {
+                // Play icon - show on chosen cue or last played cue (hide in edit mode)
+                if !isEditing && (isCued || isLastPlayed) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 24 * fontSize, weight: .bold))
                         .foregroundColor(adaptiveTextColor)
@@ -436,9 +466,14 @@ struct CBPerformanceRow: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .center, spacing: 6) {
-                        // Show shortcut icon for alias cues
+                        // Show shortcut icon for alias cues or duplicated cues
                         if song.aliasedCueID != nil {
                             Image(systemName: "arrow.turn.down.right")
+                                .font(.system(size: 18 * fontSize, weight: .semibold))
+                                .foregroundColor(adaptiveTextColor.opacity(0.7))
+                        } else if let subtitle = song.subtitle, subtitle.hasPrefix("copy of ") {
+                            // Show shortcut icon for duplicated cues
+                            Image(systemName: "doc.on.doc")
                                 .font(.system(size: 18 * fontSize, weight: .semibold))
                                 .foregroundColor(adaptiveTextColor.opacity(0.7))
                         }
@@ -462,6 +497,7 @@ struct CBPerformanceRow: View {
                     if let sub = song.subtitle, !sub.isEmpty {
                         Text(sub)
                             .font(themeFont(14 * fontSize, .medium))
+                            .italic()
                             .foregroundColor(adaptiveTextColor.opacity(0.85))
                             .lineLimit(1)
                             .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
@@ -1705,6 +1741,12 @@ struct CBProjectsSheet: View {
     }
 }
 
+/// Context for editing a cue - determines button labels and delete behavior
+enum CueEditContext {
+    case cueList  // Editing from cue list - "Remove" button only removes from list
+    case library  // Editing from library - "Delete Cue" button deletes from library
+}
+
 struct CBAddEditCueSheet: View {
     @Binding var editingSong: Song?
     let conflictFor: [MIDIKey: String]
@@ -1714,6 +1756,7 @@ struct CBAddEditCueSheet: View {
     var onCancel: () -> Void
     var onDelete: ((Song) -> Void)? = nil
     var onDuplicate: ((Song) -> Void)? = nil  // Callback for duplicating cue
+    var editContext: CueEditContext = .library  // Default to library context for backward compatibility
 
     // Global channel support
     let isGlobalChannel: Bool
@@ -1854,14 +1897,22 @@ struct CBAddEditCueSheet: View {
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                         }
 
-                        // Delete button
+                        // Delete/Remove button
                         if onDelete != nil {
                             Button(role: .destructive) {
-                                showDeleteAlert = true
+                                // Skip confirmation for cue list removal, show alert for library deletion
+                                if editContext == .cueList {
+                                    if let song = editingSong {
+                                        onDelete?(song)
+                                        lastEditingSongID = nil
+                                    }
+                                } else {
+                                    showDeleteAlert = true
+                                }
                             } label: {
                                 HStack {
                                     Spacer()
-                                    Text("Delete Cue")
+                                    Text(editContext == .cueList ? "Remove" : "Delete Cue")
                                     Spacer()
                                 }
                             }
@@ -1874,17 +1925,21 @@ struct CBAddEditCueSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle(editingSong == nil ? "Add Cue" : "Edit Cue")
             .tint(selectedTheme.defaultCueColor(for: colorScheme))
-            .alert("Delete Cue", isPresented: $showDeleteAlert) {
-                Button("Delete", role: .destructive) {
+            .alert(editContext == .cueList ? "Remove from Cue List" : "Delete Cue", isPresented: $showDeleteAlert) {
+                Button(editContext == .cueList ? "Remove" : "Delete", role: .destructive) {
                     if let song = editingSong {
                         onDelete?(song)
-                        // Clear the draft tracking since we deleted
+                        // Clear the draft tracking since we deleted/removed
                         lastEditingSongID = nil
                     }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Are you sure you want to delete '\(name.isEmpty ? defaultName : name)'? This action cannot be undone.")
+                if editContext == .cueList {
+                    Text("Remove '\(name.isEmpty ? defaultName : name)' from the cue list? It will remain in your library.")
+                } else {
+                    Text("Are you sure you want to delete '\(name.isEmpty ? defaultName : name)' from the library? This will remove it from all cue lists. This action cannot be undone.")
+                }
             }
             .alert("Maximum Controls Reached", isPresented: $showGlobalModeMaxReachedAlert) {
                 Button("OK", role: .cancel) {}
@@ -2423,7 +2478,6 @@ enum LibrarySortOption: String, CaseIterable, Identifiable {
 /// Popover view for managing the song library
 struct SongLibraryPopover: View {
     @Environment(\.colorScheme) var colorScheme
-    @Environment(\.dismiss) var dismiss
 
     // Data
     @Binding var library: [Song]
@@ -2443,6 +2497,7 @@ struct SongLibraryPopover: View {
     @State private var batchSelectMode: Bool = false
     @State private var songToDelete: Song? = nil
     @State private var showDeleteConfirmation: Bool = false
+    @State private var showBatchDeleteConfirmation: Bool = false
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -2496,31 +2551,24 @@ struct SongLibraryPopover: View {
     }
 
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Search bar and controls
-                headerView
+        VStack(spacing: 0) {
+            // Controls and search bar
+            headerView
 
-                // Song list
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(filteredSongs) { song in
-                            libraryRowView(for: song)
-                        }
-                    }
+            // Song list
+            List {
+                ForEach(filteredSongs) { song in
+                    libraryRowView(for: song)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(backgroundColor)
                 }
             }
-            .background(backgroundColor)
-            .navigationTitle("Song Library")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
         }
+        .frame(width: 450, height: 500)
+        .background(backgroundColor)
         .alert("Delete Song", isPresented: $showDeleteConfirmation, presenting: songToDelete) { song in
             Button("Cancel", role: .cancel) {
                 songToDelete = nil
@@ -2532,11 +2580,140 @@ struct SongLibraryPopover: View {
         } message: { song in
             Text("Are you sure you want to delete \"\(song.name)\" from the library?")
         }
+        .alert("Really delete \(selectedSongs.count) cues?", isPresented: $showBatchDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                // Delete all selected songs
+                let songsToDelete = library.filter { selectedSongs.contains($0.id) }
+                for song in songsToDelete {
+                    onDelete(song)
+                }
+                selectedSongs.removeAll()
+                batchSelectMode = false
+            }
+        }
     }
 
     private var headerView: some View {
         VStack(spacing: 12) {
-            // Search bar
+            // Sort and Select buttons
+            HStack(spacing: 12) {
+                Spacer()
+
+                // Select mode action buttons
+                if batchSelectMode {
+                    // Select All button
+                    Button(action: {
+                        selectedSongs = Set(filteredSongs.map { $0.id })
+                    }) {
+                        Text("Select All")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(defaultCueColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+
+                    // Clear selection button
+                    Button(action: {
+                        selectedSongs.removeAll()
+                    }) {
+                        Text("Clear")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(defaultCueColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+
+                    // Add selected button
+                    Button(action: {
+                        // Add all selected songs that are not already in cue list
+                        for songID in selectedSongs {
+                            if let song = library.first(where: { $0.id == songID }),
+                               !activeSongIDs.contains(songID) {
+                                onAddToCueList(song)
+                            }
+                        }
+                        selectedSongs.removeAll()
+                        UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
+                    }) {
+                        Text("Add")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .green)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .disabled(selectedSongs.isEmpty)
+
+                    // Delete selected button
+                    Button(action: {
+                        if !selectedSongs.isEmpty {
+                            showBatchDeleteConfirmation = true
+                        }
+                    }) {
+                        Text("Delete")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .red)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .disabled(selectedSongs.isEmpty)
+                } else {
+                    // Sort menu (icon only) - only shown when not in select mode
+                    Menu {
+                        ForEach(LibrarySortOption.allCases) { option in
+                            Button(action: { sortOption = option }) {
+                                HStack {
+                                    Text(option.rawValue)
+                                    if sortOption == option {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 18))
+                            .foregroundColor(defaultCueColor)
+                            .frame(width: 36, height: 36)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                }
+
+                // Select/Exit button (icon only)
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        batchSelectMode.toggle()
+                        if !batchSelectMode {
+                            selectedSongs.removeAll()
+                        }
+                    }
+                }) {
+                    Image(systemName: batchSelectMode ? "xmark" : "checklist")
+                        .font(.system(size: 18))
+                        .foregroundColor(defaultCueColor)
+                        .frame(width: 36, height: 36)
+                        .background(.regularMaterial)
+                        .background(titleBarColor.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+            }
+            .padding(.horizontal, 16)
+
+            // Search bar (moved below buttons)
             HStack(spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
@@ -2557,60 +2734,6 @@ struct SongLibraryPopover: View {
                 .background(.regularMaterial)
                 .background(titleBarColor.opacity(0.5))
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            }
-            .padding(.horizontal, 16)
-
-            // Sort and Select buttons
-            HStack(spacing: 12) {
-                // Sort menu
-                Menu {
-                    ForEach(LibrarySortOption.allCases) { option in
-                        Button(action: { sortOption = option }) {
-                            HStack {
-                                Text(option.rawValue)
-                                if sortOption == option {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.up.arrow.down")
-                        Text(sortOption.rawValue)
-                    }
-                    .font(.subheadline)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.regularMaterial)
-                    .background(titleBarColor.opacity(0.5))
-                    .foregroundColor(defaultCueColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-
-                Spacer()
-
-                // Select button
-                Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        batchSelectMode.toggle()
-                        if !batchSelectMode {
-                            selectedSongs.removeAll()
-                        }
-                    }
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: batchSelectMode ? "xmark" : "checklist")
-                        Text(batchSelectMode ? "Cancel" : "Select")
-                    }
-                    .font(.subheadline)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.regularMaterial)
-                    .background(titleBarColor.opacity(0.5))
-                    .foregroundColor(defaultCueColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
             }
             .padding(.horizontal, 16)
         }
@@ -2660,18 +2783,42 @@ struct SongLibraryPopover: View {
                     onEdit(song)
                 }
             }) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(song.name)
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundColor(isInCueList ? textColor.opacity(0.4) : textColor)
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(song.name)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundColor(isInCueList ? textColor.opacity(0.4) : textColor)
 
-                    if let subtitle = song.subtitle, !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.system(size: 14))
-                            .foregroundColor(isInCueList ? textColor.opacity(0.3) : textColor.opacity(0.6))
+                        if let subtitle = song.subtitle, !subtitle.isEmpty {
+                            Text(subtitle)
+                                .font(.system(size: 14))
+                                .foregroundColor(isInCueList ? textColor.opacity(0.3) : textColor.opacity(0.6))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // MIDI data display (matching cue list format)
+                    if song.midiEnabled {
+                        let midiText: String = {
+                            if song.kind == .cc {
+                                return "Ch \(song.channel)  •  CC \(song.cc)"
+                            } else {
+                                let noteName = (song.note ?? 60).midiNoteName
+                                return "Ch \(song.channel)  •  \(noteName)"
+                            }
+                        }()
+
+                        Text(midiText)
+                            .font(.caption2)
+                            .foregroundColor(textColor.opacity(0.6))
+                            .padding(.trailing, 8)
+                    } else {
+                        Text("No MIDI")
+                            .font(.caption2)
+                            .foregroundColor(textColor.opacity(0.4))
+                            .padding(.trailing, 8)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 12)
                 .padding(.leading, batchSelectMode ? 0 : 16)
                 .contentShape(Rectangle())
@@ -2679,17 +2826,8 @@ struct SongLibraryPopover: View {
             .buttonStyle(.plain)
         }
         .background(backgroundColor)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            // Delete action
-            Button(role: .destructive) {
-                songToDelete = song
-                showDeleteConfirmation = true
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            // Add to cue list action (disabled if already in cue list)
+            // Add to cue list action (swipe right, disabled if already in cue list)
             if !isInCueList {
                 Button {
                     onAddToCueList(song)
@@ -2700,5 +2838,530 @@ struct SongLibraryPopover: View {
                 .tint(.green)
             }
         }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            // Delete action (swipe left)
+            Button(role: .destructive) {
+                songToDelete = song
+                showDeleteConfirmation = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+}
+
+// MARK: - Cue List Chooser Popover
+
+enum CueListSortOption: String, CaseIterable, Identifiable {
+    case nameAZ = "A-Z"
+    case nameZA = "Z-A"
+    case oldest = "Oldest First"
+    case newest = "Newest First"
+
+    var id: String { rawValue }
+}
+
+struct CueListChooserPopover: View {
+    @Environment(\.colorScheme) var colorScheme
+
+    @Binding var cueLists: [CueList]
+    @Binding var activeCueListID: UUID?
+    let selectedThemeID: String
+    let projectName: String
+    let onSwitchCueList: (UUID) -> Void
+    let onDuplicate: (UUID) -> Void
+    let onRename: (UUID) -> Void
+    let onDelete: (UUID) -> Void
+    let onCreateNew: () -> Void
+    let onRenameProject: () -> Void
+
+    @State private var searchQuery = ""
+    @State private var sortOption: CueListSortOption = .nameAZ
+    @State private var batchSelectMode = false
+    @State private var selectedCueLists = Set<UUID>()
+    @State private var showDeleteConfirmation = false
+    @State private var showBatchDeleteConfirmation = false
+    @State private var cueListToDelete: CueList?
+
+    private var theme: AppTheme {
+        AppTheme.allThemes.first(where: { $0.id == selectedThemeID }) ?? AppTheme.defaultTheme
+    }
+
+    private var textColor: Color {
+        theme.primaryTextColor(for: colorScheme)
+    }
+
+    private var backgroundColor: Color {
+        theme.backgroundColor(for: colorScheme)
+    }
+
+    private var titleBarColor: Color {
+        theme.titleBarColor(for: colorScheme)
+    }
+
+    private var defaultCueColor: Color {
+        theme.defaultCueColor(for: colorScheme)
+    }
+
+    private var filteredCueLists: [CueList] {
+        debugPrint("🔍 CueListChooserPopover: cueLists count = \(cueLists.count), searchQuery = '\(searchQuery)'")
+        let filtered = searchQuery.isEmpty ? cueLists : cueLists.filter { $0.name.localizedCaseInsensitiveContains(searchQuery) }
+        debugPrint("🔍 CueListChooserPopover: filtered count = \(filtered.count)")
+
+        // Sort the filtered lists
+        switch sortOption {
+        case .nameAZ:
+            return filtered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .nameZA:
+            return filtered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+        case .oldest:
+            return filtered.sorted { $0.createdAt < $1.createdAt }
+        case .newest:
+            return filtered.sorted { $0.createdAt > $1.createdAt }
+        }
+    }
+
+    private var contentView: some View {
+        VStack(spacing: 0) {
+            headerView
+
+            Divider()
+                .background(textColor.opacity(0.2))
+
+            if filteredCueLists.isEmpty {
+                emptyStateView
+            } else {
+                cueListsView
+            }
+        }
+        .frame(width: 400)
+        .background(backgroundColor)
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "tray")
+                .font(.system(size: 48))
+                .foregroundColor(textColor.opacity(0.3))
+            Text("No Cue Lists")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundColor(textColor)
+        }
+        .frame(maxWidth: .infinity, maxHeight: 400)
+        .background(backgroundColor)
+    }
+
+    private var cueListsView: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(filteredCueLists) { cueList in
+                    SwipeableCueListRow(
+                        cueList: cueList,
+                        isActive: cueList.id == activeCueListID,
+                        textColor: textColor,
+                        backgroundColor: backgroundColor,
+                        onTap: { onSwitchCueList(cueList.id) },
+                        onDelete: {
+                            cueListToDelete = cueList
+                            showDeleteConfirmation = true
+                        },
+                        onDuplicate: { onDuplicate(cueList.id) },
+                        onRename: { onRename(cueList.id) }
+                    )
+                }
+            }
+        }
+        .frame(maxHeight: 400)
+    }
+
+    var body: some View {
+        let _ = print("🔍 CueListChooserPopover body rendering - cueLists.count: \(cueLists.count), filteredCueLists.count: \(filteredCueLists.count)")
+
+        return contentView
+            .alert("Delete Cue List", isPresented: $showDeleteConfirmation, presenting: cueListToDelete) { cueList in
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                onDelete(cueList.id)
+            }
+        } message: { cueList in
+            Text("Are you sure you want to delete \"\(cueList.name)\"?")
+        }
+        .alert("Delete \(selectedCueLists.count) Cue Lists", isPresented: $showBatchDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                // Delete all selected cue lists
+                for cueListID in selectedCueLists {
+                    onDelete(cueListID)
+                }
+                selectedCueLists.removeAll()
+                batchSelectMode = false
+            }
+        } message: {
+            Text("Are you sure you want to delete \(selectedCueLists.count) cue list\(selectedCueLists.count == 1 ? "" : "s")?")
+        }
+    }
+
+    private var headerView: some View {
+        VStack(spacing: 12) {
+            // Top row: + button, project name, sort, and select buttons OR batch action buttons
+            HStack(spacing: 12) {
+                // + button to create new cue list (hide in batch mode)
+                if !batchSelectMode {
+                    Button(action: onCreateNew) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(defaultCueColor)
+                            .frame(width: 36, height: 36)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                }
+
+                // Project name button (hide in batch mode)
+                if !batchSelectMode {
+                    Button(action: onRenameProject) {
+                        Text(projectName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(textColor)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Spacer()
+
+                if batchSelectMode {
+                    // Batch mode action buttons
+                    Button(action: {
+                        selectedCueLists = Set(filteredCueLists.map { $0.id })
+                    }) {
+                        Text("Select All")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(defaultCueColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+
+                    Button(action: {
+                        selectedCueLists.removeAll()
+                    }) {
+                        Text("Clear")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(defaultCueColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+
+                    Button(action: {
+                        if !selectedCueLists.isEmpty {
+                            showBatchDeleteConfirmation = true
+                        }
+                    }) {
+                        Text("Delete")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(selectedCueLists.isEmpty ? textColor.opacity(0.3) : .red)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .disabled(selectedCueLists.isEmpty)
+                } else {
+                    // Sort menu (icon only) - only show when NOT in batch mode
+                    Menu {
+                        ForEach(CueListSortOption.allCases) { option in
+                            Button(action: { sortOption = option }) {
+                                HStack {
+                                    Text(option.rawValue)
+                                    if sortOption == option {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(defaultCueColor)
+                            .frame(width: 36, height: 36)
+                            .background(.regularMaterial)
+                            .background(titleBarColor.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                }
+
+                // Select/Exit button
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        batchSelectMode.toggle()
+                        if !batchSelectMode {
+                            selectedCueLists.removeAll()
+                        }
+                    }
+                }) {
+                    Image(systemName: batchSelectMode ? "xmark" : "checklist")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(defaultCueColor)
+                        .frame(width: 36, height: 36)
+                        .background(.regularMaterial)
+                        .background(titleBarColor.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+            }
+            .padding(.horizontal, 16)
+
+            // "CUE LISTS" label
+            Text("CUE LISTS")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(textColor.opacity(0.5))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+
+            // Search bar
+            HStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(textColor.opacity(0.5))
+
+                    TextField("Search cue lists...", text: $searchQuery)
+                        .foregroundColor(textColor)
+
+                    if !searchQuery.isEmpty {
+                        Button(action: { searchQuery = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(textColor.opacity(0.5))
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.regularMaterial)
+                .background(titleBarColor.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.vertical, 12)
+        .background(backgroundColor)
+    }
+
+    @ViewBuilder
+    private func cueListRow(_ cueList: CueList) -> some View {
+        HStack(spacing: 12) {
+            // Selection checkbox (in select mode)
+            if batchSelectMode {
+                Button(action: {
+                    if selectedCueLists.contains(cueList.id) {
+                        selectedCueLists.remove(cueList.id)
+                    } else {
+                        selectedCueLists.insert(cueList.id)
+                    }
+                }) {
+                    Image(systemName: selectedCueLists.contains(cueList.id) ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundColor(selectedCueLists.contains(cueList.id) ? .blue : textColor.opacity(0.3))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 16)
+                .padding(.trailing, 12)
+            }
+
+            // Cue list info
+            Button(action: {
+                if batchSelectMode {
+                    if selectedCueLists.contains(cueList.id) {
+                        selectedCueLists.remove(cueList.id)
+                    } else {
+                        selectedCueLists.insert(cueList.id)
+                    }
+                } else {
+                    // Click to open cue list
+                    onSwitchCueList(cueList.id)
+                }
+            }) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(cueList.name)
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundColor(textColor)
+
+                            // Active indicator
+                            if cueList.id == activeCueListID {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.green)
+                            }
+                        }
+
+                        Text("\(cueList.songs.count) cue\(cueList.songs.count == 1 ? "" : "s")")
+                            .font(.system(size: 14))
+                            .foregroundColor(textColor.opacity(0.6))
+                    }
+
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 12)
+                .padding(.leading, batchSelectMode ? 0 : 16)
+                .padding(.trailing, 16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                if !batchSelectMode {
+                    Button(action: { onDuplicate(cueList.id) }) {
+                        Label("Duplicate", systemImage: "doc.on.doc")
+                    }
+                    Button(action: { onRename(cueList.id) }) {
+                        Label("Rename", systemImage: "pencil")
+                    }
+                    Button(role: .destructive, action: {
+                        cueListToDelete = cueList
+                        showDeleteConfirmation = true
+                    }) {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+        }
+        .background(backgroundColor)
+    }
+}
+
+// MARK: - Swipeable Cue List Row
+struct SwipeableCueListRow: View {
+    let cueList: CueList
+    let isActive: Bool
+    let textColor: Color
+    let backgroundColor: Color
+    let onTap: () -> Void
+    let onDelete: () -> Void
+    let onDuplicate: () -> Void
+    let onRename: () -> Void
+
+    @State private var offset: CGFloat = 0
+    @State private var isDragging = false
+
+    private let deleteThreshold: CGFloat = -80
+    private let deleteButtonWidth: CGFloat = 80
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            // Delete button background
+            HStack {
+                Spacer()
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        offset = 0
+                    }
+                    onDelete()
+                }) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.white)
+                        .frame(width: deleteButtonWidth)
+                        .frame(maxHeight: .infinity)
+                }
+                .background(Color.red)
+            }
+
+            // Main row content
+            Button(action: {
+                if offset == 0 {
+                    onTap()
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        offset = 0
+                    }
+                }
+            }) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(cueList.name)
+                                .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                                .foregroundColor(textColor)
+
+                            if isActive {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+
+                        Text("\(cueList.songs.count) cue\(cueList.songs.count == 1 ? "" : "s")")
+                            .font(.system(size: 14))
+                            .foregroundColor(textColor.opacity(0.6))
+                    }
+
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(backgroundColor)
+            .offset(x: offset)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 10)
+                    .onChanged { gesture in
+                        isDragging = true
+                        let translation = gesture.translation.width
+                        // Only allow left swipe
+                        if translation < 0 {
+                            offset = translation
+                        } else if offset < 0 {
+                            // Allow dragging back to close
+                            offset = min(0, offset + translation)
+                        }
+                    }
+                    .onEnded { gesture in
+                        isDragging = false
+                        let translation = gesture.translation.width
+                        let velocity = gesture.predictedEndTranslation.width - translation
+
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            if offset < deleteThreshold || velocity < -50 {
+                                // Show delete button
+                                offset = -deleteButtonWidth
+                            } else {
+                                // Close
+                                offset = 0
+                            }
+                        }
+                    }
+            )
+            .contextMenu {
+                Button(action: onTap) {
+                    Label("Open", systemImage: "arrow.right.circle")
+                }
+                Button(action: onDuplicate) {
+                    Label("Duplicate", systemImage: "doc.on.doc")
+                }
+                Button(action: onRename) {
+                    Label("Rename", systemImage: "pencil")
+                }
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+        .frame(height: 60)
+        .clipped()
     }
 }

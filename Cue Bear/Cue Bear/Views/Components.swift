@@ -310,20 +310,22 @@ struct ThemedCapsuleButtonStyle: ButtonStyle {
             if isPhone {
                 // iPhone: Text-only button, no background or shadow
                 configuration.label
+                    .fixedSize(horizontal: true, vertical: false)
                     .foregroundColor(textColor)
                     .frame(minHeight: 28)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                     .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
                     .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
                     .opacity(isEnabled ? 1.0 : 0.4)
             } else {
-                // iPad: Just text/icons, no background or shadow
+                // iPad: Larger tap area for better usability
                 configuration.label
+                    .fixedSize(horizontal: true, vertical: false)
                     .foregroundColor(textColor)
-                    .frame(minHeight: 28)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .frame(minHeight: 36)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                     .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
                     .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
                     .opacity(isEnabled ? 1.0 : 0.4)
