@@ -237,7 +237,7 @@ struct CBPerformanceList: View {
                     Color.clear.frame(height: 8)
                 }
                 .padding(.horizontal, 36)
-                .padding(.top, isEditing ? 145 : 80)  // Slide down in edit mode - further below search bar
+                .padding(.top, isEditing ? 170 : 80)  // Slide down in edit mode - equal spacing with top bar
                 .padding(.bottom, 12)
                 .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
             }
@@ -271,7 +271,7 @@ struct CBPerformanceList: View {
             // Find the index of the dragged song to calculate its original position
             if let index = songs.firstIndex(where: { $0.id == song.id }) {
                 let cueHeightWithSpacing = CGFloat(cueHeight + 12)
-                let topPadding: CGFloat = isEditing ? 145 : 80
+                let topPadding: CGFloat = isEditing ? 170 : 80
 
                 // Calculate the center Y position of the original cue
                 let originalCenterY = topPadding + (CGFloat(index) * cueHeightWithSpacing) + (CGFloat(cueHeight) / 2)
@@ -903,7 +903,7 @@ struct CBSetlistColumn: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         onBatchRemove?()
                     }
-                    .foregroundColor(selected.isEmpty ? .gray : .red)
+                    .foregroundColor(selected.isEmpty ? .gray : selectedTheme.errorColor(for: colorScheme))
                     .disabled(selected.isEmpty)
                 }
                 .padding(.horizontal, 16)
@@ -1528,10 +1528,34 @@ struct CBConnectionsSheet: View {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 
+    private var noBridgeDetected: Bool {
+        !usbServer.usbBridgeAvailable && wifiClient.discovered.isEmpty
+    }
+
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("USB").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
+            Group {
+                if noBridgeDetected {
+                    // Show special "Download Bridge" view when no bridges detected
+                    downloadBridgeView
+                } else {
+                    // Show normal connections form
+                    connectionsForm
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+                }
+            }
+        }
+        .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
+    }
+
+    private var connectionsForm: some View {
+        Form {
+            Section(header: Text("USB").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
                     KeyValueRow("Status", connectionCoordinator.activeConnection == .usb ? "Connected" : "Waiting")
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if connectionCoordinator.activeConnection == .usb {
@@ -1602,20 +1626,90 @@ struct CBConnectionsSheet: View {
                         }
                     }
                 }
-
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
-            .navigationTitle("Connections")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
-                }
-            }
             .tint(selectedTheme.defaultCueColor(for: colorScheme))
+    }
+
+    private var downloadBridgeView: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                Spacer()
+                    .frame(height: 40)
+
+                // Title
+                Text("Ready to Connect?")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+
+                // Body text
+                Text("Looks like you haven't installed Cue Bear Bridge yet! Download it for your Mac to start sending MIDI to your DAW.")
+                    .font(.body)
+                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+
+                // QR Code
+                VStack(spacing: 12) {
+                    if let qrImage = generateQRCode(from: "https://cuebear.app/bridge") {
+                        Image(uiImage: qrImage)
+                            .interpolation(.none)
+                            .resizable()
+                            .frame(width: 180, height: 180)
+                            .padding(12)
+                            .background(selectedTheme.titleBarColor(for: colorScheme))
+                            .cornerRadius(12)
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(selectedTheme.titleBarColor(for: colorScheme))
+                            .frame(width: 180, height: 180)
+                            .overlay(
+                                Image(systemName: "qrcode")
+                                    .font(.system(size: 60))
+                                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.5))
+                            )
+                    }
+
+                    Text("Scan with your phone to download")
+                        .font(.caption)
+                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                }
+                .padding(.vertical, 8)
+
+                // Download button
+                Button(action: {
+                    if let url = URL(string: "https://cuebear.app/bridge") {
+                        UIApplication.shared.open(url)
+                    }
+                }) {
+                    HStack(spacing: 8) {
+                        Text("cuebear.app/bridge")
+                            .fontWeight(.medium)
+                        Image(systemName: "arrow.up.forward")
+                            .font(.system(size: 14))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(selectedTheme.defaultCueColor(for: colorScheme))
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal, 32)
+
+                // Footer text
+                Text("Once installed, connections will appear here automatically")
+                    .font(.footnote)
+                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                    .padding(.top, 8)
+
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
         }
-        .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
     
     
@@ -1635,6 +1729,25 @@ struct CBConnectionsSheet: View {
         }
         // Fallback to build number if git hash not available
         return Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
+    private func generateQRCode(from string: String) -> UIImage? {
+        let data = Data(string.utf8)
+
+        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("H", forKey: "inputCorrectionLevel") // High error correction
+
+        guard let ciImage = filter.outputImage else { return nil }
+
+        // Scale up the QR code for better quality
+        let transform = CGAffineTransform(scaleX: 10, y: 10)
+        let scaledImage = ciImage.transformed(by: transform)
+
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
+
+        return UIImage(cgImage: cgImage)
     }
 }
 
@@ -1861,7 +1974,8 @@ struct CBAddEditCueSheet: View {
                             channel: channel,
                             currentOwnerName: currentOwnerName,
                             editingControl: nil,
-                            editingSong: editingSong
+                            editingSong: editingSong,
+                            midiFilter: midiFilter
                         )
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
@@ -1950,10 +2064,18 @@ struct CBAddEditCueSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { onCancel() } }
                 if editingSong == nil {
                     ToolbarItem(placement: .primaryAction) {
+                        let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
                         Button("Save & Add Another") { save(andAddAnother: true) }
+                            .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color(hex: "0A84FF"))
+                            .disabled(isDisabled)
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { save(andAddAnother: false) } }
+                ToolbarItem(placement: .confirmationAction) {
+                    let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
+                    Button("Done") { save(andAddAnother: false) }
+                        .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color(hex: "0A84FF"))
+                        .disabled(isDisabled)
+                }
             }
             .onAppear {
                 // Always call preset() to ensure form is properly initialized
@@ -2178,6 +2300,10 @@ struct CBAddEditCueSheet: View {
 
         debugPrint("❌ [CONFLICT] Returning ownersString: '\(ownersString)'")
         return ownersString
+    }
+
+    private func isFilteredMIDI() -> Bool {
+        return !midiFilter.isEmpty && midiFilter.contains(number)
     }
 
     private func ownerFor(kind: MIDIKind, number: Int, channel: Int) -> String? {
@@ -2487,6 +2613,7 @@ struct SongLibraryPopover: View {
 
     // Callbacks
     let onAddToCueList: (Song) -> Void
+    let onRemoveFromCueList: (Song) -> Void
     let onDelete: (Song) -> Void
     let onEdit: (Song) -> Void
 
@@ -2824,6 +2951,35 @@ struct SongLibraryPopover: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .contextMenu {
+                // Show "Add to Cue List" or "Remove from Cue List" based on whether song is in cue list
+                if !isInCueList {
+                    Button(action: {
+                        onAddToCueList(song)
+                    }) {
+                        Label("Add to Cue List", systemImage: "plus.circle")
+                    }
+                } else {
+                    Button(action: {
+                        onRemoveFromCueList(song)
+                    }) {
+                        Label("Remove from Cue List", systemImage: "minus.circle")
+                    }
+                }
+
+                Button(action: {
+                    onEdit(song)
+                }) {
+                    Label("Edit", systemImage: "pencil")
+                }
+
+                Button(role: .destructive, action: {
+                    songToDelete = song
+                    showDeleteConfirmation = true
+                }) {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
         }
         .background(backgroundColor)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {

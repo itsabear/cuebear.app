@@ -93,6 +93,107 @@ class ControlEditorDraft: ObservableObject {
     }
 }
 
+// MARK: - Reusable Button Styles
+
+struct PrimaryWideButton: View {
+    let title: String
+    let action: () -> Void
+    let isDisabled: Bool
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    isDisabled
+                        ? Color.gray.opacity(0.4)
+                        : (isPressed ? Color(hex: "0A84FF").opacity(0.7) : Color(hex: "0A84FF"))
+                )
+                .cornerRadius(10)
+        }
+        .disabled(isDisabled)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
+struct SecondaryWideButton: View {
+    let title: String
+    let action: () -> Void
+    let isDisabled: Bool
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(
+                    isDisabled
+                        ? Color.gray.opacity(0.5)
+                        : Color(hex: "0A84FF")
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    isDisabled
+                        ? Color.gray.opacity(0.1)
+                        : (isPressed ? Color(hex: "0A84FF").opacity(0.2) : Color(hex: "0A84FF").opacity(0.1))
+                )
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(
+                            isDisabled
+                                ? Color.gray.opacity(0.3)
+                                : Color(hex: "0A84FF").opacity(0.5),
+                            lineWidth: 1
+                        )
+                )
+        }
+        .disabled(isDisabled)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
+struct DestructiveWideButton: View {
+    let title: String
+    let action: () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    isPressed ? Color.red.opacity(0.7) : Color.red
+                )
+                .cornerRadius(10)
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
 // MARK: - Shared Wobble Animator (Time-Based Continuous Animation)
 // Uses continuous sine-wave calculations instead of discrete state updates for smooth 60fps performance
 @MainActor
@@ -336,6 +437,7 @@ struct MIDINumberPicker: View {
     var currentOwnerName: ((MIDIKey) -> String?)?
     var editingControl: ControlButton?
     var editingSong: Song?  // Added to filter cue conflicts
+    var midiFilter: Set<Int> = []  // Added to show filtered MIDI warning
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @State private var textValue: String = ""
@@ -433,6 +535,19 @@ struct MIDINumberPicker: View {
             // Show "MIDI taken by" warning if number is taken
             if let owner = ownerFor(kind: kind, number: number, channel: channel) {
                 Text("⚠️ MIDI taken by: \(owner)")
+                    .font(.caption)
+                    .foregroundColor(selectedTheme.warningColor(for: colorScheme))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // Show filtered MIDI warning (only if filters are enabled)
+            if !midiFilter.isEmpty && kind == .cc && midiFilter.contains(number) {
+                Text("⚠️ This CC is filtered. Turn off filter to use it.")
+                    .font(.caption)
+                    .foregroundColor(selectedTheme.warningColor(for: colorScheme))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if !midiFilter.isEmpty && kind == .note && midiFilter.contains(number) {
+                Text("⚠️ This Note is filtered. Turn off filter to use it.")
                     .font(.caption)
                     .foregroundColor(selectedTheme.warningColor(for: colorScheme))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1000,6 +1115,7 @@ struct CBControlEditorSheet: View {
 
     // Color picker inline state
     @State private var showColorPicker = false
+    @State private var showPreview = false
 
     @State private var showDeleteAlert: Bool = false
     @State private var showGlobalModeMaxReachedAlert: Bool = false
@@ -1289,20 +1405,28 @@ struct CBControlEditorSheet: View {
                     )
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
-                // Live Preview
-                Section(header: Text("Preview")) {
-                    HStack {
-                        Spacer(minLength: 0)
-                        if draft.isFader {
-                            ControlFaderPreview(title: draft.title, cc: draft.number, channel: draft.channel, orientation: draft.faderOrientation, direction: draft.faderDirection, colorHex: draft.colorHex)
-                                .id("fader-\(draft.faderOrientation)-\(draft.faderDirection)")
-                        } else {
-                            ControlButtonPreview(title: draft.title, symbol: draft.symbol, kind: draft.kind, number: draft.number, channel: draft.channel, velocity: draft.velocity, isSmall: draft.isSmall, colorHex: draft.colorHex)
-                                .id("button-\(draft.isSmall)")
+                // Live Preview - Collapsible
+                Section {
+                    DisclosureGroup(
+                        isExpanded: $showPreview,
+                        content: {
+                            HStack {
+                                Spacer(minLength: 0)
+                                if draft.isFader {
+                                    ControlFaderPreview(title: draft.title, cc: draft.number, channel: draft.channel, orientation: draft.faderOrientation, direction: draft.faderDirection, colorHex: draft.colorHex)
+                                        .id("fader-\(draft.faderOrientation)-\(draft.faderDirection)")
+                                } else {
+                                    ControlButtonPreview(title: draft.title, symbol: draft.symbol, kind: draft.kind, number: draft.number, channel: draft.channel, velocity: draft.velocity, isSmall: draft.isSmall, colorHex: draft.colorHex)
+                                        .id("button-\(draft.isSmall)")
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 6)
+                        },
+                        label: {
+                            Text("Preview")
                         }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.vertical, 6)
+                    )
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 Section(header: Text("MIDI")) {
@@ -1338,7 +1462,8 @@ struct CBControlEditorSheet: View {
                         disabled: draft.autoAssign,
                         channel: isGlobalChannel ? globalChannel : draft.channel,
                         currentOwnerName: currentOwnerName,
-                        editingControl: editing
+                        editingControl: editing,
+                        midiFilter: midiFilter
                     )
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !draft.isFader && draft.kind == .note {
@@ -1350,17 +1475,37 @@ struct CBControlEditorSheet: View {
                 // Delete section - only show when editing existing control
                 if isEditMode, onDelete != nil {
                     Section {
-                        Button(role: .destructive) {
-                            showDeleteAlert = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text(draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"))
-                                Spacer()
-                            }
-                        }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        DestructiveWideButton(
+                            title: draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"),
+                            action: { showDeleteAlert = true }
+                        )
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                     }
+                }
+
+                // Action buttons section
+                Section {
+                    VStack(spacing: 12) {
+                        // Primary action button
+                        PrimaryWideButton(
+                            title: isEditMode ? "Save" : (draft.isFader ? "Add Fader" : "Add Button"),
+                            action: { saveControl(andAddAnother: false) },
+                            isDisabled: conflictOwner() != nil || isFilteredMIDI() || showSpaceWarning || isOutOfRoom
+                        )
+
+                        // "Save & Add Another" button - only show when adding new controls
+                        if !isEditMode {
+                            SecondaryWideButton(
+                                title: "Save & Add Another",
+                                action: { saveControl(andAddAnother: true) },
+                                isDisabled: conflictOwner() != nil || isFilteredMIDI() || showSpaceWarning || isOutOfRoom || !canAddMore
+                            )
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
             }
             .scrollContentBackground(.hidden)
@@ -1385,29 +1530,12 @@ struct CBControlEditorSheet: View {
                 Text("You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.")
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        // v1.0.8: Clear draft state on Cancel
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        // v1.0.8: Clear draft state on Done
                         draft.clear()
                         onCancel()
                     }
-                }
-                // Show "Save & Add Another" when adding new controls (not when editing existing)
-                if !isEditMode {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Save & Add Another") {
-                            saveControl(andAddAnother: true)
-                        }
-                        .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
-                        .disabled(conflictOwner() != nil || showSpaceWarning || isOutOfRoom || !canAddMore)
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(isEditMode ? "Save" : "Add") {
-                        saveControl(andAddAnother: false)
-                    }
-                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
-                    .disabled(conflictOwner() != nil || showSpaceWarning || isOutOfRoom)
                 }
             }
             .onAppear {
@@ -1655,6 +1783,10 @@ struct CBControlEditorSheet: View {
         return ownersString
     }
 
+    private func isFilteredMIDI() -> Bool {
+        return !midiFilter.isEmpty && midiFilter.contains(draft.number)
+    }
+
     private func assignFreeNumber() {
         draft.number = firstFreeNumber(for: draft.kind, channel: draft.channel)
     }
@@ -1769,6 +1901,20 @@ struct CBControlEditorSheet: View {
         b.isToggle = draft.isToggle
         b.isFader = (controlType == .fader)
         b.colorHex = draft.colorHex
+
+        // Auto-name if title is empty
+        if b.title.trimmingCharacters(in: .whitespaces).isEmpty {
+            if controlType == .fader {
+                // Count existing faders
+                let faderCount = allButtons.filter { $0.isFader == true && $0.id != b.id }.count
+                b.title = "Fader \(faderCount + 1)"
+            } else {
+                // Count existing buttons
+                let buttonCount = allButtons.filter { $0.isFader != true && $0.id != b.id }.count
+                b.title = "Button \(buttonCount + 1)"
+            }
+        }
+
         debugPrint("💾 Saving control '\(b.title)' with colorHex: \(draft.colorHex ?? "nil")")
         // v1.0.9: Set isSmall from draft (picker updates draft.isSmall directly)
         if controlType != .fader {
@@ -1911,6 +2057,7 @@ struct CBEditControlSheet: View {
     var onCancel: () -> Void
     var onDelete: ((ControlButton) -> Void)? = nil
     let icons: [String]
+    let midiFilter: Set<Int>
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
@@ -1936,6 +2083,7 @@ struct CBEditControlSheet: View {
     @State private var faderDirection: String = "up"
     @State private var colorHex: String? = nil  // Custom color for button/fader
     @State private var showColorPicker: Bool = false
+    @State private var showPreview: Bool = false
     @State private var userDismissedExplicitly: Bool = false  // v1.0.8: Track Save/Cancel clicks
 
     var body: some View {
@@ -2034,18 +2182,26 @@ struct CBEditControlSheet: View {
                     .tint(.secondary)
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
-                // Live Preview
-                Section(header: Text("Preview")) {
-                    HStack {
-                        Spacer(minLength: 0)
-                        if isFaderUI {
-                            ControlFaderPreview(title: title, cc: number, channel: channel, orientation: faderOrientation, direction: faderDirection, colorHex: colorHex)
-                        } else {
-                            ControlButtonPreview(title: title, symbol: symbol, kind: kind, number: number, channel: channel, velocity: velocity, isSmall: isSmall, colorHex: colorHex)
+                // Live Preview - Collapsible
+                Section {
+                    DisclosureGroup(
+                        isExpanded: $showPreview,
+                        content: {
+                            HStack {
+                                Spacer(minLength: 0)
+                                if isFaderUI {
+                                    ControlFaderPreview(title: title, cc: number, channel: channel, orientation: faderOrientation, direction: faderDirection, colorHex: colorHex)
+                                } else {
+                                    ControlButtonPreview(title: title, symbol: symbol, kind: kind, number: number, channel: channel, velocity: velocity, isSmall: isSmall, colorHex: colorHex)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 6)
+                        },
+                        label: {
+                            Text("Preview")
                         }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.vertical, 6)
+                    )
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 Section(header: Text("MIDI")) {
@@ -2071,7 +2227,8 @@ struct CBEditControlSheet: View {
                         disabled: autoAssign,
                         channel: channel,
                         currentOwnerName: currentOwnerName,
-                        editingControl: editing
+                        editingControl: editing,
+                        midiFilter: midiFilter
                     )
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     if !isFaderUI && kind == .note {
@@ -2083,16 +2240,12 @@ struct CBEditControlSheet: View {
                 // Delete section - always show when editing existing control
                 if onDelete != nil {
                     Section {
-                        Button(role: .destructive) {
-                            showDeleteAlert = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text(isFaderUI ? "Delete Fader" : "Delete Button")
-                                Spacer()
-                            }
-                        }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        DestructiveWideButton(
+                            title: isFaderUI ? "Delete Fader" : "Delete Button",
+                            action: { showDeleteAlert = true }
+                        )
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                     }
                 }
             }
@@ -2118,11 +2271,7 @@ struct CBEditControlSheet: View {
                     userDismissedExplicitly = true  // v1.0.8: Mark as explicit dismissal
                     onCancel()
                 },
-                trailing: Button("Save") {
-                    userDismissedExplicitly = true  // v1.0.8: Mark as explicit dismissal
-                    saveEdit()
-                }
-                .disabled(title.isEmpty || conflictOwner() != nil)
+                trailing: saveButton
             )
             .onAppear {
                 userDismissedExplicitly = false  // v1.0.8: Reset on appear
@@ -2130,7 +2279,7 @@ struct CBEditControlSheet: View {
             }
             .onDisappear {
                 // v1.0.8: Auto-save if dismissed by tapping outside (not Cancel/Save)
-                if !userDismissedExplicitly && !title.isEmpty && conflictOwner() == nil {
+                if !userDismissedExplicitly && !title.isEmpty && conflictOwner() == nil && !isFilteredMIDI() {
                     debugPrint("📝 [SHEET] Edit control dismissed by outside-tap - auto-saving")
                     saveEdit()
                 }
@@ -2160,6 +2309,16 @@ struct CBEditControlSheet: View {
             }
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
+    }
+
+    private var saveButton: some View {
+        let isDisabled = title.isEmpty || conflictOwner() != nil || isFilteredMIDI()
+        return Button("Save") {
+            userDismissedExplicitly = true  // v1.0.8: Mark as explicit dismissal
+            saveEdit()
+        }
+        .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color(hex: "0A84FF"))
+        .disabled(isDisabled)
     }
 
     // v1.0.8: Extract save logic to function for reuse in onDisappear
@@ -2218,6 +2377,10 @@ struct CBEditControlSheet: View {
         }
         let key = MIDIKey(kind: kind, channel: channel, number: number)
         return currentOwnerName(key)
+    }
+
+    private func isFilteredMIDI() -> Bool {
+        return !midiFilter.isEmpty && midiFilter.contains(number)
     }
 
     private func ownerFor(kind: MIDIKind, number: Int, channel: Int) -> String? {
@@ -2622,6 +2785,7 @@ internal struct ContentView: View {
     @State private var tempName: String = ""
     @State private var showSaveChangesAlert: Bool = false
     @State private var pendingAction: (() -> Void)? = nil
+    @State private var shouldSaveAfterNaming: Bool = false  // Track if we should save after user names the project
 
     // Cue list renaming
     @State private var showCueListRenamePrompt: Bool = false
@@ -2675,7 +2839,7 @@ internal struct ContentView: View {
     // Flag to prevent backup/restore during project loading
     @State private var isLoadingProject: Bool = false
 
-    // MIDI Filter
+    // MIDI Filter - Default filters for common MIDI messages
     @State private var midiFilter: Set<Int> = [1, 7, 10, 11, 64, 120, 121, 122, 123, 124, 125, 126, 127]
     @State private var customMidiFilters: [(Int, String)] = []  // User-added custom filters
 
@@ -2828,15 +2992,11 @@ internal struct ContentView: View {
                 },
                 onSave: {
                     if isEditing { isEditing = false }
-                    do {
-                        try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
-                    } catch {
-                        debugPrint("Save failed: \(error)")
-                    }
+                    saveCurrentProject(overwrite: true)
                 },
                 onSaveAs: {
                     if isEditing { isEditing = false }
-                    /* TODO: Save As dialog */
+                    saveCurrentProject(overwrite: false)
                 },
                 onOpenProject: {
                     if isEditing { isEditing = false }
@@ -3144,19 +3304,7 @@ internal struct ContentView: View {
                                     }
                                     .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
                                 } else {
-                                    // Normal mode: reorder and select buttons
-                                    Button(action: {
-                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                                            reorderMode.toggle()
-                                        }
-                                    }) {
-                                        Image(systemName: reorderMode ? "checkmark" : "list.bullet")
-                                            .font(.system(size: 20))
-                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                    }
-                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-                                    .transition(.scale.combined(with: .opacity))
-
+                                    // Normal mode: select and reorder buttons (select on left, reorder on right)
                                     Button(action: {
                                         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                                             setlistBatchMode = true
@@ -3164,6 +3312,18 @@ internal struct ContentView: View {
                                         }
                                     }) {
                                         Image(systemName: "checklist")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    }
+                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                                    .transition(.scale.combined(with: .opacity))
+
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                                            reorderMode.toggle()
+                                        }
+                                    }) {
+                                        Image(systemName: reorderMode ? "checkmark" : "list.bullet")
                                             .font(.system(size: 20))
                                             .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                     }
@@ -3197,6 +3357,7 @@ internal struct ContentView: View {
                 reportedHeight: $controlAreaHeight,
                 canAddMoreControls: $canAddMoreControlsToGrid,
                 conflictFor: conflictLookup(),
+                midiFilter: midiFilter,
                 showMIDIData: showMIDIData,
                 onTap: { btn in triggerControl(btn) },
                 onEditButton: { btn in
@@ -3570,14 +3731,6 @@ internal struct ContentView: View {
                 // Main content (without top bar - it will overlay)
                 VStack(spacing: 0) {
                     AnyView(buildMiddleSectionView())
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if controlEditMode {
-                                withAnimation(.easeInOut) {
-                                    controlEditMode = false
-                                }
-                            }
-                        }
                     AnyView(bottomSectionView)
                 }
                 .disabled(showSideMenu)
@@ -3587,14 +3740,6 @@ internal struct ContentView: View {
                 // Floating top bar overlay
                 VStack {
                     AnyView(topBarView)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if controlEditMode {
-                                withAnimation(.easeInOut) {
-                                    controlEditMode = false
-                                }
-                            }
-                        }
                     Spacer()
                 }
                 .background(Color.clear)
@@ -3830,17 +3975,20 @@ internal struct ContentView: View {
         .sheet(isPresented: $showMidiTable) {
             MidiTableSheet(
                 setlist: store.activeSongs,
-                controlButtons: controlButtons,
+                controlButtons: $controlButtons,
                 isGlobalChannel: $isGlobalChannel,
                 globalChannel: $globalChannel,
                 midiFilter: $midiFilter,
                 customMidiFilters: $customMidiFilters,
                 onDismiss: { showMidiTable = false },
                 onApply: { items in
+                    debugPrint("🎛️ [MIDI] Applying MIDI assignments: \(items.count) items")
+
                     // Write changes back to setlist and controls by id
                     store.updateActiveSongs { songs in
                         for i in 0..<songs.count {
                             if let edited = items.first(where: { $0.id == songs[i].id }) {
+                                debugPrint("🎛️ [MIDI] Updating song '\(songs[i].name)': \(edited.midiType) Ch\(edited.channel) #\(edited.value)")
                                 songs[i].kind = edited.midiType
                                 songs[i].channel = edited.channel
                                 if edited.midiType == .note { songs[i].note = edited.value } else { songs[i].cc = edited.value }
@@ -3849,13 +3997,17 @@ internal struct ContentView: View {
                     }
 
                     var controls = controlButtons
+                    var updatedCount = 0
                     for i in 0..<controls.count {
                         if let edited = items.first(where: { $0.id == controls[i].id }) {
+                            debugPrint("🎛️ [MIDI] Updating control '\(controls[i].title)' (was \(controls[i].kind) Ch\(controls[i].channel) #\(controls[i].number)) -> (now \(edited.midiType) Ch\(edited.channel) #\(edited.value))")
                             controls[i].kind = edited.midiType
                             controls[i].channel = edited.channel
                             controls[i].number = edited.value
+                            updatedCount += 1
                         }
                     }
+                    debugPrint("🎛️ [MIDI] Updated \(updatedCount) controls out of \(controls.count) total")
                     controlButtons = controls
                     markDirty()
                 }
@@ -4154,12 +4306,20 @@ internal struct ContentView: View {
         view
         .alert("Project Name", isPresented: $showNamePrompt, actions: {
             TextField("Name", text: $tempName)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") {
+            Button("Cancel", role: .cancel) {
+                shouldSaveAfterNaming = false
+            }
+            Button("OK") {
                 let final = tempName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !final.isEmpty else { return }
                 projectName = final
-                saveCurrentProject(overwrite: false)
+
+                // Save only if this was triggered from Save/Save As action
+                if shouldSaveAfterNaming {
+                    snapshotAndSave(as: final, overwrite: false)
+                    shouldSaveAfterNaming = false
+                }
+
                 showProjects = false
             }
         }, message: { Text("Enter a name for your project.") })
@@ -4514,7 +4674,8 @@ internal struct ContentView: View {
             // Deduplicate owner names
             let uniqueOwners = Array(Set(owners)).sorted()
 
-            // Only store if there are multiple owners (conflict)
+            // Store ALL owners (even single ones) so we can detect conflicts
+            // The filtering happens at display time to exclude the current item
             if uniqueOwners.count >= 2 {
                 // Format list with separator
                 map[key] = uniqueOwners.joined(separator: "|||")
@@ -5111,9 +5272,10 @@ internal struct ContentView: View {
         isDirty = true
     }
 
-    private func markDirty() { 
+    private func markDirty() {
         isDirty = true
-        startAutosave()
+        // Autosave disabled - user must explicitly choose to save via Save/Save As
+        // startAutosave()
     }
 
     private func snapshotAndSave(as name: String, overwrite: Bool) {
@@ -5247,6 +5409,7 @@ internal struct ContentView: View {
         if !overwrite || trimmed.isEmpty || isUntitledProject(trimmed) {
             // Pre-fill with current name for "Save As", or suggest active cue list name for new projects
             tempName = trimmed.isEmpty || isUntitledProject(trimmed) ? (store.activeCueList?.name ?? "My Show") : trimmed
+            shouldSaveAfterNaming = true  // Mark that we should save after user enters name
             showNamePrompt = true
             return
         }
@@ -5984,6 +6147,16 @@ private struct CBTopBar: View {
                         libAddedAt: libAddedAt,
                         selectedThemeID: selectedThemeID,
                         onAddToCueList: onAddToSetlist,
+                        onRemoveFromCueList: { song in
+                            // Remove song from active cue list
+                            if let activeCueList = cueLists.first(where: { $0.id == activeCueListID }) {
+                                var updatedList = activeCueList
+                                updatedList.songs.removeAll(where: { $0.id == song.id })
+                                if let index = cueLists.firstIndex(where: { $0.id == activeCueListID }) {
+                                    cueLists[index] = updatedList
+                                }
+                            }
+                        },
                         onDelete: onDeleteFromLibrary,
                         onEdit: { song in
                             editingSong = song
@@ -6300,6 +6473,7 @@ private struct CBControlSection: View {
     @Binding var reportedHeight: CGFloat
     @Binding var canAddMoreControls: Bool
     let conflictFor: [MIDIKey: String]
+    let midiFilter: Set<Int>
     let showMIDIData: Bool  // Toggle for showing MIDI data
     var onTap: (ControlButton) -> Void
     var onEditButton: (ControlButton) -> Void
@@ -7695,7 +7869,7 @@ private struct CBControlSection: View {
     
     // Helper function to build individual control tile (extracted from ForEach for type-checking performance)
     @ViewBuilder
-    private func buildControlTileView(button: ControlButton, cellSize: CGFloat, columnSpacing: CGFloat, rowSpacing: CGFloat, conflictFor: [MIDIKey: String], isEditing: Bool, maxRows: Int, usbServer: ConnectionManager, wifiClient: BridgeOutput, connectionCoordinator: ConnectionCoordinator, controlButtons: Binding<[ControlButton]>, markDirty: @escaping () -> Void) -> some View {
+    private func buildControlTileView(button: ControlButton, cellSize: CGFloat, columnSpacing: CGFloat, rowSpacing: CGFloat, conflictFor: [MIDIKey: String], midiFilter: Set<Int>, isEditing: Bool, maxRows: Int, usbServer: ConnectionManager, wifiClient: BridgeOutput, connectionCoordinator: ConnectionCoordinator, controlButtons: Binding<[ControlButton]>, markDirty: @escaping () -> Void) -> some View {
         // Calculate button size
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
         let totalWidth = CGFloat(button.gridWidth) * cellSize + CGFloat(max(0, button.gridWidth - 1)) * columnSpacing
@@ -7713,9 +7887,46 @@ private struct CBControlSection: View {
                 let key = MIDIKey(kind: button.kind, channel: button.channel, number: button.number)
                 let owner = conflictFor[key]
 
+                // Filter out the current button from conflict list
+                let typePrefix = (button.isFader == true) ? "Fader" : "Button"
+                let buttonDisplayName = button.title.isEmpty ? typePrefix : "\(typePrefix): \(button.title)"
+                let filteredOwner: String? = {
+                    var warning: String? = nil
+
+                    // Check for MIDI conflicts
+                    if let ownerString = owner {
+                        // If owner string contains multiple owners (separated by "|||")
+                        if ownerString.contains("|||") {
+                            let owners = ownerString.split(separator: "|||")
+                                .map { $0.trimmingCharacters(in: .whitespaces) }
+                                .filter { $0 != buttonDisplayName }
+                            if !owners.isEmpty {
+                                warning = owners.joined(separator: " and ")
+                            }
+                        } else {
+                            // Single owner - check if it's this button
+                            if ownerString.trimmingCharacters(in: .whitespaces) != buttonDisplayName {
+                                warning = ownerString
+                            }
+                        }
+                    }
+
+                    // Check for filtered MIDI
+                    if !midiFilter.isEmpty && midiFilter.contains(button.number) {
+                        let filteredMsg = "Filtered \(button.kind == .cc ? "CC" : "Note")"
+                        if let existing = warning {
+                            warning = "\(existing) • \(filteredMsg)"
+                        } else {
+                            warning = filteredMsg
+                        }
+                    }
+
+                    return warning
+                }()
+
                 iPadControlTile(
                     button: button,
-                    takenBy: (owner != nil && owner != button.title) ? owner : nil,
+                    takenBy: filteredOwner,
                     isEditing: isEditing,
                     isDragging: dragging?.id == button.id,
                     defaultCueColor: defaultCueColor,
@@ -7741,7 +7952,7 @@ private struct CBControlSection: View {
                         connectionCoordinator.sendMIDI(type: .cc, channel: channel, number: cc, value: value, label: title, buttonID: buttonID.uuidString)
                     }
                 )
-                .id("\(button.id.uuidString)-\(isEditing)-\(button.colorHex ?? "nil")")
+                .id("\(button.id.uuidString)-\(isEditing)-\(button.colorHex ?? "nil")-\(button.kind.rawValue)-\(button.channel)-\(button.number)")
                 .frame(width: width, height: height)
                 .offset(
                     x: x + (dragging?.id == button.id ? dragTranslation.width : 0),
@@ -7924,6 +8135,7 @@ private struct CBControlSection: View {
                 columnSpacing: columnSpacing,
                 rowSpacing: rowSpacing,
                 conflictFor: conflictFor,
+                midiFilter: midiFilter,
                 isEditing: isCtrlEditing,
                 maxRows: maxRows,
                 usbServer: usbServer,
@@ -9180,6 +9392,19 @@ private struct iPadControlTile: View {
                 .offset(x: isPhone ? -10 : -30, y: isPhone ? -10 : -30)  // iPhone: position at corner, half sticking out
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
+
+            // Show MIDI conflict warning
+            if let owner = takenBy, showMIDIData {
+                Text("⚠️ MIDI taken by: \(owner)")
+                    .font(.caption2)
+                    .padding(6)
+                    .foregroundColor(Color(uiColor: .systemBackground))
+                    .background(selectedTheme.warningColor(for: colorScheme))
+                    .clipShape(Capsule())
+                    .padding(6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .allowsHitTesting(false)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(isEditing ? Rectangle() : Rectangle())
@@ -9342,7 +9567,7 @@ private struct iPadControlTile: View {
                         Spacer(minLength: 0)
                     }
                     Text(button.title)
-                        .font(isPhone ? .system(size: 11, weight: .semibold) : .title3.weight(.semibold))
+                        .font(isPhone ? .system(size: 11, weight: .semibold) : .title3.weight(.regular))
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
                     if showMIDIData {
@@ -9386,7 +9611,7 @@ private struct iPadControlTile: View {
                         .font(.system(size: isPhone ? 14 : 24, weight: .semibold))
                         .foregroundColor(buttonIconColor)
                     Text(button.title)
-                        .font(isPhone ? .system(size: 9, weight: .semibold) : .footnote.weight(.semibold))
+                        .font(isPhone ? .system(size: 9, weight: .semibold) : .footnote.weight(.regular))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     if showMIDIData {
@@ -9524,7 +9749,7 @@ private struct iPadControlTile: View {
                 // Title overlay - centered
                 HStack {
                     Text(button.title)
-                        .font(isPhone ? .system(size: 9, weight: .semibold) : .caption.weight(.semibold))
+                        .font(isPhone ? .system(size: 9, weight: .semibold) : .caption.weight(.regular))
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.center)
                         .padding(.leading, isPhone ? 2 : 4)
@@ -9633,7 +9858,7 @@ private struct iPadControlTile: View {
                 // Title overlay - centered
                 VStack {
                     Text(button.title)
-                        .font(isPhone ? .system(size: 9, weight: .semibold) : .caption.weight(.semibold))
+                        .font(isPhone ? .system(size: 9, weight: .semibold) : .caption.weight(.regular))
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.center)
                         .padding(.top, isPhone ? 2 : 4)
@@ -9957,7 +10182,7 @@ private struct iPadDropDelegate: DropDelegate {
 // MARK: - MIDI Table Sheet
 struct MidiTableSheet: View {
     let setlist: [Song]
-    let controlButtons: [ControlButton]
+    @Binding var controlButtons: [ControlButton]
     @Binding var isGlobalChannel: Bool
     @Binding var globalChannel: Int
     @Binding var midiFilter: Set<Int>
@@ -10019,10 +10244,12 @@ struct MidiTableSheet: View {
                 Section {
                     NavigationLink(destination: MidiAssignmentsView(
                         setlist: setlist,
-                        controlButtons: controlButtons,
+                        controlButtons: $controlButtons,
                         isGlobalChannel: $isGlobalChannel,
                         globalChannel: $globalChannel,
-                        onApply: onApply
+                        midiFilter: midiFilter,
+                        onApply: onApply,
+                        onDismissAll: onDismiss
                     )) {
                         Text("MIDI Assignments")
                     }
@@ -10051,10 +10278,12 @@ struct MidiTableSheet: View {
 // MARK: - MIDI Assignments View (NavigationLink destination)
 struct MidiAssignmentsView: View {
     let setlist: [Song]
-    let controlButtons: [ControlButton]
+    @Binding var controlButtons: [ControlButton]
     @Binding var isGlobalChannel: Bool
     @Binding var globalChannel: Int
+    let midiFilter: Set<Int>
     var onApply: (([MidiTableItem]) -> Void)? = nil
+    var onDismissAll: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -10129,12 +10358,14 @@ struct MidiAssignmentsView: View {
                                 isGlobalChannel: isGlobalChannel,
                                 globalChannel: globalChannel,
                                     allowFullCCR: allowFullCCR,
+                                midiFilter: midiFilter,
                                 onMidiChange: { item, newMidiType, newChannel, newValue in
                                     handleMidiChange(item: item, newMidiType: newMidiType, newChannel: newChannel, newValue: newValue)
                                 },
                                 getOwnerName: { midiType, channel, value, excludeId, excludeName in
                                     getOwnerName(for: midiType, channel: channel, value: value, excluding: excludeId, excludeName: excludeName)
-                                }
+                                },
+                                onDismissAll: onDismissAll
                             )
                             .background(Color(UIColor.systemBackground))
                             
@@ -10174,8 +10405,15 @@ struct MidiAssignmentsView: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") {
+                    debugPrint("🎛️ [MIDI Assignments] Done button clicked - applying \(editableItems.count) items")
+                    // Only call onApply - the parent will handle updating controlButtons
                     onApply?(editableItems)
-                    dismiss()
+                    // Dismiss all sheets (MIDI Settings + MIDI Assignments)
+                    if let onDismissAll = onDismissAll {
+                        onDismissAll()
+                    } else {
+                        dismiss()
+                    }
                 }
                 .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
             }
@@ -10183,6 +10421,7 @@ struct MidiAssignmentsView: View {
     }
     
     private func buildMidiTableItems() {
+        debugPrint("🎛️ [Build Items] Starting - setlist.count=\(setlist.count), controlButtons.count=\(controlButtons.count)")
         var items: [MidiTableItem] = []
         var seenIDs: Set<UUID> = []
 
@@ -10201,6 +10440,7 @@ struct MidiAssignmentsView: View {
                 value: song.kind == .cc ? song.cc : (song.note ?? 0)
             ))
         }
+        debugPrint("🎛️ [Build Items] Added \(items.count) setlist items")
 
         // Add control buttons and faders
         for button in controlButtons {
@@ -10208,18 +10448,23 @@ struct MidiAssignmentsView: View {
             guard !seenIDs.contains(button.id) else { continue }
             seenIDs.insert(button.id)
 
+            let itemType: MidiItemType = button.isFader == true ? .fader : .button
+            debugPrint("🎛️ [Build Items] Adding \(itemType.displayName): '\(button.title)' - \(button.kind) Ch\(button.channel) #\(button.number)")
+
             items.append(MidiTableItem(
                 id: button.id,
                 name: button.title,
-                type: button.isFader == true ? .fader : .button,
+                type: itemType,
                 midiType: button.kind,
                 channel: button.channel,
                 value: button.number
             ))
         }
+        debugPrint("🎛️ [Build Items] Total items: \(items.count) (setlist + controls)")
 
             editableItems = items
             sortEditableItems()
+        debugPrint("🎛️ [Build Items] Finished - editableItems.count=\(editableItems.count)")
     }
     
     private func applyGlobalChannel() {
@@ -10230,17 +10475,23 @@ struct MidiAssignmentsView: View {
     }
     
     private func handleMidiChange(item: MidiTableItem, newMidiType: MIDIKind, newChannel: Int, newValue: Int) {
+        debugPrint("🎛️ [MIDI Assignments] handleMidiChange for '\(item.name)' (\(item.type.displayName)): \(newMidiType) Ch\(newChannel) #\(newValue)")
+
         // Check if this creates a conflict
         if let conflict = checkForMidiConflict(item: item, newMidiType: newMidiType, newChannel: newChannel, newValue: newValue) {
+            debugPrint("🎛️ [MIDI Assignments] Conflict detected with: \(conflict.existingOwner)")
             // Show conflict alert
             pendingConflict = conflict
             showingConflictAlert = true
         } else {
             // No conflict, update directly
             if let itemIndex = editableItems.firstIndex(where: { $0.id == item.id }) {
+                debugPrint("🎛️ [MIDI Assignments] Updating editableItems[\(itemIndex)] for '\(item.name)'")
                 editableItems[itemIndex].midiType = newMidiType
                 editableItems[itemIndex].channel = newChannel
                 editableItems[itemIndex].value = newValue
+            } else {
+                debugPrint("🎛️ [MIDI Assignments] ERROR: Could not find item in editableItems!")
             }
         }
     }
@@ -10314,6 +10565,8 @@ struct MidiAssignmentsView: View {
         let owners = editableItems.filter { item in
             item.id != excludeId && MIDIKey(kind: item.midiType, channel: item.channel, number: item.value) == testKey
         }.map { $0.name }
+
+        debugPrint("🔍 [MIDI Assignments] getOwnerName for \(midiType) Ch\(channel) #\(value), excluding '\(excludeName)': found \(owners.count) owners: \(owners)")
 
         // Remove duplicate names (filter out the item being edited by name as well)
         let uniqueOwners = owners.filter { $0 != excludeName }
@@ -10458,8 +10711,10 @@ struct MidiAssignmentEditSheet: View {
     let isGlobalChannel: Bool
     let globalChannel: Int
     let allowFullCCR: Bool
+    let midiFilter: Set<Int>
     let onMidiChange: (MidiTableItem, MIDIKind, Int, Int) -> Void
     let getOwnerName: (MIDIKind, Int, Int, UUID, String) -> String?
+    var onDismissAll: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -10474,13 +10729,15 @@ struct MidiAssignmentEditSheet: View {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 
-    init(item: Binding<MidiTableItem>, isGlobalChannel: Bool, globalChannel: Int, allowFullCCR: Bool, onMidiChange: @escaping (MidiTableItem, MIDIKind, Int, Int) -> Void, getOwnerName: @escaping (MIDIKind, Int, Int, UUID, String) -> String?) {
+    init(item: Binding<MidiTableItem>, isGlobalChannel: Bool, globalChannel: Int, allowFullCCR: Bool, midiFilter: Set<Int>, onMidiChange: @escaping (MidiTableItem, MIDIKind, Int, Int) -> Void, getOwnerName: @escaping (MIDIKind, Int, Int, UUID, String) -> String?, onDismissAll: (() -> Void)? = nil) {
         self._item = item
         self.isGlobalChannel = isGlobalChannel
         self.globalChannel = globalChannel
         self.allowFullCCR = allowFullCCR
+        self.midiFilter = midiFilter
         self.onMidiChange = onMidiChange
         self.getOwnerName = getOwnerName
+        self.onDismissAll = onDismissAll
         self._editedType = State(initialValue: item.wrappedValue.midiType)
         self._editedChannel = State(initialValue: item.wrappedValue.channel)
         self._editedValue = State(initialValue: item.wrappedValue.value)
@@ -10601,6 +10858,19 @@ struct MidiAssignmentEditSheet: View {
                                 .foregroundColor(selectedTheme.warningColor(for: colorScheme))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
+
+                        // Show filtered MIDI warning
+                        if !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue) {
+                            Text("⚠️ This CC is filtered. Turn off filter to use it.")
+                                .font(.caption)
+                                .foregroundColor(selectedTheme.warningColor(for: colorScheme))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else if !midiFilter.isEmpty && editedType == .note && midiFilter.contains(editedValue) {
+                            Text("⚠️ This Note is filtered. Turn off filter to use it.")
+                                .font(.caption)
+                                .foregroundColor(selectedTheme.warningColor(for: colorScheme))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
@@ -10617,19 +10887,28 @@ struct MidiAssignmentEditSheet: View {
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
             }
             ToolbarItem(placement: .confirmationAction) {
+                let channel = isGlobalChannel ? globalChannel : editedChannel
+                let hasConflict = getOwnerName(editedType, channel, editedValue, item.id, item.name) != nil
+                let isFiltered = !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue)
+                let isDisabled = hasConflict || isFiltered
+
                 Button("Done") {
-                    let channel = isGlobalChannel ? globalChannel : editedChannel
-                    // Update the binding directly
-                    item.midiType = editedType
-                    item.channel = channel
-                    item.value = editedValue
-                    // Also call the callback to handle conflicts and update parent
+                    debugPrint("🎛️ [Edit Sheet] Done clicked for '\(item.name)' - type:\(editedType) ch:\(channel) val:\(editedValue)")
+
+                    // Call onMidiChange to check for conflicts and update if valid
+                    // This will update editableItems in the parent view
                     onMidiChange(item, editedType, channel, editedValue)
+
+                    // Dismiss this edit sheet only (go back to MIDI Assignments view)
+                    // Don't use onDismissAll which would close everything
+                    debugPrint("🎛️ [Edit Sheet] Dismissing edit sheet")
                     dismiss()
                 }
-                .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+                .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : selectedTheme.defaultCueColor(for: colorScheme))
+                .disabled(isDisabled)
             }
         }
+        .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
 }
 
@@ -10638,8 +10917,10 @@ struct MidiTableRow: View {
     let isGlobalChannel: Bool
     let globalChannel: Int
     let allowFullCCR: Bool
+    let midiFilter: Set<Int>
     let onMidiChange: (MidiTableItem, MIDIKind, Int, Int) -> Void
     let getOwnerName: (MIDIKind, Int, Int, UUID, String) -> String?
+    var onDismissAll: (() -> Void)? = nil
 
     var body: some View {
         NavigationLink(destination: MidiAssignmentEditSheet(
@@ -10647,8 +10928,10 @@ struct MidiTableRow: View {
             isGlobalChannel: isGlobalChannel,
             globalChannel: globalChannel,
             allowFullCCR: allowFullCCR,
+            midiFilter: midiFilter,
             onMidiChange: onMidiChange,
-            getOwnerName: getOwnerName
+            getOwnerName: getOwnerName,
+            onDismissAll: onDismissAll
         )) {
             HStack(spacing: 0) {
                 // Name Column

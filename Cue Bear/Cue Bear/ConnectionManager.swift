@@ -1710,32 +1710,26 @@ class ConnectionManager: ObservableObject {
     }
     
     private func checkUSBBridgeAvailability() {
-        // Show USB chip when listener is ready OR Bridge has connected before
+        // Show USB chip only when Bridge has actually connected before
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
 
-            // Show USB bridge chip when:
-            // 1. Bridge app has connected before (has sent handshake) - connectedComputerName is set
-            //    This keeps the chip visible even when switching to WiFi (stays blue/inactive)
-            // 2. OR when listener is running (ready for Bridge to connect)
-            //    This handles the case where iPad app starts after Bridge is already running
+            // Show USB bridge chip ONLY when:
+            // Bridge app has connected before (has sent handshake) - connectedComputerName is set
+            // This keeps the chip visible even when switching to WiFi (stays blue/inactive)
+            // Do NOT show just because listener is ready - that would show it in simulator/first launch
             let hasConnectedBefore = self.connectedComputerName != nil
-            let isListenerReady = self.isListening
-            let shouldBeAvailable = hasConnectedBefore || isListenerReady
+            let shouldBeAvailable = hasConnectedBefore
 
             let wasAvailable = self.usbBridgeAvailable
             self.usbBridgeAvailable = shouldBeAvailable
 
             // Enhanced debug logging to diagnose visibility issues
             debugPrint("🔗 ConnectionManager: 🔍 checkUSBBridgeAvailability() - connectedComputerName: \(self.connectedComputerName ?? "nil"), isListening: \(self.isListening), isWiFiConnected: \(self.isWiFiConnected)")
-            debugPrint("🔗 ConnectionManager: 🔍 hasConnectedBefore: \(hasConnectedBefore), isListenerReady: \(isListenerReady), shouldBeAvailable: \(shouldBeAvailable)")
+            debugPrint("🔗 ConnectionManager: 🔍 hasConnectedBefore: \(hasConnectedBefore), shouldBeAvailable: \(shouldBeAvailable)")
 
             if shouldBeAvailable && !wasAvailable {
-                if hasConnectedBefore {
-                    debugPrint("🔗 ConnectionManager: 🎯 USB Bridge available - showing USB chip (Bridge connected before)")
-                } else {
-                    debugPrint("🔗 ConnectionManager: 🎯 USB Bridge ready - showing USB chip (listener running, ready for connection)")
-                }
+                debugPrint("🔗 ConnectionManager: 🎯 USB Bridge available - showing USB chip (Bridge has connected before)")
             } else if !shouldBeAvailable && wasAvailable {
                 debugPrint("🔗 ConnectionManager: ❌ USB Bridge unavailable - hiding USB chip")
             }
