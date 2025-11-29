@@ -21,6 +21,10 @@ struct AboutSheet: View {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 
+    private var gitCommitHash: String {
+        GitInfo.commitHash
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -37,9 +41,16 @@ struct AboutSheet: View {
                         Text("Cue Bear")
                             .font(.system(size: 36, weight: .bold))
 
-                        Text("Version \(appVersion) (\(buildNumber))")
-                            .font(.subheadline)
-                            .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                        VStack(spacing: 4) {
+                            Text("Version \(appVersion) (\(buildNumber))")
+                                .font(.subheadline)
+                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+
+                            Text("Commit: \(gitCommitHash)")
+                                .font(.caption)
+                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.7))
+                                .fontDesign(.monospaced)
+                        }
                     }
                     .padding(.top, 40)
 
