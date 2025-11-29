@@ -100,8 +100,6 @@ struct PrimaryWideButton: View {
     let action: () -> Void
     let isDisabled: Bool
 
-    @State private var isPressed = false
-
     var body: some View {
         Button(action: action) {
             Text(title)
@@ -109,19 +107,25 @@ struct PrimaryWideButton: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(
-                    isDisabled
-                        ? Color.gray.opacity(0.4)
-                        : (isPressed ? Color(hex: "0A84FF").opacity(0.7) : Color(hex: "0A84FF"))
-                )
-                .cornerRadius(10)
         }
+        .buttonStyle(PrimaryWideButtonStyle(isDisabled: isDisabled))
         .disabled(isDisabled)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+    }
+}
+
+struct PrimaryWideButtonStyle: ButtonStyle {
+    let isDisabled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(
+                        isDisabled
+                            ? Color.gray.opacity(0.4)
+                            : (configuration.isPressed ? Color(hex: "0A84FF").opacity(0.7) : Color(hex: "0A84FF"))
+                    )
+            )
     }
 }
 
@@ -129,8 +133,6 @@ struct SecondaryWideButton: View {
     let title: String
     let action: () -> Void
     let isDisabled: Bool
-
-    @State private var isPressed = false
 
     var body: some View {
         Button(action: action) {
@@ -143,36 +145,40 @@ struct SecondaryWideButton: View {
                 )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(
-                    isDisabled
-                        ? Color.gray.opacity(0.1)
-                        : (isPressed ? Color(hex: "0A84FF").opacity(0.2) : Color(hex: "0A84FF").opacity(0.1))
-                )
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(
-                            isDisabled
-                                ? Color.gray.opacity(0.3)
-                                : Color(hex: "0A84FF").opacity(0.5),
-                            lineWidth: 1
-                        )
-                )
         }
+        .buttonStyle(SecondaryWideButtonStyle(isDisabled: isDisabled))
         .disabled(isDisabled)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+    }
+}
+
+struct SecondaryWideButtonStyle: ButtonStyle {
+    let isDisabled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(
+                        isDisabled
+                            ? Color.gray.opacity(0.1)
+                            : (configuration.isPressed ? Color(hex: "0A84FF").opacity(0.2) : Color(hex: "0A84FF").opacity(0.1))
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(
+                        isDisabled
+                            ? Color.gray.opacity(0.3)
+                            : Color(hex: "0A84FF").opacity(0.5),
+                        lineWidth: 1
+                    )
+            )
     }
 }
 
 struct DestructiveWideButton: View {
     let title: String
     let action: () -> Void
-
-    @State private var isPressed = false
 
     var body: some View {
         Button(action: action) {
@@ -181,16 +187,18 @@ struct DestructiveWideButton: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(
-                    isPressed ? Color.red.opacity(0.7) : Color.red
-                )
-                .cornerRadius(10)
         }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+        .buttonStyle(DestructiveWideButtonStyle())
+    }
+}
+
+struct DestructiveWideButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(configuration.isPressed ? Color.red.opacity(0.7) : Color.red)
+            )
     }
 }
 
@@ -1472,18 +1480,6 @@ struct CBControlEditorSheet: View {
                     }
                 }
 
-                // Delete section - only show when editing existing control
-                if isEditMode, onDelete != nil {
-                    Section {
-                        DestructiveWideButton(
-                            title: draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"),
-                            action: { showDeleteAlert = true }
-                        )
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    }
-                }
-
                 // Action buttons section
                 Section {
                     VStack(spacing: 12) {
@@ -1500,6 +1496,14 @@ struct CBControlEditorSheet: View {
                                 title: "Save & Add Another",
                                 action: { saveControl(andAddAnother: true) },
                                 isDisabled: conflictOwner() != nil || isFilteredMIDI() || showSpaceWarning || isOutOfRoom || !canAddMore
+                            )
+                        }
+
+                        // Delete button - only show when editing existing control
+                        if isEditMode, onDelete != nil {
+                            DestructiveWideButton(
+                                title: draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"),
+                                action: { showDeleteAlert = true }
                             )
                         }
                     }
@@ -1536,6 +1540,7 @@ struct CBControlEditorSheet: View {
                         draft.clear()
                         onCancel()
                     }
+                    .disabled(conflictOwner() != nil || isFilteredMIDI() || showSpaceWarning || isOutOfRoom)
                 }
             }
             .onAppear {
@@ -2642,10 +2647,10 @@ internal struct ContentView: View {
         "pause.circle.fill", "pause.fill",
         "play.circle.fill", "play.fill", "play.square.fill",
         "record.circle.fill",
-        "stop.circle.fill", "stop.fill",
+        "stop.circle.fill",
 
         // Music & Performance - Strings & Keys
-        "guitars", "guitars.fill",
+        "guitars",
         "music.note.house", "music.note.house.fill",
         "pianokeys", "pianokeys.inverse",
 
@@ -2817,6 +2822,7 @@ internal struct ContentView: View {
     // Control Area (formerly transport)
     @State private var controlButtons: [ControlButton] = []
     @State private var controlEditMode = false
+    @State private var controlAreaCollapsed: Bool = false  // Track if control area is collapsed
     @State private var controlsPerRow: Int = 4
     @State private var controlAreaHeight: CGFloat = 0
     @State private var canAddMoreControlsToGrid: Bool = true  // Track if grid has space for new controls
@@ -2876,6 +2882,7 @@ internal struct ContentView: View {
     // Theme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     private var currentTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
@@ -3098,6 +3105,7 @@ internal struct ContentView: View {
                     showMIDIData: showMIDIData,  // Pass MIDI data visibility setting
                     cueHeight: cueHeight,  // Pass customizable cue height
                     fontSize: fontSize,  // Pass font size multiplier
+                    controlAreaCollapsed: controlAreaCollapsed || (controlButtons.isEmpty && !controlEditMode),  // Pass effective collapsed state
                     onTapSong: { song in
                         if store.mode == .regular || store.mode == .regularPlusRemote {
                             // In Navigator mode, update the index to match the tapped song
@@ -3181,7 +3189,7 @@ internal struct ContentView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
                 .overlay(alignment: .top) {
                     // Gradient from top of screen (solid background) to below title/search bar (fades to transparent) - improves scrolled cue visibility
-                    let gradientHeight: CGFloat = isEditing ? 118 : 60  // Taller in edit mode (title + search), shorter in normal mode (title only)
+                    let gradientHeight: CGFloat = isEditing ? 118 : 120  // Taller in edit mode (title + search), extends below title bar capsule in normal mode
                     let bgColor = currentTheme.backgroundColor(for: colorScheme)
 
                     LinearGradient(
@@ -3348,6 +3356,77 @@ internal struct ContentView: View {
             )
     }
 
+    private var effectivelyCollapsedForOverlay: Bool {
+        return controlAreaCollapsed || (controlButtons.isEmpty && !controlEditMode)
+    }
+
+    private var collapsedControlCapsule: some View {
+        Group {
+            if controlButtons.isEmpty && !controlEditMode {
+                // Empty state - just Edit button
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                        controlEditMode = true
+                        controlAreaCollapsed = false
+                    }
+                }) {
+                    Text("Edit")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                .contentShape(Rectangle())
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.regularMaterial)
+                .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .padding(.trailing, 16)
+                .padding(.bottom, 8)
+                .transition(.move(edge: .bottom))
+            } else {
+                // Collapsed with buttons - Edit/Done + chevron
+                HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
+                    Button(controlEditMode ? "Done" : "Edit") {
+                        withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                            controlEditMode.toggle()
+                        }
+                    }
+                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                    .controlSize(.small)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+
+                    if !controlButtons.isEmpty {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                                controlAreaCollapsed = false
+                            }
+                        }) {
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 14, weight: .medium))
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                        .controlSize(.small)
+                        .contentShape(Rectangle())
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.regularMaterial)
+                .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .padding(.trailing, 16)
+                .padding(.bottom, 8)
+                .transition(.move(edge: .bottom))
+            }
+        }
+    }
+
     private var controlSectionView: some View {
             CBControlSection(
                 buttons: $controlButtons,
@@ -3356,6 +3435,7 @@ internal struct ContentView: View {
             pendingAddIsFader: $pendingAddIsFader,
                 reportedHeight: $controlAreaHeight,
                 canAddMoreControls: $canAddMoreControlsToGrid,
+                isCollapsed: $controlAreaCollapsed,
                 conflictFor: conflictLookup(),
                 midiFilter: midiFilter,
                 showMIDIData: showMIDIData,
@@ -3736,10 +3816,17 @@ internal struct ContentView: View {
                 .disabled(showSideMenu)
                 .blur(radius: showSideMenu ? 3 : 0)
                 .animation(.easeInOut(duration: 0.3), value: showSideMenu)
+                .overlay(alignment: .bottomTrailing) {
+                    // Floating control area capsules - only when NOT in cue list edit mode
+                    if !isEditing && effectivelyCollapsedForOverlay {
+                        AnyView(collapsedControlCapsule)
+                    }
+                }
 
                 // Floating top bar overlay
                 VStack {
                     AnyView(topBarView)
+                        .padding(.top, UIDevice.current.userInterfaceIdiom == .phone && verticalSizeClass == .compact ? 8 : 0)
                     Spacer()
                 }
                 .background(Color.clear)
@@ -3771,14 +3858,16 @@ internal struct ContentView: View {
     }
 
     private var bottomSectionView: some View {
-        VStack(spacing: 0) {
-            // Hide control area completely in cue list edit mode
-            if !isEditing {
+        Group {
+            // Only show control area when NOT in edit mode AND NOT collapsed
+            // Collapsed capsules are rendered as overlay on main content
+            if !isEditing && !effectivelyCollapsedForOverlay {
                 AnyView(controlSectionView)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: effectivelyCollapsedForOverlay)
     }
 
     // MARK: - Control functions
@@ -3852,6 +3941,7 @@ internal struct ContentView: View {
 
     private enum AddKind { case button, fader }
     private func beginAddControlOfType(_ kind: AddKind) {
+        debugPrint("🎹 [ADD CONTROL] beginAddControlOfType called with kind: \(kind)")
         // Always compute fresh conflicts to ensure we have the latest control buttons
         let conflicts = computeConflictLookup()
         // FIX: Start from 1 instead of 0 to avoid assigning CC# 0 by default
@@ -3862,15 +3952,19 @@ internal struct ContentView: View {
         case .button:
             draft.isFader = false
             draft.isSmall = false
+            debugPrint("🎹 [ADD CONTROL] Creating button draft")
         case .fader:
             draft.isFader = true
             draft.isSmall = false
             draft.symbol = "" // no icon for fader
+            debugPrint("🎹 [ADD CONTROL] Creating fader draft")
         }
         editingControl = draft
         // Hint the editor about fader mode
         pendingAddIsFader = (kind == .fader)
+        debugPrint("🎹 [ADD CONTROL] Setting showControlEditor = true")
         showControlEditor = true
+        debugPrint("🎹 [ADD CONTROL] showControlEditor is now: \(showControlEditor)")
     }
 
     private func deleteControl(_ btn: ControlButton) {
@@ -4465,10 +4559,17 @@ internal struct ContentView: View {
                 }
 
                 // NEW: Check onboarding even for returning users (for testing/debugging)
-                if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") && !crashAlertActive {
+                let hasSeenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
+                debugPrint("📖 Onboarding check: hasSeenOnboarding=\(hasSeenOnboarding), crashAlertActive=\(crashAlertActive)")
+                if !hasSeenOnboarding && !crashAlertActive {
                     debugPrint("📖 Onboarding not seen yet - showing after short delay")
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                    showOnboarding = true
+                    // Use DispatchQueue instead of Task.sleep to ensure UI update completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        debugPrint("📖 Setting showOnboarding = true")
+                        showOnboarding = true
+                    }
+                } else {
+                    debugPrint("📖 Skipping onboarding: hasSeenOnboarding=\(hasSeenOnboarding), crashAlertActive=\(crashAlertActive)")
                 }
 
                 return
@@ -4513,10 +4614,17 @@ internal struct ContentView: View {
             }
 
             // Show onboarding after splash screen if user hasn't seen it and crash alert is not active
-            if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") && !crashAlertActive {
+            let hasSeenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
+            debugPrint("📖 Onboarding check (first launch): hasSeenOnboarding=\(hasSeenOnboarding), crashAlertActive=\(crashAlertActive)")
+            if !hasSeenOnboarding && !crashAlertActive {
                 debugPrint("📖 First launch - showing onboarding after splash")
-                try? await Task.sleep(nanoseconds: 500_000_000) // Wait 0.5s after splash
-                showOnboarding = true
+                // Use DispatchQueue instead of Task.sleep to ensure UI update completes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    debugPrint("📖 Setting showOnboarding = true (first launch)")
+                    showOnboarding = true
+                }
+            } else {
+                debugPrint("📖 Skipping onboarding: hasSeenOnboarding=\(hasSeenOnboarding), crashAlertActive=\(crashAlertActive)")
             }
 
             debugPrint("✅ App initialization complete")
@@ -6472,6 +6580,7 @@ private struct CBControlSection: View {
     @Binding var pendingAddIsFader: Bool?
     @Binding var reportedHeight: CGFloat
     @Binding var canAddMoreControls: Bool
+    @Binding var isCollapsed: Bool  // Changed from @State to @Binding so ContentView can access it
     let conflictFor: [MIDIKey: String]
     let midiFilter: Set<Int>
     let showMIDIData: Bool  // Toggle for showing MIDI data
@@ -6503,7 +6612,6 @@ private struct CBControlSection: View {
     @State private var dragging: ControlButton? = nil
     @State private var previewLocation: GridPosition? = nil
     @State private var dropSurfaceElevated: Bool = false
-    @State private var isCollapsed: Bool = false
     @State private var editSessionNonce: Int = 0
     @State private var isDragOperation: Bool = false
     @State private var lastDropTime: Date = Date.distantPast
@@ -6635,61 +6743,94 @@ private struct CBControlSection: View {
         return Int(ceil(Double(max(1, totalSlots)) / Double(slotsPerRow)))
     }
 
-    private var headerView: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                // Expanded header (fades out when collapsing)
-                mainHeader
-                    .opacity(effectivelyCollapsed ? 0 : 1)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: effectivelyCollapsed)
-
-                // Collapsed header (fades in when collapsed) - use same styling as main header for consistency
-                HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
-                    Text("Control Area")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(textColor)
-                    Spacer()
-
-                    // Collapsed mode always shows: Edit + Chevron (iPhone and iPad)
-                    Button(isEditing ? "Done" : "Edit") {
-                        withAnimation(.easeInOut) {
-                            isEditing.toggle()
-                            if !isEditing {
-                                clearDragState(reason: "exiting edit mode")
-                            } else {
-                                // Entering edit mode - always unfold control area
+    private var collapsedView: some View {
+        Group {
+            if buttons.isEmpty && !isEditing {
+                // Show floating Edit button capsule when no controls exist
+                Color.clear
+                    .frame(height: 0)
+                    .overlay(alignment: .bottomTrailing) {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                isEditing = true
                                 isCollapsed = false
                                 editSessionNonce &+= 1
-                                clearDragState(reason: "entering edit mode")
-                            }
-                        }
-                    }
-                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                    .controlSize(.small)
-
-                    // Expand button (only show when collapsed and has buttons)
-                    if !buttons.isEmpty {
-                        Button(action: {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                isCollapsed = false
                             }
                         }) {
-                            Image(systemName: "chevron.up")
-                                .font(.system(size: 14, weight: .medium))
-                                .frame(minWidth: 28)  // Make it square
+                            Text("Edit")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(standardButtonColor)
                         }
                         .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                        .controlSize(.small)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(controlAreaColor.opacity(0.9))
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 3)
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 8)
                     }
-                }
-                .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .phone ? 8 : 16)
-                .padding(.top, UIDevice.current.userInterfaceIdiom == .phone ? 6 : 12)
-                .padding(.bottom, UIDevice.current.userInterfaceIdiom == .phone ? 6 : 4)
-                .frame(height: UIDevice.current.userInterfaceIdiom == .phone ? 44 : nil)  // Fixed height on iPhone
-                .opacity(effectivelyCollapsed ? 1 : 0)
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: effectivelyCollapsed)
+                    .transition(.move(edge: .bottom))
+            } else {
+                // Show small collapsed capsule on right when collapsed
+                Color.clear
+                    .frame(height: 0)
+                    .overlay(alignment: .bottomTrailing) {
+                        HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
+                            Button(isEditing ? "Done" : "Edit") {
+                                withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                                    if isEditing {
+                                        isEditing = false
+                                        clearDragState(reason: "done button in collapsed capsule")
+                                    } else {
+                                        isEditing = true
+                                        isCollapsed = false
+                                        editSessionNonce &+= 1
+                                    }
+                                }
+                            }
+                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                            .controlSize(.small)
+
+                            if !buttons.isEmpty {
+                                Button(action: {
+                                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                                        isCollapsed = false
+                                    }
+                                }) {
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .frame(minWidth: 28)
+                                }
+                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
+                                .controlSize(.small)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(controlAreaColor.opacity(0.9))
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 8)
+                    }
+                    .transition(.move(edge: .bottom))
             }
+        }
+        .onChange(of: isEditing) { _, editing in
+            clearDragState(reason: "edit mode toggle")
+        }
+        .onAppear {
+            canAddMoreControls = canAddMoreControlsGlobal
+        }
+        .onChange(of: buttons.count) { _, _ in
+            canAddMoreControls = canAddMoreControlsGlobal
+        }
+    }
+
+    private var headerView: some View {
+        VStack(spacing: 0) {
+            mainHeader
         }
     }
     
@@ -6697,7 +6838,7 @@ private struct CBControlSection: View {
         Button(action: {
             // Only allow toggle if there are buttons in the control area
             if !buttons.isEmpty {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
                     isCollapsed.toggle()
                 }
             }
@@ -6728,15 +6869,17 @@ private struct CBControlSection: View {
                         // Edit mode: Chevron, Done, Redo, Undo, More (right to left order)
                         HStack(spacing: 6) {
                             Button(action: {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
                                     isCollapsed.toggle()
                                 }
                             }) {
                                 Image(systemName: "chevron.down")
                                     .font(.system(size: 14, weight: .medium))
+                                    .frame(minWidth: 44, minHeight: 44)
                             }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                             .controlSize(.small)
+                            .contentShape(Rectangle())
 
                             Button("Done") {
                                 withAnimation(.easeInOut) {
@@ -6793,15 +6936,17 @@ private struct CBControlSection: View {
 
                             if !buttons.isEmpty {
                                 Button(action: {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
                                         isCollapsed.toggle()
                                     }
                                 }) {
                                     Image(systemName: "chevron.down")
                                         .font(.system(size: 14, weight: .medium))
+                                        .frame(minWidth: 44, minHeight: 44)
                                 }
                                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                                 .controlSize(.small)
+                                .contentShape(Rectangle())
                             }
                         }
                     }
@@ -6846,16 +6991,17 @@ private struct CBControlSection: View {
 
                 if !buttons.isEmpty {
                     Button(action: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
                             isCollapsed.toggle()
                         }
                     }) {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 14, weight: .medium))
-                            .frame(minWidth: 28)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
                     .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: effectivelyCollapsed ? defaultCueColor : standardButtonColor))
                     .controlSize(.small)
+                    .contentShape(Rectangle())
                 }
             }
         }
@@ -6867,11 +7013,16 @@ private struct CBControlSection: View {
     
 
     var body: some View {
+        // Early return for collapsed/empty states - skip grid creation entirely
+        if effectivelyCollapsed {
+            return AnyView(collapsedView)
+        }
+
         let gridArea = Group {
-            // Always render the grid area, but animate height and opacity
-            GeometryReader { outerProxy in
-                buildControlGrid(proxy: outerProxy, isCtrlEditing: isEditing, sessionNonce: editSessionNonce, usbServer: usbServer, wifiClient: wifiClient, connectionCoordinator: connectionCoordinator)
-                    .opacity(effectivelyCollapsed ? 0 : 1)  // Fade out when collapsing
+            // Only render the grid area when not collapsed
+            if !effectivelyCollapsed {
+                GeometryReader { outerProxy in
+                    buildControlGrid(proxy: outerProxy, isCtrlEditing: isEditing, sessionNonce: editSessionNonce, usbServer: usbServer, wifiClient: wifiClient, connectionCoordinator: connectionCoordinator)
                     .onAppear {
                         // Update actual width when view appears
                         actualWidth = outerProxy.size.width
@@ -6881,22 +7032,25 @@ private struct CBControlSection: View {
                         actualWidth = newWidth
                         debugPrint("🔄 CBControlSection: Width changed to \(newWidth)")
                     }
-            }
-            .id("ctrl-geo-\(isEditing)-sess-\(editSessionNonce)")
-            .frame(maxWidth: .infinity)  // Ensure full width
-            .frame(height: effectivelyCollapsed ? 0 : calculateDynamicHeight())  // Animate height to 0
-            .animation(.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0.05), value: cachedHeight)
-            .animation(.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0.05), value: isEditing)
-            .drawingGroup(opaque: false, colorMode: .nonLinear)
-            .onChange(of: actualWidth) { _, _ in
-                // Recalculate height when width changes (orientation change)
-                let height = calculateDynamicHeight()
-                cachedHeight = height
-                reportedHeight = height
+                }
+                .id("ctrl-geo-\(isEditing)-sess-\(editSessionNonce)")
+                .frame(maxWidth: .infinity)  // Ensure full width
+                .frame(height: calculateDynamicHeight(), alignment: .top)  // Align content to top
+                .background(Color.clear)  // Ensure no white background
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: cachedHeight)
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
+                .drawingGroup(opaque: false, colorMode: .nonLinear)
+                .onChange(of: actualWidth) { _, _ in
+                    // Recalculate height when width changes (orientation change)
+                    let height = calculateDynamicHeight()
+                    cachedHeight = height
+                    reportedHeight = height
+                }
             }
         }
 
         let styledGridArea = gridArea
+            .opacity(effectivelyCollapsed ? 0 : 1)  // Hide grid completely when collapsed
             .animation(Animation.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.1), value: buttons.count)
             .animation(Animation.spring(response: 0.4, dampingFraction: 0.8), value: isCollapsed)
             .animation(Animation.spring(response: 0.4, dampingFraction: 0.8), value: effectivelyCollapsed)
@@ -6942,7 +7096,7 @@ private struct CBControlSection: View {
 
                 // Auto-unfold when control area becomes empty
                 if newCount == 0 && isCollapsed {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
                         isCollapsed = false
                     }
                 }
@@ -6965,8 +7119,8 @@ private struct CBControlSection: View {
                                 "recent drop (time since: \(String(format: "%.2f", timeSinceLastDrop))s)"
                     debugPrint("⏭️ Skipping auto-assign: \(reason)")
                 }
-                }
-                .onChange(of: dragging) { _, newValue in
+            }
+            .onChange(of: dragging) { _, newValue in
                     debugPrint("🔄 dragging state changed → \(newValue?.title ?? "nil")")
 
                     if newValue != nil {
@@ -7002,22 +7156,81 @@ private struct CBControlSection: View {
                     updateDisplacementCache()
                 }
 
-        return VStack(spacing: 0) {
+        // Expanded view - only reached when not collapsed
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        let isLandscape = verticalSizeClass == .compact
+
+        // Calculate grid width with padding for iPhone landscape alignment
+        let gridWidthWithPadding: CGFloat? = {
+            if isPhone && isLandscape {
+                // Calculate grid width manually
+                let totalSpacing = CGFloat(columns - 1) * columnSpacing
+                let actualHorizontalPadding = columnSpacing
+                let availableWidth = actualWidth - (2 * actualHorizontalPadding) - totalSpacing
+                var cellSize = floor(availableWidth / CGFloat(columns))
+
+                // Apply same height constraint logic
+                let screenHeight = UIScreen.main.bounds.height
+                let maxHeight = screenHeight * 0.6
+                let actualVerticalPadding: CGFloat = 18 + 0  // top + bottom (0 in landscape)
+                let extraPadding: CGFloat = 0  // No extra padding in iPhone landscape
+                let availableGridHeight = maxHeight - actualVerticalPadding - extraPadding
+                let displayRows = isEditing ? 4 : min(4, max(0, calculateVisualRows()))
+                let verticalGaps = max(0, displayRows - 1)
+                let maxCellSize = (availableGridHeight - CGFloat(verticalGaps) * rowSpacing) / CGFloat(displayRows)
+                cellSize = min(cellSize, floor(maxCellSize))
+
+                let gridWidth = CGFloat(columns) * cellSize + CGFloat(max(0, columns - 1)) * columnSpacing
+                let capsulePadding: CGFloat = 32 // 16 left + 16 right from .padding(.horizontal, 16)
+                return gridWidth + (columnSpacing * 2) + capsulePadding
+            }
+            return nil
+        }()
+
+        let baseView = VStack(spacing: 0) {
             headerView
+                .background(
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(.ultraThinMaterial)
+                        .background(controlAreaColor.opacity(0.7))
+                )
             gridWithLifecycle
+                .background(
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(.ultraThinMaterial)
+                        .background(controlAreaColor.opacity(0.7))
+                )
         }
-        .background(controlAreaColor)
+
+        let shapedView = baseView
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 4)
+
+        let controlCapsule = shapedView
+        .padding(.horizontal, 16)
+        .padding(.bottom, isPhone ? 0 : 16)
+        .transition(.move(edge: .bottom))
         .onChange(of: isEditing) { _, editing in
-            // Reset drag/drop state when toggling edit mode to avoid stale state
             clearDragState(reason: "edit mode toggle")
         }
         .onAppear {
-            // Update canAddMoreControls binding on appear
             canAddMoreControls = canAddMoreControlsGlobal
         }
         .onChange(of: buttons.count) { _, _ in
-            // Update canAddMoreControls binding when button count changes
             canAddMoreControls = canAddMoreControlsGlobal
+        }
+
+        // iPhone landscape: constrain width and align to trailing
+        if let width = gridWidthWithPadding {
+            return AnyView(
+                HStack {
+                    Spacer()
+                    controlCapsule
+                        .frame(width: width)
+                }
+            )
+        } else {
+            return AnyView(controlCapsule)
         }
     }
     
@@ -7078,17 +7291,26 @@ private struct CBControlSection: View {
         let gridHeight = CGFloat(rows) * adjustedCellSize + CGFloat(verticalGaps) * rowSpacing
 
         // Add extra padding in landscape to prevent cutoff and provide breathing room
-        let extraPadding: CGFloat = isLandscape ? 30 : 0
-        // iPhone uses different vertical padding: top=16, bottom=16 (total 32)
+        // iPhone landscape: no extra padding since we want buttons flush to bottom
+        let extraPadding: CGFloat = isLandscape && UIDevice.current.userInterfaceIdiom != .phone ? 30 : 0
+        // iPhone uses different vertical padding: top=18, bottom=columnSpacing (portrait) or 0 (landscape)
         // iPad uses gridPadding for both top and bottom
         let actualVerticalPadding: CGFloat
         if UIDevice.current.userInterfaceIdiom == .phone {
-            actualVerticalPadding = 16 + 16  // top + bottom
+            let bottomPadding = isLandscape ? 0 : columnSpacing
+            actualVerticalPadding = 18 + bottomPadding  // top + bottom
         } else {
-            actualVerticalPadding = (gridPadding + 4) + (gridPadding + (isLandscape ? 10 : 0))  // top + bottom (from line 7359-7361)
+            actualVerticalPadding = (gridPadding + 4) + (gridPadding + (isLandscape ? 10 : 0))  // top + bottom
         }
         let finalHeight = gridHeight + actualVerticalPadding + extraPadding
-        
+
+        // iPhone landscape: Limit control area to 60% of screen height
+        if UIDevice.current.userInterfaceIdiom == .phone && isLandscape {
+            let screenHeight = UIScreen.main.bounds.height
+            let maxHeight = screenHeight * 0.6
+            return min(finalHeight, maxHeight)
+        }
+
         // Removed verbose height calculation logs for cleaner testing
         return finalHeight
     }
@@ -8098,11 +8320,11 @@ private struct CBControlSection: View {
         // Use actual horizontal padding: columnSpacing on iPhone, gridPadding on iPad
         let actualHorizontalPadding = UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
         let availableWidth = proxy.size.width - (2 * actualHorizontalPadding) - totalSpacing
-        let cellSize = floor(availableWidth / CGFloat(columns))
-        
+        var cellSize = floor(availableWidth / CGFloat(columns))
+
         // Determine rows based on mode and orientation (same as height calculation)
         let displayRows: Int
-        
+
         // Unified approach: Both orientations use dynamic height with 4-row maximum
             if isEditing {
             // Edit mode: Show editing canvas (4 rows for both iPhone and iPad)
@@ -8113,11 +8335,24 @@ private struct CBControlSection: View {
             // 4 rows max for both iPhone and iPad
             displayRows = min(4, max(0, visualRows))
         }
-        
+
+        // iPhone landscape: Adjust cell size to fit within 60% screen height
+        let isLandscape = verticalSizeClass == .compact
+        if UIDevice.current.userInterfaceIdiom == .phone && isLandscape && displayRows > 0 {
+            let screenHeight = UIScreen.main.bounds.height
+            let maxHeight = screenHeight * 0.6
+            let actualVerticalPadding: CGFloat = 16 + 16  // top + bottom
+            let extraPadding: CGFloat = 30
+            let availableGridHeight = maxHeight - actualVerticalPadding - extraPadding
+            let verticalGaps = max(0, displayRows - 1)
+            let maxCellSize = (availableGridHeight - CGFloat(verticalGaps) * rowSpacing) / CGFloat(displayRows)
+            cellSize = min(cellSize, floor(maxCellSize))
+        }
+
         let verticalGaps = max(0, displayRows - 1)
         let gridHeight = CGFloat(displayRows) * cellSize + CGFloat(verticalGaps) * rowSpacing
         let gridWidth = CGFloat(columns) * cellSize + CGFloat(max(0, columns - 1)) * columnSpacing
-        
+
         return (cellSize: cellSize, displayRows: displayRows, gridHeight: gridHeight, gridWidth: gridWidth)
     }
     
@@ -8242,7 +8477,7 @@ private struct CBControlSection: View {
         .padding(EdgeInsets(
             top: UIDevice.current.userInterfaceIdiom == .phone ? 18 : (gridPadding + 4),
             leading: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding,
-            bottom: UIDevice.current.userInterfaceIdiom == .phone ? 18 : (gridPadding + (verticalSizeClass == .compact ? 10 : 0)),
+            bottom: UIDevice.current.userInterfaceIdiom == .phone ? (verticalSizeClass == .compact ? 0 : columnSpacing) : (gridPadding + (verticalSizeClass == .compact ? 10 : 0)),
             trailing: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
         ))
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -8382,15 +8617,6 @@ private struct ControlButtonTile: View {
                     if editing { startWobble() } else { stopWobble(); down = false }
             }
             .onDisappear { stopWobble() }
-            if let owner = takenBy, !isEditing {
-                Text("MIDI taken by: \(owner)")
-                    .font(.caption2).padding(6)
-                    .foregroundColor(Color(uiColor: .systemBackground))
-                    .background(Color.primary.opacity(0.6))
-                    .clipShape(Capsule())
-                    .padding(6)
-                    .allowsHitTesting(false)
-            }
         }
     }
 
@@ -9392,19 +9618,6 @@ private struct iPadControlTile: View {
                 .offset(x: isPhone ? -10 : -30, y: isPhone ? -10 : -30)  // iPhone: position at corner, half sticking out
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-
-            // Show MIDI conflict warning
-            if let owner = takenBy, showMIDIData {
-                Text("⚠️ MIDI taken by: \(owner)")
-                    .font(.caption2)
-                    .padding(6)
-                    .foregroundColor(Color(uiColor: .systemBackground))
-                    .background(selectedTheme.warningColor(for: colorScheme))
-                    .clipShape(Capsule())
-                    .padding(6)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .allowsHitTesting(false)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(isEditing ? Rectangle() : Rectangle())
@@ -10359,13 +10572,15 @@ struct MidiAssignmentsView: View {
                                 globalChannel: globalChannel,
                                     allowFullCCR: allowFullCCR,
                                 midiFilter: midiFilter,
+                                getEditableItems: { editableItems },
                                 onMidiChange: { item, newMidiType, newChannel, newValue in
                                     handleMidiChange(item: item, newMidiType: newMidiType, newChannel: newChannel, newValue: newValue)
                                 },
                                 getOwnerName: { midiType, channel, value, excludeId, excludeName in
                                     getOwnerName(for: midiType, channel: channel, value: value, excluding: excludeId, excludeName: excludeName)
                                 },
-                                onDismissAll: onDismissAll
+                                onDismissAll: onDismissAll,
+                                onApply: onApply
                             )
                             .background(Color(UIColor.systemBackground))
                             
@@ -10712,9 +10927,11 @@ struct MidiAssignmentEditSheet: View {
     let globalChannel: Int
     let allowFullCCR: Bool
     let midiFilter: Set<Int>
+    let getEditableItems: () -> [MidiTableItem]  // Closure to get current editableItems
     let onMidiChange: (MidiTableItem, MIDIKind, Int, Int) -> Void
     let getOwnerName: (MIDIKind, Int, Int, UUID, String) -> String?
     var onDismissAll: (() -> Void)? = nil
+    var onApply: (([MidiTableItem]) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -10729,15 +10946,17 @@ struct MidiAssignmentEditSheet: View {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 
-    init(item: Binding<MidiTableItem>, isGlobalChannel: Bool, globalChannel: Int, allowFullCCR: Bool, midiFilter: Set<Int>, onMidiChange: @escaping (MidiTableItem, MIDIKind, Int, Int) -> Void, getOwnerName: @escaping (MIDIKind, Int, Int, UUID, String) -> String?, onDismissAll: (() -> Void)? = nil) {
+    init(item: Binding<MidiTableItem>, isGlobalChannel: Bool, globalChannel: Int, allowFullCCR: Bool, midiFilter: Set<Int>, getEditableItems: @escaping () -> [MidiTableItem], onMidiChange: @escaping (MidiTableItem, MIDIKind, Int, Int) -> Void, getOwnerName: @escaping (MIDIKind, Int, Int, UUID, String) -> String?, onDismissAll: (() -> Void)? = nil, onApply: (([MidiTableItem]) -> Void)? = nil) {
         self._item = item
         self.isGlobalChannel = isGlobalChannel
         self.globalChannel = globalChannel
         self.allowFullCCR = allowFullCCR
         self.midiFilter = midiFilter
+        self.getEditableItems = getEditableItems
         self.onMidiChange = onMidiChange
         self.getOwnerName = getOwnerName
         self.onDismissAll = onDismissAll
+        self.onApply = onApply
         self._editedType = State(initialValue: item.wrappedValue.midiType)
         self._editedChannel = State(initialValue: item.wrappedValue.channel)
         self._editedValue = State(initialValue: item.wrappedValue.value)
@@ -10874,6 +11093,48 @@ struct MidiAssignmentEditSheet: View {
                     }
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
+
+            // Save button section at bottom
+            Section {
+                let channel = isGlobalChannel ? globalChannel : editedChannel
+                let hasConflict = getOwnerName(editedType, channel, editedValue, item.id, item.name) != nil
+                let isFiltered = !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue)
+                let isDisabled = hasConflict || isFiltered
+
+                Button(action: {
+                    debugPrint("🎛️ [Edit Sheet] Save clicked for '\(item.name)' - type:\(editedType) ch:\(channel) val:\(editedValue)")
+
+                    // Call onMidiChange to check for conflicts and update if valid
+                    // This will update editableItems in the parent view
+                    onMidiChange(item, editedType, channel, editedValue)
+
+                    // Small delay to ensure editableItems is updated before applying
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        // Get the current editableItems and apply changes
+                        let currentItems = getEditableItems()
+                        debugPrint("🎛️ [Edit Sheet] Applying \(currentItems.count) items and dismissing all sheets")
+                        onApply?(currentItems)
+
+                        // Dismiss all sheets (MIDI Settings + MIDI Assignments)
+                        if let onDismissAll = onDismissAll {
+                            onDismissAll()
+                        } else {
+                            dismiss()
+                        }
+                    }
+                }) {
+                    Text("Save")
+                        .font(.headline)
+                        .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(isDisabled ? Color.gray.opacity(0.3) : selectedTheme.defaultCueColor(for: colorScheme))
+                        .cornerRadius(10)
+                }
+                .disabled(isDisabled)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            }
         }
         .scrollContentBackground(.hidden)
         .background(selectedTheme.backgroundColor(for: colorScheme))
@@ -10886,27 +11147,6 @@ struct MidiAssignmentEditSheet: View {
                 }
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
             }
-            ToolbarItem(placement: .confirmationAction) {
-                let channel = isGlobalChannel ? globalChannel : editedChannel
-                let hasConflict = getOwnerName(editedType, channel, editedValue, item.id, item.name) != nil
-                let isFiltered = !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue)
-                let isDisabled = hasConflict || isFiltered
-
-                Button("Done") {
-                    debugPrint("🎛️ [Edit Sheet] Done clicked for '\(item.name)' - type:\(editedType) ch:\(channel) val:\(editedValue)")
-
-                    // Call onMidiChange to check for conflicts and update if valid
-                    // This will update editableItems in the parent view
-                    onMidiChange(item, editedType, channel, editedValue)
-
-                    // Dismiss this edit sheet only (go back to MIDI Assignments view)
-                    // Don't use onDismissAll which would close everything
-                    debugPrint("🎛️ [Edit Sheet] Dismissing edit sheet")
-                    dismiss()
-                }
-                .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : selectedTheme.defaultCueColor(for: colorScheme))
-                .disabled(isDisabled)
-            }
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
@@ -10918,9 +11158,11 @@ struct MidiTableRow: View {
     let globalChannel: Int
     let allowFullCCR: Bool
     let midiFilter: Set<Int>
+    let getEditableItems: () -> [MidiTableItem]
     let onMidiChange: (MidiTableItem, MIDIKind, Int, Int) -> Void
     let getOwnerName: (MIDIKind, Int, Int, UUID, String) -> String?
     var onDismissAll: (() -> Void)? = nil
+    var onApply: (([MidiTableItem]) -> Void)? = nil
 
     var body: some View {
         NavigationLink(destination: MidiAssignmentEditSheet(
@@ -10929,9 +11171,11 @@ struct MidiTableRow: View {
             globalChannel: globalChannel,
             allowFullCCR: allowFullCCR,
             midiFilter: midiFilter,
+            getEditableItems: getEditableItems,
             onMidiChange: onMidiChange,
             getOwnerName: getOwnerName,
-            onDismissAll: onDismissAll
+            onDismissAll: onDismissAll,
+            onApply: onApply
         )) {
             HStack(spacing: 0) {
                 // Name Column

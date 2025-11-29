@@ -43,6 +43,7 @@ struct CBPerformanceList: View {
     let showMIDIData: Bool  // Toggle for showing MIDI data
     let cueHeight: Double  // Customizable cue height
     let fontSize: Double  // Font size multiplier
+    let controlAreaCollapsed: Bool  // Is control area collapsed (for dynamic bottom padding)
     var onTapSong: (Song) -> Void
     var onLongPressChangeMIDI: (Song) -> Void
     var onRename: (Song) -> Void
@@ -236,10 +237,10 @@ struct CBPerformanceList: View {
                     }
                     Color.clear.frame(height: 8)
                 }
-                .padding(.horizontal, 36)
+                .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .phone ? 16 : 36)  // Smaller padding on iPhone for wider cues
                 .padding(.top, isEditing ? 170 : 80)  // Slide down in edit mode - equal spacing with top bar
-                .padding(.bottom, 12)
-                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
+                .padding(.bottom, controlAreaCollapsed ? 100 : 40)  // Less padding when expanded so cues are visible through control capsule
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
             }
             .onChange(of: cuedID) { _, newID in
                 // Scroll to selected cue in both Cue mode and Nav mode
@@ -2034,6 +2035,30 @@ struct CBAddEditCueSheet: View {
                         }
                     }
                 }
+
+                // Action buttons section
+                Section {
+                    VStack(spacing: 12) {
+                        // Primary action button (Save/Add)
+                        PrimaryWideButton(
+                            title: editingSong == nil ? "Add" : "Save",
+                            action: { save(andAddAnother: false) },
+                            isDisabled: (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
+                        )
+
+                        // "Save & Add Another" button - only show when adding new cue
+                        if editingSong == nil {
+                            SecondaryWideButton(
+                                title: "Save & Add Another",
+                                action: { save(andAddAnother: true) },
+                                isDisabled: (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
+                            )
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                }
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
@@ -2061,20 +2086,8 @@ struct CBAddEditCueSheet: View {
                 Text("You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.")
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { onCancel() } }
-                if editingSong == nil {
-                    ToolbarItem(placement: .primaryAction) {
-                        let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
-                        Button("Save & Add Another") { save(andAddAnother: true) }
-                            .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color(hex: "0A84FF"))
-                            .disabled(isDisabled)
-                    }
-                }
                 ToolbarItem(placement: .confirmationAction) {
-                    let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
-                    Button("Done") { save(andAddAnother: false) }
-                        .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color(hex: "0A84FF"))
-                        .disabled(isDisabled)
+                    Button("Done") { onCancel() }
                 }
             }
             .onAppear {
