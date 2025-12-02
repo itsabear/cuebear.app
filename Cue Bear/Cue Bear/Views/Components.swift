@@ -132,6 +132,7 @@ struct CBTransportDock: View {
     var canPrev: Bool = true
     var canNext: Bool = true
     var isGoEnabled: Bool = true
+    var isDragging: Bool = false  // Disable buttons during drag
     var onPrev: () -> Void
     var onGo: () -> Void
     var onNext: () -> Void
@@ -175,7 +176,7 @@ struct CBTransportDock: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .disabled(!canPrev)
+                .disabled(!canPrev || isDragging)
                 .opacity(canPrev ? 1.0 : 0.5)
 
                 Button(action: {
@@ -191,19 +192,22 @@ struct CBTransportDock: View {
                         .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
                 }
                 .buttonStyle(.plain)
-                .disabled(!isGoEnabled)
+                .disabled(!isGoEnabled || isDragging)
                 // v1.0.9: Add tap animation like control area buttons
                 .scaleEffect(isGoPressed ? 1.05 : 1.0)
-                .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isGoPressed)
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { _ in
                             if !isGoPressed {
-                                isGoPressed = true
+                                withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                                    isGoPressed = true
+                                }
                             }
                         }
                         .onEnded { _ in
-                            isGoPressed = false
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                                isGoPressed = false
+                            }
                         }
                 )
                 .zIndex(1)  // Layer GO button above capsule background
@@ -216,7 +220,7 @@ struct CBTransportDock: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .disabled(!canNext)
+                .disabled(!canNext || isDragging)
                 .opacity(canNext ? 1.0 : 0.5)
             }
             .padding(.horizontal, 13.5)

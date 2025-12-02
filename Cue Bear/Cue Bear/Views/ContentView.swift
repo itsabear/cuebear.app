@@ -7,6 +7,23 @@ import UIKit
 import UniformTypeIdentifiers
 import Combine
 
+// MARK: - PreferenceKeys for UI Element Positions
+
+struct EditCapsuleBottomPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+// New comprehensive collision detection system
+struct CapsuleBoundsPreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
 // MARK: - Draft State Persistence
 // v1.0.8: Preserve draft edits across sheet dismissals (when tapping outside)
 // Only clear drafts when Cancel is clicked, not when tapping outside
@@ -2825,6 +2842,9 @@ internal struct ContentView: View {
     @State private var controlAreaCollapsed: Bool = false  // Track if control area is collapsed
     @State private var controlsPerRow: Int = 4
     @State private var controlAreaHeight: CGFloat = 0
+    @State private var titleBarBottom: CGFloat = 88  // Bottom edge of title bar (default: safe area + title height)
+    @State private var editCapsuleBottom: CGFloat = 0  // Bottom edge of edit/search capsules when visible
+    @State private var capsuleBounds: [String: CGRect] = [:]  // Track all UI capsule bounds for collision detection
     @State private var canAddMoreControlsToGrid: Bool = true  // Track if grid has space for new controls
     @State private var controlEditModeTimer: Timer? = nil  // Auto-exit timer for edit mode
     @State private var showControlEditor: Bool = false
@@ -3106,6 +3126,7 @@ internal struct ContentView: View {
                     cueHeight: cueHeight,  // Pass customizable cue height
                     fontSize: fontSize,  // Pass font size multiplier
                     controlAreaCollapsed: controlAreaCollapsed || (controlButtons.isEmpty && !controlEditMode),  // Pass effective collapsed state
+                    controlAreaHeight: controlAreaHeight,  // Pass control area height for dynamic bottom padding
                     onTapSong: { song in
                         if store.mode == .regular || store.mode == .regularPlusRemote {
                             // In Navigator mode, update the index to match the tapped song
@@ -3164,8 +3185,14 @@ internal struct ContentView: View {
                             onNext: { selectNextCued() },
                             onClear: { store.cuedSong = nil },
                             controlAreaHeight: $controlAreaHeight,
-                            sizeMultiplier: cueCapsuleSize
+                            isEditing: isEditing,
+                            titleBarBottom: titleBarBottom,
+                            editCapsuleBottom: editCapsuleBottom,
+                            sizeMultiplier: cueCapsuleSize,
+                            isControlAreaCollapsed: effectivelyCollapsedForOverlay,
+                            capsuleBounds: capsuleBounds
                         )
+                        .zIndex(100)
                     }
 
                     // Show draggable navigation capsule in regularPlusRemote mode (hide in edit mode)
@@ -3181,12 +3208,18 @@ internal struct ContentView: View {
                             onPrev: { triggerPrevious() },
                             onNext: { triggerNext() },
                             controlAreaHeight: $controlAreaHeight,
-                            sizeMultiplier: navigationPillSize
+                            isEditing: isEditing,
+                            titleBarBottom: titleBarBottom,
+                            editCapsuleBottom: editCapsuleBottom,
+                            sizeMultiplier: navigationPillSize,
+                            isControlAreaCollapsed: effectivelyCollapsedForOverlay,
+                            capsuleBounds: capsuleBounds
                         )
+                        .zIndex(100)
                     }
                 }
                 // No background needed - cues and capsules live on same plane
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
+                // Animation removed to prevent interference with draggable capsule position updates
                 .overlay(alignment: .top) {
                     // Gradient from top of screen (solid background) to below title/search bar (fades to transparent) - improves scrolled cue visibility
                     let gradientHeight: CGFloat = isEditing ? 118 : 120  // Taller in edit mode (title + search), extends below title bar capsule in normal mode
@@ -3347,6 +3380,11 @@ internal struct ContentView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 88)  // Position below the top bar (increased from 68)
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(key: EditCapsuleBottomPreferenceKey.self, value: geo.frame(in: .global).maxY)
+                            }
+                        )
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isEditing)
                     }
@@ -3385,6 +3423,14 @@ internal struct ContentView: View {
                 .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                 .padding(.trailing, 16)
                 .padding(.bottom, 8)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: CapsuleBoundsPreferenceKey.self,
+                            value: ["controlAreaCollapsedEmpty": geo.frame(in: .global)]
+                        )
+                    }
+                )
                 .transition(.move(edge: .bottom))
             } else {
                 // Collapsed with buttons - Edit/Done + chevron
@@ -3422,6 +3468,14 @@ internal struct ContentView: View {
                 .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                 .padding(.trailing, 16)
                 .padding(.bottom, 8)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: CapsuleBoundsPreferenceKey.self,
+                            value: ["controlAreaCollapsedButtons": geo.frame(in: .global)]
+                        )
+                    }
+                )
                 .transition(.move(edge: .bottom))
             }
         }
@@ -3811,22 +3865,83 @@ internal struct ContentView: View {
                 // Main content (without top bar - it will overlay)
                 VStack(spacing: 0) {
                     AnyView(buildMiddleSectionView())
-                    AnyView(bottomSectionView)
                 }
                 .disabled(showSideMenu)
                 .blur(radius: showSideMenu ? 3 : 0)
                 .animation(.easeInOut(duration: 0.3), value: showSideMenu)
-                .overlay(alignment: .bottomTrailing) {
-                    // Floating control area capsules - only when NOT in cue list edit mode
-                    if !isEditing && effectivelyCollapsedForOverlay {
-                        AnyView(collapsedControlCapsule)
+                .overlay(alignment: .bottom) {
+                    // Bottom gradient fade - ALWAYS visible, extends to bottom
+                    VStack(spacing: 0) {
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.clear,
+                                currentTheme.backgroundColor(for: colorScheme).opacity(0.6),
+                                currentTheme.backgroundColor(for: colorScheme)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 200)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea(edges: .bottom)
+                    .allowsHitTesting(false)
+                }
+                .overlay(alignment: .bottom) {
+                    // Floating control area capsules with proper slide animation
+                    ZStack {
+                        if !isEditing {
+                            // Full-height control area with slide animation
+                            if !effectivelyCollapsedForOverlay {
+                                ZStack {
+                                    AnyView(controlSectionView)
+                                }
+                                .offset(y: effectivelyCollapsedForOverlay ? 1000 : 0)
+                                .frame(maxWidth: .infinity, alignment: .bottom)
+                                .clipped()
+                                .background(
+                                    GeometryReader { geo in
+                                        Color.clear.preference(
+                                            key: CapsuleBoundsPreferenceKey.self,
+                                            value: ["controlArea": geo.frame(in: .global)]
+                                        )
+                                    }
+                                )
+                                .zIndex(0)
+                            }
+
+                            // Small collapsed capsule with scale animation
+                            if effectivelyCollapsedForOverlay {
+                                AnyView(collapsedControlCapsule)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                    .transition(.scale.combined(with: .opacity))
+                                    .background(
+                                        GeometryReader { geo in
+                                            Color.clear.preference(
+                                                key: CapsuleBoundsPreferenceKey.self,
+                                                value: ["controlAreaCollapsed": geo.frame(in: .global)]
+                                            )
+                                        }
+                                    )
+                                    .zIndex(1)
+                            }
+                        }
+                    }
+                    .animation(.spring(response: 0.25, dampingFraction: 0.9), value: effectivelyCollapsedForOverlay)
                 }
 
                 // Floating top bar overlay
                 VStack {
                     AnyView(topBarView)
                         .padding(.top, UIDevice.current.userInterfaceIdiom == .phone && verticalSizeClass == .compact ? 8 : 0)
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: CapsuleBoundsPreferenceKey.self,
+                                    value: ["topBar": geo.frame(in: .global)]
+                                )
+                            }
+                        )
                     Spacer()
                 }
                 .background(Color.clear)
@@ -4012,6 +4127,12 @@ internal struct ContentView: View {
             applyAlerts(
                 applySheets(
                     contentView
+                        .onPreferenceChange(EditCapsuleBottomPreferenceKey.self) { value in
+                            editCapsuleBottom = isEditing ? value : 0  // Only track when visible
+                        }
+                        .onPreferenceChange(CapsuleBoundsPreferenceKey.self) { value in
+                            capsuleBounds = value  // Update all capsule bounds for collision detection
+                        }
                         .onChange(of: scenePhase) { _, phase in
                             // Ensure connections are properly managed when app becomes active
                             if phase == .active {
@@ -5554,6 +5675,12 @@ internal struct ContentView: View {
             isGlobalChannel = payload.isGlobalChannel ?? false
             globalChannel = payload.globalChannel ?? 1
 
+            // Restore app mode preference if saved
+            if let savedMode = payload.appMode {
+                store.mode = savedMode
+                debugPrint("✅ Restored app mode: \(savedMode)")
+            }
+
             // Reset loading flag after a brief delay to allow onChange to process
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.isLoadingProject = false
@@ -5917,7 +6044,8 @@ internal struct ContentView: View {
             controls: controlButtons,
             isGlobalChannel: isGlobalChannel,
             globalChannel: globalChannel,
-            theme: selectedThemeID
+            theme: selectedThemeID,
+            appMode: store.mode
         )
 
         // Present share sheet
@@ -7189,26 +7317,18 @@ private struct CBControlSection: View {
 
         let baseView = VStack(spacing: 0) {
             headerView
-                .background(
-                    RoundedRectangle(cornerRadius: 0)
-                        .fill(.ultraThinMaterial)
-                        .background(controlAreaColor.opacity(0.7))
-                )
             gridWithLifecycle
-                .background(
-                    RoundedRectangle(cornerRadius: 0)
-                        .fill(.ultraThinMaterial)
-                        .background(controlAreaColor.opacity(0.7))
-                )
         }
+        .background(controlAreaColor)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
 
         let shapedView = baseView
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 4)
 
         let controlCapsule = shapedView
         .padding(.horizontal, 16)
-        .padding(.bottom, isPhone ? 0 : 16)
+        .padding(.bottom, isPhone ? 0 : 8)
+        .compositingGroup()
         .transition(.move(edge: .bottom))
         .onChange(of: isEditing) { _, editing in
             clearDragState(reason: "edit mode toggle")
@@ -11418,27 +11538,115 @@ struct DraggableNavigationCapsule: View {
     let onPrev: () -> Void
     let onNext: () -> Void
     @Binding var controlAreaHeight: CGFloat
+    let isEditing: Bool  // Track control area mode for collision detection
+    let titleBarBottom: CGFloat  // Bottom edge of title bar to avoid
+    let editCapsuleBottom: CGFloat  // Bottom edge of edit capsules (0 if not visible)
     let sizeMultiplier: Double  // Appearance setting for pill size (0.7-1.5x)
+    let isControlAreaCollapsed: Bool  // Whether control area is collapsed to small capsule
+    let capsuleBounds: [String: CGRect]  // All UI capsule bounds for collision detection
 
     @State private var position: CGPoint = .zero
     @State private var isTrackingDrag: Bool = false
     @State private var isDragging: Bool = false
+    @State private var dragDelayTask: Task<Void, Never>?
+    @State private var isDragDelayComplete: Bool = false
+    @State private var startDragPosition: CGPoint = .zero  // Position when drag started
     @State private var isPrevPressed: Bool = false
     @State private var isNextPressed: Bool = false
     @State private var prevFlashOpacity: Double = 0.0  // Flash for top half
     @State private var nextFlashOpacity: Double = 0.0  // Flash for bottom half
+    @State private var distanceFromControlAreaTop: CGFloat = 100  // Distance to maintain from control area
 
     // Vertical pill size (reduced from 166×365 based on user feedback)
     private var pillSize: CGSize { CGSize(width: 125 * sizeMultiplier, height: 275 * sizeMultiplier) }
+
+    // Collision detection: prevent nav pill from overlapping with UI capsules
+    // Returns a position that doesn't collide, clamping to obstacle edges
+    private func clampPositionAvoidingCapsules(_ proposedPoint: CGPoint, previousPoint: CGPoint, screenBounds: CGRect) -> CGPoint {
+        // If no capsuleBounds to check, return proposed position (no collision possible)
+        guard !capsuleBounds.isEmpty else {
+            return proposedPoint
+        }
+
+        // Add small spacing buffer around obstacles (visual breathing room)
+        let spacing: CGFloat = 8
+
+        // Helper function to check if a position collides with any UI capsule
+        func isPositionValid(_ point: CGPoint) -> Bool {
+            let testRect = CGRect(
+                x: point.x - pillSize.width / 2,
+                y: point.y - pillSize.height / 2,
+                width: pillSize.width,
+                height: pillSize.height
+            )
+
+            for (_, capsuleRect) in capsuleBounds {
+                let expandedRect = capsuleRect.insetBy(dx: -spacing, dy: -spacing)
+                if testRect.intersects(expandedRect) {
+                    return false
+                }
+            }
+            return true
+        }
+
+        // If proposed position is valid, use it
+        if isPositionValid(proposedPoint) {
+            return proposedPoint
+        }
+
+        // Otherwise, find closest valid position by trying positions around each obstacle edge
+        var bestPosition: CGPoint? = nil
+        var bestDistance = CGFloat.infinity
+
+        for (_, capsuleRect) in capsuleBounds {
+            let expandedRect = capsuleRect.insetBy(dx: -spacing, dy: -spacing)
+
+            // Try positions on all four sides of the obstacle
+            let candidates = [
+                // Left side
+                CGPoint(x: expandedRect.minX - pillSize.width / 2, y: proposedPoint.y),
+                // Right side
+                CGPoint(x: expandedRect.maxX + pillSize.width / 2, y: proposedPoint.y),
+                // Top side
+                CGPoint(x: proposedPoint.x, y: expandedRect.minY - pillSize.height / 2),
+                // Bottom side
+                CGPoint(x: proposedPoint.x, y: expandedRect.maxY + pillSize.height / 2)
+            ]
+
+            for candidate in candidates {
+                // Check if this position is valid (doesn't collide with any capsule)
+                if isPositionValid(candidate) {
+                    let distance = hypot(candidate.x - proposedPoint.x, candidate.y - proposedPoint.y)
+                    if distance < bestDistance {
+                        bestDistance = distance
+                        bestPosition = candidate
+                    }
+                }
+            }
+        }
+
+        // If we found a valid position, use it; otherwise use proposed point (visible but colliding is better than invisible)
+        return bestPosition ?? proposedPoint
+    }
 
     var body: some View {
         GeometryReader { geo in
             let width = geo.size.width
             let height = geo.size.height
+            let safeTop = geo.safeAreaInsets.top
 
-            // Upper limit: position() uses CENTER, so add half height to keep top edge below safe area
-            let safeTop = max(geo.safeAreaInsets.top, 20)
-            let upperLimit = safeTop + 20 + (pillSize.height / 2)  // Center position that keeps top edge at safeTop + 20
+            // Calculate movement boundaries
+            // Top: Can go to screen edge (safe area top)
+            let upperLimit = safeTop + (pillSize.height / 2)
+
+            // Bottom: Can go to screen edge (collision detection will handle control area)
+            let lowerLimit = height - (pillSize.height / 2) - 10
+
+            // Sides: Stay within screen with padding
+            let horizontalPadding = pillSize.width / 2 + 10
+
+            let spacing: CGFloat = 10
+            let effectiveControlHeight: CGFloat = isControlAreaCollapsed ? 56 : controlAreaHeight
 
             VStack(spacing: 0) {
                 // Top button: Minus (PREVIOUS)
@@ -11455,16 +11663,20 @@ struct DraggableNavigationCapsule: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(!canPrev)
-                .scaleEffect(isPrevPressed ? 0.92 : 1.0)  // Press down effect
-                .animation(.spring(response: 0.15, dampingFraction: 0.7), value: isPrevPressed)
+                .disabled(!canPrev || isDragging)
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { _ in
-                            if !isPrevPressed && canPrev { isPrevPressed = true }
+                            if !isPrevPressed && canPrev {
+                                withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
+                                    isPrevPressed = true
+                                }
+                            }
                         }
                         .onEnded { _ in
-                            isPrevPressed = false
+                            withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
+                                isPrevPressed = false
+                            }
                         }
                 )
 
@@ -11486,16 +11698,20 @@ struct DraggableNavigationCapsule: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(!canNext)
-                .scaleEffect(isNextPressed ? 0.92 : 1.0)  // Press down effect
-                .animation(.spring(response: 0.15, dampingFraction: 0.7), value: isNextPressed)
+                .disabled(!canNext || isDragging)
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { _ in
-                            if !isNextPressed && canNext { isNextPressed = true }
+                            if !isNextPressed && canNext {
+                                withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
+                                    isNextPressed = true
+                                }
+                            }
                         }
                         .onEnded { _ in
-                            isNextPressed = false
+                            withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
+                                isNextPressed = false
+                            }
                         }
                 )
             }
@@ -11503,18 +11719,41 @@ struct DraggableNavigationCapsule: View {
             .background(.ultraThinMaterial)
             .clipShape(Capsule())
             .overlay(
-                // Flash effects - separate for each half, clipped to capsule shape
-                GeometryReader { overlayGeo in
+                // Flash effects and press effects - separate for each half, clipped to capsule shape
+                GeometryReader { geo in
                     ZStack {
-                        // Top half flash (for prev button)
+                        // Top half press effect (for prev button)
                         Capsule()
-                            .fill(Color.green.opacity(0.4))
-                            .frame(width: overlayGeo.size.width, height: overlayGeo.size.height)
+                            .fill(Color.primary.opacity(0.15))
                             .mask(
                                 // Mask to show only top half
                                 Rectangle()
-                                    .frame(height: overlayGeo.size.height / 2)
-                                    .position(x: overlayGeo.size.width / 2, y: overlayGeo.size.height / 4)
+                                    .frame(height: geo.size.height / 2)
+                                    .position(x: geo.size.width / 2, y: geo.size.height / 4)
+                            )
+                            .opacity(isPrevPressed ? 1 : 0)
+                            .allowsHitTesting(false)
+
+                        // Bottom half press effect (for next button)
+                        Capsule()
+                            .fill(Color.primary.opacity(0.15))
+                            .mask(
+                                // Mask to show only bottom half
+                                Rectangle()
+                                    .frame(height: geo.size.height / 2)
+                                    .position(x: geo.size.width / 2, y: geo.size.height * 0.75)
+                            )
+                            .opacity(isNextPressed ? 1 : 0)
+                            .allowsHitTesting(false)
+
+                        // Top half flash (for prev button)
+                        Capsule()
+                            .fill(Color.green.opacity(0.4))
+                            .mask(
+                                // Mask to show only top half
+                                Rectangle()
+                                    .frame(height: geo.size.height / 2)
+                                    .position(x: geo.size.width / 2, y: geo.size.height / 4)
                             )
                             .opacity(prevFlashOpacity)
                             .allowsHitTesting(false)
@@ -11522,100 +11761,165 @@ struct DraggableNavigationCapsule: View {
                         // Bottom half flash (for next button)
                         Capsule()
                             .fill(Color.green.opacity(0.4))
-                            .frame(width: overlayGeo.size.width, height: overlayGeo.size.height)
                             .mask(
                                 // Mask to show only bottom half
                                 Rectangle()
-                                    .frame(height: overlayGeo.size.height / 2)
-                                    .position(x: overlayGeo.size.width / 2, y: overlayGeo.size.height * 0.75)
+                                    .frame(height: geo.size.height / 2)
+                                    .position(x: geo.size.width / 2, y: geo.size.height * 0.75)
                             )
                             .opacity(nextFlashOpacity)
                             .allowsHitTesting(false)
                     }
                 }
             )
-            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 6)
+            // Apply lift animation when delay completes
+            .scaleEffect(isDragDelayComplete ? 1.05 : 1.0)
+            .shadow(
+                color: isDragDelayComplete ? Color.black.opacity(0.3) : Color.black.opacity(0.15),
+                radius: isDragDelayComplete ? 20 : 10,
+                x: 0,
+                y: isDragDelayComplete ? 8 : 6
+            )
             .contentShape(Capsule())
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 3, coordinateSpace: .local)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in
+                        // Start delay timer on first change
                         if !isTrackingDrag {
                             isTrackingDrag = true
-                            isDragging = true
                             if position == .zero {
                                 // Initialize to bottom-right, respecting control area
                                 let bottomY = max(upperLimit, height - (pillSize.height / 2) - 8)
                                 let rightX = width - 50
                                 position = CGPoint(x: rightX, y: bottomY)
                             }
+
+                            // Store starting position
+                            startDragPosition = position
+
+                            // Start 0.3s delay before enabling drag
+                            dragDelayTask?.cancel()
+                            dragDelayTask = Task {
+                                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                                if !Task.isCancelled {
+                                    await MainActor.run {
+                                        withAnimation(.easeOut(duration: 0.15)) {
+                                            isDragDelayComplete = true
+                                        }
+                                    }
+                                }
+                            }
                         }
 
-                        // Update position directly during drag (increased horizontal padding)
-                        let horizontalPadding = pillSize.width / 2 + 10
-                        let maxY = height - (pillSize.height / 2) - 8  // Position capsule at bottom of cue list view with 8pt gap
-                        let newX = max(horizontalPadding, min(width - horizontalPadding, position.x + value.translation.width))
-                        let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
+                        // Only update position if delay is complete
+                        if isDragDelayComplete {
+                            // Clamp to screen boundaries (can touch top, must stay above control area)
+                            var newX = max(horizontalPadding, min(width - horizontalPadding, startDragPosition.x + value.translation.width))
+                            var newY = max(upperLimit, min(lowerLimit, startDragPosition.y + value.translation.height))
 
-                        position = CGPoint(x: newX, y: newY)
+                            // Simple collision avoidance: check if nav pill overlaps with tracked capsules
+                            let navPillRect = CGRect(
+                                x: newX - pillSize.width / 2,
+                                y: newY - pillSize.height / 2,
+                                width: pillSize.width,
+                                height: pillSize.height
+                            )
+
+                            // Check each UI capsule for collision
+                            for (_, capsuleRect) in capsuleBounds {
+                                let expandedCapsule = capsuleRect.insetBy(dx: -10, dy: -10)
+
+                                if navPillRect.intersects(expandedCapsule) {
+                                    // Push nav pill away from the collision
+                                    let overlapLeft = navPillRect.maxX - expandedCapsule.minX
+                                    let overlapRight = expandedCapsule.maxX - navPillRect.minX
+                                    let overlapTop = navPillRect.maxY - expandedCapsule.minY
+                                    let overlapBottom = expandedCapsule.maxY - navPillRect.minY
+
+                                    let minOverlap = min(overlapLeft, overlapRight, overlapTop, overlapBottom)
+
+                                    if minOverlap == overlapLeft && overlapLeft > 0 {
+                                        newX -= overlapLeft + 2
+                                    } else if minOverlap == overlapRight && overlapRight > 0 {
+                                        newX += overlapRight + 2
+                                    } else if minOverlap == overlapTop && overlapTop > 0 {
+                                        newY -= overlapTop + 2
+                                    } else if minOverlap == overlapBottom && overlapBottom > 0 {
+                                        newY += overlapBottom + 2
+                                    }
+                                }
+                            }
+
+                            // Re-clamp after collision detection to ensure we stay on screen
+                            newX = max(horizontalPadding, min(width - horizontalPadding, newX))
+                            newY = max(upperLimit, min(lowerLimit, newY))
+
+                            // Update distance from control area top for following behavior
+                            distanceFromControlAreaTop = (height - effectiveControlHeight) - newY
+
+                            // Direct synchronous update with animation disabled
+                            var transaction = Transaction()
+                            transaction.animation = nil
+                            withTransaction(transaction) {
+                                position = CGPoint(x: newX, y: newY)
+                            }
+                        }
                     }
                     .onEnded { value in
                         defer {
+                            dragDelayTask?.cancel()
+                            dragDelayTask = nil
                             isTrackingDrag = false
                             isDragging = false
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                isDragDelayComplete = false
+                            }
                         }
-                        let horizontalPadding = pillSize.width / 2 + 10
-                        let maxY = height - (pillSize.height / 2) - 8  // Position capsule at bottom of cue list view with 8pt gap
-                        let newX = max(horizontalPadding, min(width - horizontalPadding, position.x + value.translation.width))
-                        let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
-                        position = CGPoint(x: newX, y: newY)
 
-                        // Save position to UserDefaults
-                        UserDefaults.standard.set(newX, forKey: "navigationCapsule.x")
-                        UserDefaults.standard.set(newY, forKey: "navigationCapsule.y")
+                        // Only save if delay completed (position already set during drag)
+                        if isDragDelayComplete {
+                            // Save the current position to UserDefaults (already updated during drag)
+                            UserDefaults.standard.set(position.x, forKey: "navigationCapsule.x")
+                            UserDefaults.standard.set(position.y, forKey: "navigationCapsule.y")
+                        }
                     }
             )
-            .position(
-                x: {
-                    let horizontalPadding = pillSize.width / 2 + 5
-                    return max(horizontalPadding, min(width - horizontalPadding, position.x))
-                }(),
-                y: max(upperLimit, min(height - (pillSize.height / 2) - 8, position.y))
-            )
-            // Initialize position from UserDefaults or default to bottom-right
+            .position(position)
             .task(id: "\(width)-\(height)") {
                 guard width > 0 && height > 0 else { return }
 
+                // Initialize position immediately - use default bottom-right, ignore saved values for now
                 if position == .zero {
-                    let savedX = UserDefaults.standard.object(forKey: "navigationCapsule.x") as? CGFloat
-                    let savedY = UserDefaults.standard.object(forKey: "navigationCapsule.y") as? CGFloat
+                    let defaultY = height - effectiveControlHeight - spacing - (pillSize.height / 2) - 50
+                    let defaultX = width - (pillSize.width / 2) - 50
 
-                    let bottomY = max(upperLimit, height - (pillSize.height / 2) - 8)
-                    let rightX = width - 50
+                    position = CGPoint(x: defaultX, y: defaultY)
 
-                    let finalX = savedX ?? rightX
-                    let finalY = savedY ?? bottomY
-
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        position = CGPoint(x: finalX, y: finalY)
-                    }
+                    // Clear any bad saved values
+                    UserDefaults.standard.removeObject(forKey: "navigationCapsule.x")
+                    UserDefaults.standard.removeObject(forKey: "navigationCapsule.y")
                 }
             }
-            .onChange(of: controlAreaHeight) { _, newHeight in
+            .onChange(of: controlAreaHeight) { oldHeight, newHeight in
                 if isDragging { return }
+                guard position != .zero else { return }
 
-                // Control area height changed - adjust Y position to stay above it
-                let maxY = height - (pillSize.height / 2) - 8
-                if position.y > maxY {
-                    // Capsule would be below the new control area boundary, move it up
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        position = CGPoint(x: position.x, y: maxY)
-                    }
-                    // Update saved position
-                    UserDefaults.standard.set(position.x, forKey: "navigationCapsule.x")
-                    UserDefaults.standard.set(maxY, forKey: "navigationCapsule.y")
+                // Maintain distance from control area top when it changes
+                let spacing: CGFloat = 10
+                let controlAreaTop = height - newHeight
+                let targetY = controlAreaTop - spacing - distanceFromControlAreaTop
+
+                // Clamp to screen bounds
+                let clampedY = max(upperLimit, min(height - newHeight - spacing - (pillSize.height / 2), targetY))
+
+                // Animate the capsule following the control area
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    position = CGPoint(x: position.x, y: clampedY)
                 }
+
+                // Update saved position
+                UserDefaults.standard.set(position.x, forKey: "navigationCapsule.x")
+                UserDefaults.standard.set(clampedY, forKey: "navigationCapsule.y")
             }
         }
     }
@@ -11646,25 +11950,107 @@ struct SimpleDraggableTransportDock: View {
     let onNext: () -> Void
     let onClear: () -> Void
     @Binding var controlAreaHeight: CGFloat
+    let isEditing: Bool  // Track control area mode for collision detection
+    let titleBarBottom: CGFloat  // Bottom edge of title bar to avoid
+    let editCapsuleBottom: CGFloat  // Bottom edge of edit capsules (0 if not visible)
     let sizeMultiplier: Double  // Appearance setting for capsule size (0.8-1.5x)
+    let isControlAreaCollapsed: Bool  // Whether control area is collapsed to small capsule
+    let capsuleBounds: [String: CGRect]  // Tracked UI capsule bounds for collision detection
 
     @State private var position: CGPoint = .zero
     @State private var isTrackingDrag: Bool = false
     @State private var isDragging: Bool = false
+    @State private var dragDelayTask: Task<Void, Never>?
+    @State private var isDragDelayComplete: Bool = false
+    @State private var startDragPosition: CGPoint = .zero  // Position when drag started
+    @State private var distanceFromControlAreaTop: CGFloat = 100  // Distance to maintain from control area
 
     // Base size of the transport capsule (before scaling)
     private var baseDockSize: CGSize { CGSize(width: 320, height: 150) }
     // Actual visual size after scaling (used for boundary calculations)
     private var scaledDockSize: CGSize { CGSize(width: baseDockSize.width * 1.20 * sizeMultiplier, height: baseDockSize.height * 1.20 * sizeMultiplier) }
 
+    // Collision detection: prevent cue capsule from overlapping with UI capsules
+    // Returns a position that doesn't collide, clamping to obstacle edges
+    private func clampPositionAvoidingCapsules(_ proposedPoint: CGPoint, previousPoint: CGPoint, screenBounds: CGRect) -> CGPoint {
+        // If no capsuleBounds to check, return proposed position (no collision possible)
+        guard !capsuleBounds.isEmpty else {
+            return proposedPoint
+        }
+
+        // Add small spacing buffer around obstacles (visual breathing room)
+        let spacing: CGFloat = 8
+
+        // Helper function to check if a position collides with any UI capsule
+        func isPositionValid(_ point: CGPoint) -> Bool {
+            let testRect = CGRect(
+                x: point.x - scaledDockSize.width / 2,
+                y: point.y - scaledDockSize.height / 2,
+                width: scaledDockSize.width,
+                height: scaledDockSize.height
+            )
+
+            for (_, capsuleRect) in capsuleBounds {
+                let expandedRect = capsuleRect.insetBy(dx: -spacing, dy: -spacing)
+                if testRect.intersects(expandedRect) {
+                    return false
+                }
+            }
+            return true
+        }
+
+        // If proposed position is valid, use it
+        if isPositionValid(proposedPoint) {
+            return proposedPoint
+        }
+
+        // Otherwise, find closest valid position by trying positions around each obstacle edge
+        var bestPosition: CGPoint? = nil
+        var bestDistance = CGFloat.infinity
+
+        for (_, capsuleRect) in capsuleBounds {
+            let expandedRect = capsuleRect.insetBy(dx: -spacing, dy: -spacing)
+
+            // Try positions on all four sides of the obstacle
+            let candidates = [
+                // Left side
+                CGPoint(x: expandedRect.minX - scaledDockSize.width / 2, y: proposedPoint.y),
+                // Right side
+                CGPoint(x: expandedRect.maxX + scaledDockSize.width / 2, y: proposedPoint.y),
+                // Top side
+                CGPoint(x: proposedPoint.x, y: expandedRect.minY - scaledDockSize.height / 2),
+                // Bottom side
+                CGPoint(x: proposedPoint.x, y: expandedRect.maxY + scaledDockSize.height / 2)
+            ]
+
+            for candidate in candidates {
+                // Check if this position is valid (doesn't collide with any capsule)
+                if isPositionValid(candidate) {
+                    let distance = hypot(candidate.x - proposedPoint.x, candidate.y - proposedPoint.y)
+                    if distance < bestDistance {
+                        bestDistance = distance
+                        bestPosition = candidate
+                    }
+                }
+            }
+        }
+
+        // If we found a valid position, use it; otherwise use proposed point (visible but colliding is better than invisible)
+        return bestPosition ?? proposedPoint
+    }
+
     var body: some View {
         GeometryReader { geo in
             let width = geo.size.width
             let height = geo.size.height
+            let safeTop = geo.safeAreaInsets.top
 
-            // Upper limit: position() uses CENTER, so add half height to keep top edge below safe area
-            let safeTop = max(geo.safeAreaInsets.top, 20) // Minimum 20pt if no safe area
-            let upperLimit = safeTop + 20 + (scaledDockSize.height / 2)  // Center position that keeps top edge at safeTop + 20
+            // Calculate movement boundaries
+            // Top: Can go to screen edge (safe area top)
+            let upperLimit = safeTop + (scaledDockSize.height / 2)
+
+            // Bottom: Can go to screen edge (collision detection will handle control area)
+            let lowerLimit = height - (scaledDockSize.height / 2) - 10
 
             // Calculate proper boundaries accounting for parent padding
             // CBPerformanceList has 36pt horizontal padding, extend bounds to get closer to screen edges
@@ -11674,74 +12060,148 @@ struct SimpleDraggableTransportDock: View {
             let minX = scaledDockSize.width / 2 - parentPadding + edgeMargin
             let maxX = width - scaledDockSize.width / 2 + parentPadding - edgeMargin
 
+            let spacing: CGFloat = 10
+            let effectiveControlHeight: CGFloat = isControlAreaCollapsed ? 56 : controlAreaHeight
+
             ZStack {
                 CBTransportDock(
                     cuedName: cuedName,
                     canPrev: canPrev,
                     canNext: canNext,
                     isGoEnabled: isGoEnabled,
+                    isDragging: isDragging,  // Pass drag state to disable buttons
                     onPrev: onPrev,
                     onGo: onGo,
                     onNext: onNext,
                     onClear: onClear
                 )
                 .scaleEffect(1.20 * sizeMultiplier)
-                .allowsHitTesting(!isDragging)
             }
             .frame(width: scaledDockSize.width, height: scaledDockSize.height)
+            // Apply lift animation when delay completes
+            .scaleEffect(isDragDelayComplete ? 1.05 : 1.0)
+            .shadow(
+                color: isDragDelayComplete ? Color.black.opacity(0.3) : Color.clear,
+                radius: isDragDelayComplete ? 20 : 0,
+                x: 0,
+                y: isDragDelayComplete ? 8 : 0
+            )
             .contentShape(RoundedRectangle(cornerRadius: 32))
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 3, coordinateSpace: .local)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in
+                        // Start delay timer on first change
                         if !isTrackingDrag {
                             isTrackingDrag = true
-                            isDragging = true
                             if position == .zero {
                                 // Initialize to bottom-right, respecting control area
                                 let bottomCenterY = max(upperLimit, height - (scaledDockSize.height / 2))
                                 let bottomRightX = maxX
                                 position = CGPoint(x: bottomRightX, y: bottomCenterY)
                             }
+
+                            // Store starting position
+                            startDragPosition = position
+
+                            // Start 0.3s delay before enabling drag
+                            dragDelayTask?.cancel()
+                            dragDelayTask = Task {
+                                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                                if !Task.isCancelled {
+                                    await MainActor.run {
+                                        withAnimation(.easeOut(duration: 0.15)) {
+                                            isDragDelayComplete = true
+                                        }
+                                    }
+                                }
+                            }
                         }
 
-                        // Update position directly during drag for smooth 1:1 movement
-                        let maxY = height - (scaledDockSize.height / 2)  // Position dock flush to bottom border
-                        let newX = max(minX, min(maxX, position.x + value.translation.width))
-                        let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
+                        // Always update position smoothly once delay is complete
+                        if isDragDelayComplete {
+                            // Mark as actively dragging to disable buttons
+                            if !isDragging {
+                                isDragging = true
+                            }
 
-                        position = CGPoint(x: newX, y: newY)
+                            // Clamp to screen boundaries (can touch top, must stay above control area)
+                            var newX = max(minX, min(maxX, startDragPosition.x + value.translation.width))
+                            var newY = max(upperLimit, min(lowerLimit, startDragPosition.y + value.translation.height))
+
+                            // Simple collision avoidance: check if cue capsule overlaps with tracked capsules
+                            let dockRect = CGRect(
+                                x: newX - scaledDockSize.width / 2,
+                                y: newY - scaledDockSize.height / 2,
+                                width: scaledDockSize.width,
+                                height: scaledDockSize.height
+                            )
+
+                            // Check each UI capsule for collision
+                            for (_, capsuleRect) in capsuleBounds {
+                                let expandedCapsule = capsuleRect.insetBy(dx: -10, dy: -10)
+
+                                if dockRect.intersects(expandedCapsule) {
+                                    // Push cue capsule away from the collision
+                                    let overlapLeft = dockRect.maxX - expandedCapsule.minX
+                                    let overlapRight = expandedCapsule.maxX - dockRect.minX
+                                    let overlapTop = dockRect.maxY - expandedCapsule.minY
+                                    let overlapBottom = expandedCapsule.maxY - dockRect.minY
+
+                                    let minOverlap = min(overlapLeft, overlapRight, overlapTop, overlapBottom)
+
+                                    if minOverlap == overlapLeft && overlapLeft > 0 {
+                                        newX -= overlapLeft + 2
+                                    } else if minOverlap == overlapRight && overlapRight > 0 {
+                                        newX += overlapRight + 2
+                                    } else if minOverlap == overlapTop && overlapTop > 0 {
+                                        newY -= overlapTop + 2
+                                    } else if minOverlap == overlapBottom && overlapBottom > 0 {
+                                        newY += overlapBottom + 2
+                                    }
+                                }
+                            }
+
+                            // Re-clamp after collision detection to ensure we stay on screen
+                            newX = max(minX, min(maxX, newX))
+                            newY = max(upperLimit, min(lowerLimit, newY))
+
+                            // Update distance from control area top for following behavior
+                            distanceFromControlAreaTop = (height - effectiveControlHeight) - newY
+
+                            // Direct synchronous update with animation disabled
+                            var transaction = Transaction()
+                            transaction.animation = nil
+                            withTransaction(transaction) {
+                                position = CGPoint(x: newX, y: newY)
+                            }
+                        }
                     }
                     .onEnded { value in
                         defer {
+                            dragDelayTask?.cancel()
+                            dragDelayTask = nil
                             isTrackingDrag = false
-                            isDragging = false
+                            isDragging = false  // Reset dragging state to re-enable buttons
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                isDragDelayComplete = false
+                            }
                         }
-                        let maxY = height - (scaledDockSize.height / 2)  // Position dock flush to bottom border
-                        let newX = max(minX, min(maxX, position.x + value.translation.width))
-                        let newY = max(upperLimit, min(maxY, position.y + value.translation.height))
-                        position = CGPoint(x: newX, y: newY)
+
+                        // Position already set during drag, nothing to do here
                     }
             )
-            .position(
-                x: max(minX, min(maxX, position.x)),
-                y: max(upperLimit, min(height - (scaledDockSize.height / 2), position.y))
-            )
-            // Ensure default position snaps once control area height is known
+            .position(position)
             .task(id: "\(width)-\(height)") {
                 guard width > 0 && height > 0 else { return }
 
+                // Initialize position immediately - bottom right with spacing from control area
                 if position == .zero {
-                    let bottomCenterY = max(upperLimit, height - (scaledDockSize.height / 2))
-                    let bottomRightX = maxX
-
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        position = CGPoint(x: bottomRightX, y: bottomCenterY)
-                    }
+                    let defaultY = height - effectiveControlHeight - spacing - (scaledDockSize.height / 2) - 50
+                    let defaultX = maxX - 50
+                    position = CGPoint(x: defaultX, y: defaultY)
                 }
             }
-            .onChange(of: controlAreaHeight) { _, newHeight in
+            .onChange(of: controlAreaHeight) { oldHeight, newHeight in
                 if isDragging { return }
 
                 // If position is zero, initialize it
@@ -11757,13 +12217,17 @@ struct SimpleDraggableTransportDock: View {
                     return
                 }
 
-                // Control area height changed - adjust Y position to stay above it
-                let maxY = height - (scaledDockSize.height / 2) - 8
-                if position.y > maxY {
-                    // Capsule would be below the new control area boundary, move it up
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        position = CGPoint(x: position.x, y: maxY)
-                    }
+                // Maintain distance from control area top when it changes
+                let spacing: CGFloat = 10
+                let controlAreaTop = height - newHeight
+                let targetY = controlAreaTop - spacing - distanceFromControlAreaTop
+
+                // Clamp to screen bounds
+                let clampedY = max(upperLimit, min(height - newHeight - spacing - (scaledDockSize.height / 2), targetY))
+
+                // Animate the capsule following the control area
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    position = CGPoint(x: position.x, y: clampedY)
                 }
             }
         }
