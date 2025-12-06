@@ -142,6 +142,8 @@ final class SetlistStore: ObservableObject {
             songs: original.songs.map { song in
                 var newSong = song
                 newSong.id = UUID()  // New ID for the copy
+                // Don't set aliasedCueID - duplicated songs are independent copies, not aliases
+                newSong.aliasedCueID = nil
                 return newSong
             }
         )

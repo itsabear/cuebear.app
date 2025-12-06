@@ -44,6 +44,7 @@ struct CBPerformanceList: View {
     let cueHeight: Double  // Customizable cue height
     let fontSize: Double  // Font size multiplier
     let controlAreaCollapsed: Bool  // Is control area collapsed (for dynamic bottom padding)
+    let controlAreaHeight: CGFloat  // Height of control area when expanded (for dynamic bottom padding)
     var onTapSong: (Song) -> Void
     var onLongPressChangeMIDI: (Song) -> Void
     var onRename: (Song) -> Void
@@ -239,7 +240,7 @@ struct CBPerformanceList: View {
                 }
                 .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .phone ? 16 : 36)  // Smaller padding on iPhone for wider cues
                 .padding(.top, isEditing ? 170 : 80)  // Slide down in edit mode - equal spacing with top bar
-                .padding(.bottom, controlAreaCollapsed ? 100 : 40)  // Less padding when expanded so cues are visible through control capsule
+                .padding(.bottom, controlAreaCollapsed ? 100 : (controlAreaHeight + 8))  // Dynamic padding based on actual control area height
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
             }
             .onChange(of: cuedID) { _, newID in
@@ -606,7 +607,7 @@ struct CBPerformanceRow: View {
                     Label("Duplicate", systemImage: "doc.on.doc")
                 }
                 Button(role: .destructive, action: onDelete) {
-                    Label("Delete", systemImage: "trash")
+                    Label("Remove", systemImage: "trash")
                 }
             }
         }
@@ -2660,8 +2661,33 @@ struct SongLibraryPopover: View {
     }
 
     // Get IDs of songs already in active cue list
+    // Includes both direct song IDs and original IDs of aliased cues
     private var activeSongIDs: Set<UUID> {
-        Set(activeCueListSongs.map { $0.id })
+        var ids = Set<UUID>()
+        for song in activeCueListSongs {
+            ids.insert(song.id)
+            // If this is an alias, also include the original cue's ID
+            if let aliasedID = song.aliasedCueID {
+                ids.insert(aliasedID)
+            }
+        }
+        return ids
+    }
+
+    // Check if a library song is in the active cue list
+    // Matches by ID or by MIDI data (to handle duplicated cue lists)
+    private func isLibrarySongInCueList(_ librarySong: Song) -> Bool {
+        // First check by ID (handles direct matches and aliases)
+        if activeSongIDs.contains(librarySong.id) {
+            return true
+        }
+
+        // Then check by MIDI data (handles duplicated cue lists)
+        return activeCueListSongs.contains { cueListSong in
+            cueListSong.kind == librarySong.kind &&
+            cueListSong.channel == librarySong.channel &&
+            (cueListSong.kind == .cc ? cueListSong.cc == librarySong.cc : cueListSong.note == librarySong.note)
+        }
     }
 
     // Filtered and sorted library songs
@@ -2882,7 +2908,7 @@ struct SongLibraryPopover: View {
     }
 
     private func libraryRowView(for song: Song) -> some View {
-        let isInCueList = activeSongIDs.contains(song.id)
+        let isInCueList = isLibrarySongInCueList(song)
         let isSelected = selectedSongs.contains(song.id)
 
         return HStack(spacing: 0) {
