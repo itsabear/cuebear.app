@@ -3913,33 +3913,6 @@ internal struct ContentView: View {
                                 .zIndex(1)
                                 .id("expandedNonEdit")
                         }
-
-                        if isEditing {
-                            // Edit mode: always show expanded control area (slides down when disappearing)
-                            AnyView(controlSectionView)
-                                .frame(maxWidth: .infinity, alignment: .bottom)
-                                .ignoresSafeArea(edges: .bottom)
-                                .background(
-                                    GeometryReader { geo in
-                                        Color.clear.onAppear {
-                                            // Report actual height when appearing
-                                            DispatchQueue.main.async {
-                                                controlAreaHeight = geo.size.height
-                                            }
-                                        }
-                                        .onChange(of: geo.size.height) { _, newHeight in
-                                            // Update height as it changes
-                                            controlAreaHeight = newHeight
-                                        }
-                                    }
-                                )
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .bottom),
-                                    removal: .move(edge: .bottom).combined(with: .offset(y: 100))
-                                ))
-                                .zIndex(1)
-                                .id("expandedEdit")
-                        }
                     }
                     .animation(.spring(response: 0.15, dampingFraction: 1.0), value: isEditing)
                     .animation(.spring(response: 0.15, dampingFraction: 1.0), value: effectivelyCollapsedForOverlay)

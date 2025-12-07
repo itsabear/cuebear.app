@@ -563,15 +563,16 @@ struct CBPerformanceRow: View {
                 .allowsHitTesting(false)
         }
         .contentShape(Rectangle())
-        // Add extra padding when selected to push other cues aside
-        .padding(.vertical, isCued ? 12 : 0)
-        .padding(.horizontal, isCued ? 6 : 0)
-        // Uniform scale: slightly bigger without stretching text
+        // Add extra padding when selected to push other cues aside (but not in edit mode)
+        .padding(.vertical, (isCued && !isEditing) ? 12 : 0)
+        .padding(.horizontal, (isCued && !isEditing) ? 6 : 0)
+        // Uniform scale: slightly bigger without stretching text (but not in edit mode)
         .scaleEffect(
-            isCued ? 1.08 : (isPressed ? 0.985 : 1.0),
+            (isCued && !isEditing) ? 1.08 : (isPressed ? 0.985 : 1.0),
             anchor: .center
         )
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
+        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isEditing)
         .animation(.spring(response: 0.10, dampingFraction: 0.85), value: isPressed)
         // Shadow in light themes, colored glow in dark themes
         .shadow(
@@ -2639,6 +2640,7 @@ struct SongLibraryPopover: View {
     @State private var songToDelete: Song? = nil
     @State private var showDeleteConfirmation: Bool = false
     @State private var showBatchDeleteConfirmation: Bool = false
+    @State private var songMenuToShow: Song? = nil
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -2984,41 +2986,52 @@ struct SongLibraryPopover: View {
                             .foregroundColor(textColor.opacity(0.4))
                             .padding(.trailing, 8)
                     }
+
+                    // More button with menu (hide in batch select mode)
+                    if !batchSelectMode {
+                        Menu {
+                            // Show "Add to Cue List" or "Remove from Cue List" based on whether song is in cue list
+                            if !isInCueList {
+                                Button(action: {
+                                    onAddToCueList(song)
+                                }) {
+                                    Label("Add to Cue List", systemImage: "plus.circle")
+                                }
+                            } else {
+                                Button(action: {
+                                    onRemoveFromCueList(song)
+                                }) {
+                                    Label("Remove from Cue List", systemImage: "minus.circle")
+                                }
+                            }
+
+                            Button(action: {
+                                onEdit(song)
+                            }) {
+                                Label("Edit", systemImage: "pencil")
+                            }
+
+                            Button(role: .destructive, action: {
+                                songToDelete = song
+                                showDeleteConfirmation = true
+                            }) {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(textColor.opacity(0.6))
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
+                        }
+                        .padding(.trailing, 8)
+                    }
                 }
                 .padding(.vertical, 12)
                 .padding(.leading, batchSelectMode ? 0 : 16)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .contextMenu {
-                // Show "Add to Cue List" or "Remove from Cue List" based on whether song is in cue list
-                if !isInCueList {
-                    Button(action: {
-                        onAddToCueList(song)
-                    }) {
-                        Label("Add to Cue List", systemImage: "plus.circle")
-                    }
-                } else {
-                    Button(action: {
-                        onRemoveFromCueList(song)
-                    }) {
-                        Label("Remove from Cue List", systemImage: "minus.circle")
-                    }
-                }
-
-                Button(action: {
-                    onEdit(song)
-                }) {
-                    Label("Edit", systemImage: "pencil")
-                }
-
-                Button(role: .destructive, action: {
-                    songToDelete = song
-                    showDeleteConfirmation = true
-                }) {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
         }
         .background(backgroundColor)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -3042,6 +3055,9 @@ struct SongLibraryPopover: View {
                 Label("Delete", systemImage: "trash")
             }
         }
+        .frame(width: 450)
+        .fixedSize(horizontal: true, vertical: false)
+        .clipped()
     }
 }
 
@@ -3165,8 +3181,12 @@ struct CueListChooserPopover: View {
                     )
                 }
             }
+            .frame(width: 400)
+            .clipped()
         }
+        .frame(width: 400)
         .frame(maxHeight: 400)
+        .clipped()
     }
 
     var body: some View {
@@ -3450,113 +3470,125 @@ struct SwipeableCueListRow: View {
 
     @State private var offset: CGFloat = 0
     @State private var isDragging = false
+    @State private var showMenu = false
 
     private let deleteThreshold: CGFloat = -80
     private let deleteButtonWidth: CGFloat = 80
 
     var body: some View {
-        ZStack(alignment: .trailing) {
-            // Delete button background
-            HStack {
-                Spacer()
-                Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        offset = 0
-                    }
-                    onDelete()
-                }) {
-                    Image(systemName: "trash")
-                        .foregroundColor(.white)
-                        .frame(width: deleteButtonWidth)
-                        .frame(maxHeight: .infinity)
-                }
-                .background(Color.red)
-            }
-
-            // Main row content
-            Button(action: {
-                if offset == 0 {
-                    onTap()
-                } else {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        offset = 0
-                    }
-                }
-            }) {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text(cueList.name)
-                                .font(.system(size: 16, weight: isActive ? .semibold : .regular))
-                                .foregroundColor(textColor)
-
-                            if isActive {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.blue)
+        Color.clear
+            .frame(width: 400, height: 60)
+            .overlay(
+                ZStack(alignment: .trailing) {
+                    // Delete button background
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                offset = 0
                             }
+                            onDelete()
+                        }) {
+                            Image(systemName: "trash")
+                                .foregroundColor(.white)
+                                .frame(width: deleteButtonWidth)
+                                .frame(maxHeight: .infinity)
                         }
-
-                        Text("\(cueList.songs.count) cue\(cueList.songs.count == 1 ? "" : "s")")
-                            .font(.system(size: 14))
-                            .foregroundColor(textColor.opacity(0.6))
+                        .background(Color.red)
                     }
 
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 12)
-                .padding(.horizontal, 16)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .background(backgroundColor)
-            .offset(x: offset)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 10)
-                    .onChanged { gesture in
-                        isDragging = true
-                        let translation = gesture.translation.width
-                        // Only allow left swipe
-                        if translation < 0 {
-                            offset = translation
-                        } else if offset < 0 {
-                            // Allow dragging back to close
-                            offset = min(0, offset + translation)
-                        }
-                    }
-                    .onEnded { gesture in
-                        isDragging = false
-                        let translation = gesture.translation.width
-                        let velocity = gesture.predictedEndTranslation.width - translation
-
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            if offset < deleteThreshold || velocity < -50 {
-                                // Show delete button
-                                offset = -deleteButtonWidth
-                            } else {
-                                // Close
+                    // Main row content
+                    Button(action: {
+                        if offset == 0 {
+                            onTap()
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 offset = 0
                             }
                         }
+                    }) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 8) {
+                                    Text(cueList.name)
+                                        .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                                        .foregroundColor(textColor)
+
+                                    if isActive {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+
+                                Text("\(cueList.songs.count) cue\(cueList.songs.count == 1 ? "" : "s")")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(textColor.opacity(0.6))
+                            }
+
+                            Spacer()
+
+                            // More button with menu
+                            Menu {
+                                Button(action: onTap) {
+                                    Label("Open", systemImage: "arrow.right.circle")
+                                }
+                                Button(action: onDuplicate) {
+                                    Label("Duplicate", systemImage: "doc.on.doc")
+                                }
+                                Button(action: onRename) {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                Button(role: .destructive, action: onDelete) {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(textColor.opacity(0.6))
+                                    .frame(width: 32, height: 32)
+                                    .contentShape(Rectangle())
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .background(backgroundColor)
+                    .offset(x: offset)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 10)
+                            .onChanged { gesture in
+                                isDragging = true
+                                let translation = gesture.translation.width
+                                // Only allow left swipe
+                                if translation < 0 {
+                                    offset = translation
+                                } else if offset < 0 {
+                                    // Allow dragging back to close
+                                    offset = min(0, offset + translation)
+                                }
+                            }
+                            .onEnded { gesture in
+                                isDragging = false
+                                let translation = gesture.translation.width
+                                let velocity = gesture.predictedEndTranslation.width - translation
+
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    if offset < deleteThreshold || velocity < -50 {
+                                        // Show delete button
+                                        offset = -deleteButtonWidth
+                                    } else {
+                                        // Close
+                                        offset = 0
+                                    }
+                                }
+                            }
+                    )
+                }
             )
-            .contextMenu {
-                Button(action: onTap) {
-                    Label("Open", systemImage: "arrow.right.circle")
-                }
-                Button(action: onDuplicate) {
-                    Label("Duplicate", systemImage: "doc.on.doc")
-                }
-                Button(action: onRename) {
-                    Label("Rename", systemImage: "pencil")
-                }
-                Button(role: .destructive, action: onDelete) {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
-        }
-        .frame(height: 60)
-        .clipped()
+            .clipped()
     }
 }
