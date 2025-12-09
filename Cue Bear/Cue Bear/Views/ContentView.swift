@@ -2845,6 +2845,8 @@ internal struct ContentView: View {
     @State private var controlAreaCollapsed: Bool = false  // Track if control area is collapsed
     @State private var controlsPerRow: Int = 4
     @State private var controlAreaHeight: CGFloat = 0
+    @State private var showCollapsedCapsule: Bool = false  // Control visibility for sequential animation
+    @State private var showExpandedArea: Bool = false  // Control visibility for sequential animation
     @State private var titleBarBottom: CGFloat = 88  // Bottom edge of title bar (default: safe area + title height)
     @State private var editCapsuleBottom: CGFloat = 0  // Bottom edge of edit/search capsules when visible
     @State private var capsuleBounds: [String: CGRect] = [:]  // Track all UI capsule bounds for collision detection
@@ -3425,7 +3427,7 @@ internal struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                 .padding(.trailing, 16)
-                .padding(.bottom, 8)
+                .padding(.bottom, 0)  // No internal bottom padding - applied externally at frame level
                 .background(
                     GeometryReader { geo in
                         Color.clear.preference(
@@ -3439,6 +3441,10 @@ internal struct ContentView: View {
                 HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
                     Button(controlEditMode ? "Done" : "Edit") {
                         withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                            if !controlEditMode {
+                                // Entering edit mode: expand the control area
+                                controlAreaCollapsed = false
+                            }
                             controlEditMode.toggle()
                         }
                     }
@@ -3469,7 +3475,7 @@ internal struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                 .padding(.trailing, 16)
-                .padding(.bottom, 8)
+                .padding(.bottom, 0)  // No internal bottom padding - applied externally at frame level
                 .background(
                     GeometryReader { geo in
                         Color.clear.preference(
@@ -3872,55 +3878,73 @@ internal struct ContentView: View {
                     .disabled(showSideMenu)
                     .blur(radius: showSideMenu ? 3 : 0)
                     .animation(.easeInOut(duration: 0.3), value: showSideMenu)
-                    .clipped() // Clip cues at screen bounds
+                    .ignoresSafeArea(edges: .bottom) // Allow cues to extend into bottom safe area behind home indicator
 
                     // Floating control area capsules - NOT clipped so they can slide off-screen
                     ZStack {
-                        if !isEditing && effectivelyCollapsedForOverlay {
-                            // Show small collapsed capsule - no animation to avoid peek
+                        if !isEditing && effectivelyCollapsedForOverlay && showCollapsedCapsule {
+                            // Show small collapsed capsule with sequential animation
+                            // Match expanded control area positioning
+                            let bottomPadding: CGFloat = 21
                             AnyView(collapsedControlCapsule)
+                                .padding(.bottom, bottomPadding)  // Match expanded control area bottom padding
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                .ignoresSafeArea(edges: .bottom)  // Match expanded control area safe area handling
                                 .zIndex(0)
                                 .id("collapsed")
-                                .transaction { transaction in
-                                    transaction.animation = nil // Disable all animations for collapsed capsule
-                                }
+                                .transition(.move(edge: .bottom))
                         }
 
-                        if !isEditing && !effectivelyCollapsedForOverlay {
-                            // Show full expanded control area (slides down when disappearing)
+                        if !isEditing && !effectivelyCollapsedForOverlay && showExpandedArea {
+                            // Show full expanded control area with sequential animation
+                            let isLandscape = verticalSizeClass == .compact
+                            // Bottom padding: X + 2Y where X = home indicator height (~5pt), Y = its distance from bottom (8pt)
+                            // Result: 5 + 2(8) = 21pt
+                            let bottomPadding: CGFloat = 21
+
+                            // Portrait: center, Landscape: align to bottom-right (matching collapsed capsule)
                             AnyView(controlSectionView)
-                                .frame(maxWidth: .infinity, alignment: .bottom)
+                                .padding(.trailing, isLandscape ? 16 : 0)  // Match collapsed capsule trailing padding in landscape
+                                .padding(.bottom, bottomPadding)  // Position above home indicator with proper spacing
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isLandscape ? .bottomTrailing : .bottom)
                                 .ignoresSafeArea(edges: .bottom)
-                                .background(
-                                    GeometryReader { geo in
-                                        Color.clear.onAppear {
-                                            // Report actual height when appearing
-                                            DispatchQueue.main.async {
-                                                controlAreaHeight = geo.size.height
-                                            }
-                                        }
-                                        .onChange(of: geo.size.height) { _, newHeight in
-                                            // Update height as it changes
-                                            controlAreaHeight = newHeight
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.onAppear {
+                                        // Report actual height when appearing
+                                        DispatchQueue.main.async {
+                                            controlAreaHeight = geo.size.height
                                         }
                                     }
-                                )
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .bottom),
-                                    removal: .move(edge: .bottom).combined(with: .offset(y: 100))
-                                ))
-                                .zIndex(1)
-                                .id("expandedNonEdit")
+                                    .onChange(of: geo.size.height) { _, newHeight in
+                                        // Update height as it changes
+                                        controlAreaHeight = newHeight
+                                    }
+                                }
+                            )
+                            .transition(.move(edge: .bottom))
+                            .zIndex(1)
+                            .id("expandedNonEdit")
                         }
                     }
-                    .animation(.spring(response: 0.15, dampingFraction: 1.0), value: isEditing)
-                    .animation(.spring(response: 0.15, dampingFraction: 1.0), value: effectivelyCollapsedForOverlay)
+                    .animation(.spring(response: 0.2, dampingFraction: 1.0), value: showCollapsedCapsule)
+                    .animation(.spring(response: 0.2, dampingFraction: 1.0), value: showExpandedArea)
                     .onChange(of: effectivelyCollapsedForOverlay) { _, isCollapsed in
                         if isCollapsed {
-                            // When collapsing, report 0 height to push capsules down
+                            // Collapsing: immediately toggle both (animate simultaneously)
+                            showExpandedArea = false
+                            showCollapsedCapsule = true
                             controlAreaHeight = 0
+                        } else {
+                            // Expanding: immediately toggle both (animate simultaneously)
+                            showCollapsedCapsule = false
+                            showExpandedArea = true
                         }
+                    }
+                    .onAppear {
+                        // Initialize visibility based on initial state
+                        showCollapsedCapsule = effectivelyCollapsedForOverlay
+                        showExpandedArea = !effectivelyCollapsedForOverlay
                     }
                 }
 
@@ -6746,6 +6770,22 @@ private struct CBControlSection: View {
     // Track actual width for proper orientation handling
     @State private var actualWidth: CGFloat = UIScreen.main.bounds.width
 
+    // Track portrait width for consistent grid sizing in both orientations
+    // Use screen bounds to ensure consistent width regardless of edit mode
+    private var portraitWidth: CGFloat {
+        let screenBounds = UIScreen.main.bounds
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        let minDimension = min(screenBounds.width, screenBounds.height)
+
+        if isPhone {
+            // iPhone: use minimum dimension (portrait width)
+            return minDimension
+        } else {
+            // iPad: use full width - padding is internal to the capsule (matches title bar capsules)
+            return minDimension
+        }
+    }
+
     // Track calculated height to avoid infinite render loops
     @State private var cachedHeight: CGFloat = 0
 
@@ -6991,6 +7031,7 @@ private struct CBControlSection: View {
                         HStack(spacing: 6) {
                             Button(action: {
                                 withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                                    isEditing = false  // Exit edit mode when folding
                                     isCollapsed.toggle()
                                 }
                             }) {
@@ -7116,6 +7157,9 @@ private struct CBControlSection: View {
                 if !buttons.isEmpty {
                     Button(action: {
                         withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                            if isEditing {
+                                isEditing = false  // Exit edit mode when folding
+                            }
                             isCollapsed.toggle()
                         }
                     }) {
@@ -7154,11 +7198,10 @@ private struct CBControlSection: View {
                     .onChange(of: outerProxy.size.width) { _, newWidth in
                         // Update actual width when orientation changes
                         actualWidth = newWidth
-                        debugPrint("🔄 CBControlSection: Width changed to \(newWidth)")
                     }
                 }
                 .id("ctrl-geo-\(isEditing)-sess-\(editSessionNonce)")
-                .frame(maxWidth: .infinity)  // Ensure full width
+                // No maxWidth constraint - let the capsule width calculation determine the size
                 .frame(height: calculateDynamicHeight(), alignment: .top)  // Align content to top
                 .background(Color.clear)  // Ensure no white background
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: cachedHeight)
@@ -7284,31 +7327,42 @@ private struct CBControlSection: View {
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
         let isLandscape = verticalSizeClass == .compact
 
-        // Calculate grid width with padding for iPhone landscape alignment
+        // Calculate fixed grid width for both orientations (iPhone still uses actual width)
         let gridWidthWithPadding: CGFloat? = {
-            if isPhone && isLandscape {
-                // Calculate grid width manually
-                let totalSpacing = CGFloat(columns - 1) * columnSpacing
-                let actualHorizontalPadding = columnSpacing
-                let availableWidth = actualWidth - (2 * actualHorizontalPadding) - totalSpacing
-                var cellSize = floor(availableWidth / CGFloat(columns))
-
-                // Apply same height constraint logic
-                let screenHeight = UIScreen.main.bounds.height
-                let maxHeight = screenHeight * 0.6
-                let actualVerticalPadding: CGFloat = 18 + 0  // top + bottom (0 in landscape)
-                let extraPadding: CGFloat = 0  // No extra padding in iPhone landscape
-                let availableGridHeight = maxHeight - actualVerticalPadding - extraPadding
-                let displayRows = isEditing ? 4 : min(4, max(0, calculateVisualRows()))
-                let verticalGaps = max(0, displayRows - 1)
-                let maxCellSize = (availableGridHeight - CGFloat(verticalGaps) * rowSpacing) / CGFloat(displayRows)
-                cellSize = min(cellSize, floor(maxCellSize))
-
-                let gridWidth = CGFloat(columns) * cellSize + CGFloat(max(0, columns - 1)) * columnSpacing
-                let capsulePadding: CGFloat = 32 // 16 left + 16 right from .padding(.horizontal, 16)
-                return gridWidth + (columnSpacing * 2) + capsulePadding
+            // iPhone: Only apply in landscape, use full width in portrait
+            if isPhone && !isLandscape {
+                return nil
             }
-            return nil
+
+            debugPrint("🔄 Control area - applying fixed width based on portrait dimensions")
+            // Use tracked portrait width for consistent sizing - dynamically adapts to any iPad size
+            debugPrint("📐 Base width: \(portraitWidth)")
+
+            // Calculate grid width manually
+            let totalSpacing = CGFloat(columns - 1) * columnSpacing
+            // Account for 16pt capsule padding on each side + columnSpacing
+            let actualHorizontalPadding = 16 + columnSpacing
+            let availableWidth = portraitWidth - (2 * actualHorizontalPadding) - totalSpacing
+            var cellSize = floor(availableWidth / CGFloat(columns))
+
+            // Apply same height constraint logic
+            let screenHeight = UIScreen.main.bounds.height
+            let maxHeight = isPhone ? screenHeight * 0.6 : screenHeight * 0.7
+            let actualVerticalPadding: CGFloat = 18 + (isPhone ? 0 : 8)  // top + bottom
+            let extraPadding: CGFloat = 0
+            let availableGridHeight = maxHeight - actualVerticalPadding - extraPadding
+            // Always use 4 rows for consistent sizing regardless of edit mode
+            let displayRows = 4
+            let verticalGaps = max(0, displayRows - 1)
+            let maxCellSize = (availableGridHeight - CGFloat(verticalGaps) * rowSpacing) / CGFloat(displayRows)
+            cellSize = min(cellSize, floor(maxCellSize))
+
+            let gridWidth = CGFloat(columns) * cellSize + CGFloat(max(0, columns - 1)) * columnSpacing
+            // Capsule padding: 16pt left + 16pt right (added at line 7381)
+            let capsulePadding: CGFloat = 32
+            let finalWidth = gridWidth + (columnSpacing * 2) + capsulePadding
+            debugPrint("📐 Calculated control area width: \(finalWidth)")
+            return finalWidth
         }()
 
         let baseView = VStack(spacing: 0) {
@@ -7318,10 +7372,10 @@ private struct CBControlSection: View {
         .background(.regularMaterial)
         .background(controlAreaColor.opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
 
         let shapedView = baseView
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 16)  // Add padding to keep capsule content from edges
         .padding(.bottom, isPhone ? 0 : 8)
         .background(
             GeometryReader { geo in
@@ -7344,16 +7398,24 @@ private struct CBControlSection: View {
             canAddMoreControls = canAddMoreControlsGlobal
         }
 
-        // iPhone landscape: constrain width and align to trailing
+        // Apply width constraint (iPad: both orientations, iPhone: landscape only)
         if let width = gridWidthWithPadding {
-            return AnyView(
-                HStack {
-                    Spacer()
+            debugPrint("✅ Applying width constraint: \(width)")
+            // In landscape, use maxWidth to allow outer frame alignment to work
+            // In portrait, use fixed width
+            if isLandscape {
+                return AnyView(
                     controlCapsule
-                        .frame(width: width)
-                }
-            )
+                        .frame(maxWidth: width)  // maxWidth allows outer frame's .bottomTrailing to align correctly
+                )
+            } else {
+                return AnyView(
+                    controlCapsule
+                        .frame(width: width)  // Fixed width in portrait for centering
+                )
+            }
         } else {
+            debugPrint("✅ Using natural width (iPhone portrait)")
             return AnyView(controlCapsule)
         }
     }
@@ -7374,13 +7436,20 @@ private struct CBControlSection: View {
     // Calculate the height needed for the control area
     private func calculateControlAreaHeight(proxy: GeometryProxy?, screenWidth: CGFloat? = nil) -> CGFloat {
         // Calculate grid dimensions following the specification
-        // Use appropriate default width based on orientation
+        // iPad: Use tracked portrait width for consistent grid size in both orientations
+        // iPhone: Use actual width
         let isLandscape = verticalSizeClass == .compact
-        let defaultWidth: CGFloat = isLandscape ? 1200 : 800
-        let width: CGFloat = proxy?.size.width ?? screenWidth ?? defaultWidth
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+
+        // iPad uses tracked portrait width (dynamically set from GeometryReader)
+        // iPhone uses actual width for responsive behavior
+        let fixedWidthForGrid: CGFloat = isPhone ? 0 : portraitWidth
+
+        let defaultWidth: CGFloat = isPhone ? (isLandscape ? 1200 : 800) : fixedWidthForGrid
+        let width: CGFloat = isPhone ? (proxy?.size.width ?? screenWidth ?? defaultWidth) : fixedWidthForGrid
         let totalSpacing = CGFloat(columns - 1) * columnSpacing
         // iPhone uses columnSpacing for horizontal padding, iPad uses gridPadding
-        let actualHorizontalPadding = UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
+        let actualHorizontalPadding = isPhone ? columnSpacing : gridPadding
         let availableWidth = width - (2 * actualHorizontalPadding) - totalSpacing
         let cellSize = floor(availableWidth / CGFloat(columns))
 

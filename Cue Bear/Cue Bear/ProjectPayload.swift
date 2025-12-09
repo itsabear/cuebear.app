@@ -21,6 +21,9 @@ struct ProjectPayload: Codable {
     /// ID of the currently active cue list (v1.2.0+)
     var activeCueListID: UUID?
 
+    /// App mode preference (regular, regularPlusRemote, or cue) - remembered per project
+    var appMode: AppMode?
+
     // MARK: - Legacy Format (v1.0.x - v1.1.x)
 
     /// Legacy single setlist (for loading old projects only)
@@ -61,11 +64,13 @@ struct ProjectPayload: Codable {
         isGlobalChannel: Bool? = nil,
         globalChannel: Int? = nil,
         theme: String? = nil,
+        appMode: AppMode? = nil,
         projectVersion: String? = "1.2.0"
     ) {
         self.name = name
         self.cueLists = cueLists
         self.activeCueListID = activeCueListID
+        self.appMode = appMode
         self.setlist = nil  // Don't save legacy format
         self.library = library
         self.controls = controls
@@ -89,6 +94,7 @@ struct ProjectPayload: Codable {
         self.setlist = setlist
         self.cueLists = nil
         self.activeCueListID = nil
+        self.appMode = nil  // Legacy projects default to nil
         self.library = library
         self.controls = controls
         self.isGlobalChannel = isGlobalChannel

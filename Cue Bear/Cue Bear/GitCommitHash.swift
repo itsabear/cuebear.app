@@ -4,5 +4,5 @@
 import Foundation
 
 enum GitInfo {
-    static let commitHash = "b7acd35"
+    static let commitHash = "09dbf3c"
 }

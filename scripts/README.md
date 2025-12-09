@@ -1,53 +1,67 @@
 # Development Scripts
 
-## Git Commit Hash Tracking
+## Git Commit Hash Tracking & Changelog Generation
 
-The app displays the current git commit hash in the About sheet (shown below the version number).
+The app automatically tracks the current git commit hash and generates a changelog from your git history.
+
+### Features
+
+✅ **Commit Hash Display** - Shows current commit hash in About sheet (e.g., "Commit: 1862002")
+✅ **Auto-Generated Changelog** - Creates `CHANGELOG.md` with all commit history
+✅ **Automatic Updates** - Runs before every build (when set up as build phase)
 
 ### Setup
 
-The git commit hash is stored in `Cue Bear/Cue Bear/GitCommitHash.swift` and displayed in the About sheet.
-
-### Workflow
-
-#### Option 1: Manual Update (Recommended for development)
-
-Before building or committing changes:
+#### Quick Setup: Run the Helper Script
 
 ```bash
-./scripts/update_git_hash.sh
+python3 scripts/add_build_phase.py
 ```
 
-This will update `GitCommitHash.swift` with the current HEAD commit hash.
+This will show you step-by-step instructions to add the build phase to Xcode.
 
-#### Option 2: Add as Xcode Build Phase (Automated)
+#### Manual Xcode Setup
 
-To automatically update the hash before every build:
-
-1. Open Xcode
-2. Select the "Cue Bear" target
-3. Go to "Build Phases" tab
-4. Click "+" and select "New Run Script Phase"
-5. Move it to be the first build phase
-6. Add this script:
+1. Open **Cue Bear.xcodeproj** in Xcode
+2. Select the **"Cue Bear"** target
+3. Go to **"Build Phases"** tab
+4. Click **"+"** → **"New Run Script Phase"**
+5. Drag it to be the **FIRST** phase (above "Compile Sources")
+6. Name it: **"Update Git Commit Hash & Changelog"**
+7. Paste this script:
 
 ```bash
-bash "${SRCROOT}/scripts/update_git_hash.sh"
+# Update git commit hash and generate changelog
+bash "${SRCROOT}/scripts/update_git_info.sh"
 ```
 
-7. Name it "Update Git Commit Hash"
+8. ✅ Done! The script will run automatically before every build
 
-### After Making Changes
+### Manual Usage
 
-After committing changes, the commit hash display will show the previous commit (the one that was current when you last ran the script). This is the intended behavior - it shows which commit the build is based on.
+You can also run the script manually:
+
+```bash
+./scripts/update_git_info.sh
+```
+
+This will:
+- Update `GitCommitHash.swift` with current commit
+- Regenerate `CHANGELOG.md` with full git history
+
+### Files Generated
+
+- **`Cue Bear/Cue Bear/GitCommitHash.swift`** - Auto-generated, contains current commit hash
+- **`CHANGELOG.md`** - Auto-generated, full commit history in Markdown format
 
 ### Files Modified
 
-- `Cue Bear/Cue Bear/GitCommitHash.swift` - Auto-generated, contains the commit hash
-- `Cue Bear/Views/AboutAndAppearanceSheets.swift` - Displays the hash in the About sheet
-- `scripts/update_git_hash.sh` - Script to update the hash
+- `Cue Bear/Views/AboutAndAppearanceSheets.swift` - Displays commit hash in About sheet
+- `scripts/update_git_info.sh` - Main script (runs on every build)
+- `scripts/add_build_phase.py` - Helper to show Xcode setup instructions
 
-### Commit Hashes
+### Recent Commits
 
-- **8e7ec47**: Fix control area transparency to show cues underneath capsule
+- **1862002**: Update commit hash to b7acd35 and add documentation
 - **b7acd35**: Add git commit hash display in About sheet
+- **8e7ec47**: Fix control area transparency to show cues underneath capsule

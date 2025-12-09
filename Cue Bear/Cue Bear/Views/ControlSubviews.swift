@@ -240,7 +240,7 @@ struct CBPerformanceList: View {
                 }
                 .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .phone ? 16 : 36)  // Smaller padding on iPhone for wider cues
                 .padding(.top, isEditing ? 170 : 80)  // Slide down in edit mode - equal spacing with top bar
-                .padding(.bottom, controlAreaCollapsed ? 100 : (controlAreaHeight + 8))  // Dynamic padding based on actual control area height
+                .padding(.bottom, 134)  // Fixed padding (100 for control area + 34 for home indicator safe area)
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
             }
             .onChange(of: cuedID) { _, newID in

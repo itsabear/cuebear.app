@@ -225,8 +225,16 @@ struct CBTransportDock: View {
             }
             .padding(.horizontal, 13.5)
             .padding(.vertical, 9)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
+            .background(
+                GeometryReader { geo in
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .preference(
+                            key: CapsuleBoundsPreferenceKey.self,
+                            value: ["cueCapsule.bounds": geo.frame(in: .global)]
+                        )
+                }
+            )
             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 6)
         }
     }
