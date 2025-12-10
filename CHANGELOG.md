@@ -4,7 +4,23 @@ This changelog is automatically generated from git commits.
 
 ---
 
-## 09dbf3c - Improve control area animations and add app mode persistence
+## 389c42f - Reorder and fix spacing of edit cue sheet buttons
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+- Change button order to: Save, Duplicate, Delete (was: Duplicate, Delete, Save)
+- Fix uneven spacing by placing all buttons in single VStack with consistent 12pt spacing
+- Consolidate from two separate sections into one unified action buttons section
+- Maintain proper button styling (Primary for Save, Secondary for Duplicate, Destructive for Delete)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## 50cd0a4 - Improve control area animations and add app mode persistence
 
 **Date:** 2025-12-09
 **Author:** Omri Behr

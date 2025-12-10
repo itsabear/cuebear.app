@@ -1993,55 +1993,10 @@ struct CBAddEditCueSheet: View {
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
 
-                // Duplicate & Delete section - only show when editing existing cue
-                if editingSong != nil {
-                    Section {
-                        // Duplicate button
-                        if onDuplicate != nil {
-                            Button {
-                                if let song = editingSong {
-                                    onDuplicate?(song)
-                                }
-                            } label: {
-                                HStack {
-                                    Spacer()
-                                    Image(systemName: "doc.on.doc")
-                                    Text("Duplicate Cue")
-                                    Spacer()
-                                }
-                                .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
-                            }
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                        }
-
-                        // Delete/Remove button
-                        if onDelete != nil {
-                            Button(role: .destructive) {
-                                // Skip confirmation for cue list removal, show alert for library deletion
-                                if editContext == .cueList {
-                                    if let song = editingSong {
-                                        onDelete?(song)
-                                        lastEditingSongID = nil
-                                    }
-                                } else {
-                                    showDeleteAlert = true
-                                }
-                            } label: {
-                                HStack {
-                                    Spacer()
-                                    Text(editContext == .cueList ? "Remove" : "Delete Cue")
-                                    Spacer()
-                                }
-                            }
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                        }
-                    }
-                }
-
                 // Action buttons section
                 Section {
                     VStack(spacing: 12) {
-                        // Primary action button (Save/Add)
+                        // Primary action button (Save/Add) - always first
                         PrimaryWideButton(
                             title: editingSong == nil ? "Add" : "Save",
                             action: { save(andAddAnother: false) },
@@ -2054,6 +2009,37 @@ struct CBAddEditCueSheet: View {
                                 title: "Save & Add Another",
                                 action: { save(andAddAnother: true) },
                                 isDisabled: (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
+                            )
+                        }
+
+                        // Duplicate button - only show when editing existing cue
+                        if editingSong != nil, onDuplicate != nil {
+                            SecondaryWideButton(
+                                title: "Duplicate Cue",
+                                action: {
+                                    if let song = editingSong {
+                                        onDuplicate?(song)
+                                    }
+                                },
+                                isDisabled: false
+                            )
+                        }
+
+                        // Delete/Remove button - only show when editing existing cue
+                        if editingSong != nil, onDelete != nil {
+                            DestructiveWideButton(
+                                title: editContext == .cueList ? "Remove" : "Delete Cue",
+                                action: {
+                                    // Skip confirmation for cue list removal, show alert for library deletion
+                                    if editContext == .cueList {
+                                        if let song = editingSong {
+                                            onDelete?(song)
+                                            lastEditingSongID = nil
+                                        }
+                                    } else {
+                                        showDeleteAlert = true
+                                    }
+                                }
                             )
                         }
                     }
