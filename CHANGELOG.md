@@ -4,7 +4,29 @@ This changelog is automatically generated from git commits.
 
 ---
 
-## 0fce1fd - Reduce control area title bar height with smaller buttons
+## ca49640 - Reduce control area title bar height - fix collapsed capsule buttons
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+This completes the title bar height reduction by fixing the collapsed control
+area capsule (Edit/Done button + chevron shown at bottom-right when collapsed):
+
+- Change button control size from .small to .mini
+- Reduce button frames from 44x44pt to 32x32pt
+- Reduce chevron icon from size 14 to size 12
+- Reduce vertical padding from 6pt to 2pt
+
+These buttons were missed in the previous commit and were keeping the title
+bar tall despite other changes.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## e520f57 - Reduce control area title bar height with smaller buttons
 
 **Date:** 2025-12-10
 **Author:** Omri Behr

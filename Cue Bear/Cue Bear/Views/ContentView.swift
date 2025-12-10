@@ -3937,8 +3937,8 @@ internal struct ContentView: View {
                             .id("expandedNonEdit")
                         }
                     }
-                    .animation(.spring(response: 0.2, dampingFraction: 1.0), value: showCollapsedCapsule)
-                    .animation(.spring(response: 0.2, dampingFraction: 1.0), value: showExpandedArea)
+                    .animation(.spring(response: 0.15, dampingFraction: 0.85), value: showCollapsedCapsule)
+                    .animation(.spring(response: 0.15, dampingFraction: 0.85), value: showExpandedArea)
                     .onChange(of: effectivelyCollapsedForOverlay) { _, isCollapsed in
                         if isCollapsed {
                             // Collapsing: immediately toggle both (animate simultaneously)
