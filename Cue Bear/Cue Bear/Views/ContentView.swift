@@ -7184,8 +7184,8 @@ private struct CBControlSection: View {
             }
         }
         .padding(.horizontal, isPhone ? 8 : 16)
-        .padding(.top, isPhone ? 6 : 4)
-        .padding(.bottom, isPhone ? 6 : 2)
+        .padding(.top, 2)
+        .padding(.bottom, 2)
         .frame(height: isPhone ? 44 : nil)  // Fixed height on iPhone to prevent title bar from growing
     }
     

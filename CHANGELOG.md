@@ -4,7 +4,23 @@ This changelog is automatically generated from git commits.
 
 ---
 
-## 8929ab8 - Update control editor sheet to match cue editor pattern
+## 9387a02 - Reduce control area title bar vertical padding for better space efficiency
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+- Change top padding from 6pt (iPhone) / 4pt (iPad) to 2pt consistently
+- Change bottom padding from 6pt (iPhone) / 2pt (iPad) to 2pt consistently
+- Saves 4-6pt of vertical space in control area
+- Makes UI less cramped, especially in edit mode with multiple buttons
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## 40c6039 - Update control editor sheet to match cue editor pattern
 
 **Date:** 2025-12-10
 **Author:** Omri Behr
