@@ -4,7 +4,30 @@ This changelog is automatically generated from git commits.
 
 ---
 
-## 389c42f - Reorder and fix spacing of edit cue sheet buttons
+## 147fc0e - Redesign edit cue sheet with cleaner button layout
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+Edit Cue Sheet:
+- Move Cancel to top-left, Done removed
+- Add More menu (⋯) in top-right with Duplicate/Delete options
+- Keep only Save button at bottom (removed Duplicate/Delete full-width buttons)
+- Delete/Remove always shows confirmation alert
+
+Add Cue Sheet:
+- Cancel in top-left, no button in top-right
+- Save and "Save & Add Another" buttons at bottom
+
+Result: Cleaner, less visually overwhelming, better hierarchy
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## 9fc2602 - Reorder and fix spacing of edit cue sheet buttons
 
 **Date:** 2025-12-10
 **Author:** Omri Behr

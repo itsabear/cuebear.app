@@ -1996,7 +1996,7 @@ struct CBAddEditCueSheet: View {
                 // Action buttons section
                 Section {
                     VStack(spacing: 12) {
-                        // Primary action button (Save/Add) - always first
+                        // Primary action button (Save/Add)
                         PrimaryWideButton(
                             title: editingSong == nil ? "Add" : "Save",
                             action: { save(andAddAnother: false) },
@@ -2009,37 +2009,6 @@ struct CBAddEditCueSheet: View {
                                 title: "Save & Add Another",
                                 action: { save(andAddAnother: true) },
                                 isDisabled: (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
-                            )
-                        }
-
-                        // Duplicate button - only show when editing existing cue
-                        if editingSong != nil, onDuplicate != nil {
-                            SecondaryWideButton(
-                                title: "Duplicate Cue",
-                                action: {
-                                    if let song = editingSong {
-                                        onDuplicate?(song)
-                                    }
-                                },
-                                isDisabled: false
-                            )
-                        }
-
-                        // Delete/Remove button - only show when editing existing cue
-                        if editingSong != nil, onDelete != nil {
-                            DestructiveWideButton(
-                                title: editContext == .cueList ? "Remove" : "Delete Cue",
-                                action: {
-                                    // Skip confirmation for cue list removal, show alert for library deletion
-                                    if editContext == .cueList {
-                                        if let song = editingSong {
-                                            onDelete?(song)
-                                            lastEditingSongID = nil
-                                        }
-                                    } else {
-                                        showDeleteAlert = true
-                                    }
-                                }
                             )
                         }
                     }
@@ -2074,8 +2043,39 @@ struct CBAddEditCueSheet: View {
                 Text("You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.")
             }
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { onCancel() }
+                // Cancel button on the left
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { onCancel() }
+                }
+
+                // More menu on the right (only when editing existing cue)
+                if editingSong != nil {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Menu {
+                            // Duplicate button
+                            if onDuplicate != nil {
+                                Button {
+                                    if let song = editingSong {
+                                        onDuplicate?(song)
+                                    }
+                                } label: {
+                                    Text("Duplicate Cue")
+                                }
+                            }
+
+                            // Delete/Remove button
+                            if onDelete != nil {
+                                Button(role: .destructive) {
+                                    // Show confirmation alert for both contexts
+                                    showDeleteAlert = true
+                                } label: {
+                                    Text(editContext == .cueList ? "Remove" : "Delete Cue")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                    }
                 }
             }
             .onAppear {
