@@ -4,6 +4,23 @@ This changelog is automatically generated from git commits.
 
 ---
 
+## 9e48d07 - Revert control area grid spacing to original values
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+Reverted the grid top padding back to 18pt (iPhone) / 24pt (iPad) to maintain
+the original comfortable spacing between the title bar and buttons grid.
+
+The collapsed capsules already maintain their appropriate compact size through
+their own separate padding values.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
 ## a0fc457 - Reduce spacing between control area title bar and buttons grid
 
 **Date:** 2025-12-10
