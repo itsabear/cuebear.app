@@ -4,6 +4,29 @@ This changelog is automatically generated from git commits.
 
 ---
 
+## 77add46 - Implement sequential animations for control area expand/collapse
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+The control area was animating the collapsed capsule and expanded area
+simultaneously, causing visual overlap and imperfect transitions.
+
+Now implements proper sequential animations:
+- When expanding: collapsed capsule slides down first (0.15s), then expanded
+  area slides up after a 0.15s delay
+- When collapsing: expanded area slides down first (0.15s), then collapsed
+  capsule appears after a 0.15s delay
+
+This creates a smooth, polished transition where one element fully completes
+its animation before the next begins.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
 ## 1ad9abf - Fix control area collapsed capsule animation speed and sync
 
 **Date:** 2025-12-10
