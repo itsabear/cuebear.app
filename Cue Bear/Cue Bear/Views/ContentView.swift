@@ -3941,14 +3941,18 @@ internal struct ContentView: View {
                     .animation(.spring(response: 0.15, dampingFraction: 0.85), value: showExpandedArea)
                     .onChange(of: effectivelyCollapsedForOverlay) { _, isCollapsed in
                         if isCollapsed {
-                            // Collapsing: immediately toggle both (animate simultaneously)
+                            // Collapsing: hide expanded area first, then show collapsed capsule
                             showExpandedArea = false
-                            showCollapsedCapsule = true
                             controlAreaHeight = 0
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                showCollapsedCapsule = true
+                            }
                         } else {
-                            // Expanding: immediately toggle both (animate simultaneously)
+                            // Expanding: hide collapsed capsule first, then show expanded area
                             showCollapsedCapsule = false
-                            showExpandedArea = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                showExpandedArea = true
+                            }
                         }
                     }
                     .onAppear {

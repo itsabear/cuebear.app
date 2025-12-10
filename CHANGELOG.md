@@ -4,6 +4,30 @@ This changelog is automatically generated from git commits.
 
 ---
 
+## 1ad9abf - Fix control area collapsed capsule animation speed and sync
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+The collapsed control area capsule (Edit/Done + chevron at bottom-right) was
+using a different animation than the expand/collapse buttons, causing timing
+mismatches when clicking the chevron to expand.
+
+Changed ZStack animations from:
+- response: 0.2, dampingFraction: 1.0
+
+To match button animations:
+- response: 0.15, dampingFraction: 0.85
+
+This ensures the control area slides down/up at the same speed when using
+the chevron on the collapsed capsule.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
 ## ca49640 - Reduce control area title bar height - fix collapsed capsule buttons
 
 **Date:** 2025-12-10
