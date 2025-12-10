@@ -4,6 +4,24 @@ This changelog is automatically generated from git commits.
 
 ---
 
+## a0fc457 - Reduce spacing between control area title bar and buttons grid
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+Changed the top padding of the buttons grid from 18pt (iPhone) / 24pt (iPad)
+to a consistent 8pt for both devices.
+
+This eliminates the excessive space between the title bar and the control
+buttons grid, making the control area more compact and efficient with screen
+space while maintaining the cleaner title bar appearance.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
 ## 7ad1131 - Remove animation delay for control area expand/collapse transitions
 
 **Date:** 2025-12-10
