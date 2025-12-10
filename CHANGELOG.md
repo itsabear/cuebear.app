@@ -4,7 +4,24 @@ This changelog is automatically generated from git commits.
 
 ---
 
-## 9387a02 - Reduce control area title bar vertical padding for better space efficiency
+## 0fce1fd - Reduce control area title bar height with smaller buttons
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+- Change all buttons from .controlSize(.small) to .controlSize(.mini)
+- Reduce chevron button from 44x44pt to 32x32pt
+- Reduce chevron icon font from size 14 to size 12
+- Combined with previous padding reduction, title bar is now significantly shorter
+- Applies to both iPhone and iPad layouts
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## 8822d6e - Reduce control area title bar vertical padding for better space efficiency
 
 **Date:** 2025-12-10
 **Author:** Omri Behr

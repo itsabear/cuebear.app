@@ -7046,11 +7046,11 @@ private struct CBControlSection: View {
                                 }
                             }) {
                                 Image(systemName: "chevron.down")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .frame(minWidth: 44, minHeight: 44)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .frame(minWidth: 32, minHeight: 32)
                             }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
                             .contentShape(Rectangle())
 
                             Button("Done") {
@@ -7060,27 +7060,27 @@ private struct CBControlSection: View {
                                 }
                             }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
 
                             Button(action: onRedo) {
                                 Image(systemName: "arrow.uturn.forward")
                             }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
                             .disabled(!canRedo)
 
                             Button(action: onUndo) {
                                 Image(systemName: "arrow.uturn.backward")
                             }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
                             .disabled(!canUndo)
 
                             Button(action: { showControlAddMenu = true }) {
                                 Image(systemName: "ellipsis")
                             }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
                             .confirmationDialog("Add Control", isPresented: $showControlAddMenu) {
                                 Button("+ Button") {
                                     onAddButton()
@@ -7104,7 +7104,7 @@ private struct CBControlSection: View {
                                 }
                             }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
 
                             if !buttons.isEmpty {
                                 Button(action: {
@@ -7113,11 +7113,11 @@ private struct CBControlSection: View {
                                     }
                                 }) {
                                     Image(systemName: "chevron.down")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .frame(minWidth: 44, minHeight: 44)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .frame(minWidth: 32, minHeight: 32)
                                 }
                                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                                .controlSize(.small)
+                                .controlSize(.mini)
                                 .contentShape(Rectangle())
                             }
                         }
@@ -7129,19 +7129,19 @@ private struct CBControlSection: View {
                     HStack(spacing: 6) {
                         Button(action: onUndo) { Image(systemName: "arrow.uturn.backward") }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
                             .disabled(!canUndo)
                         Button(action: onRedo) { Image(systemName: "arrow.uturn.forward") }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
                             .disabled(!canRedo)
                         Button("+ Button") { onAddButton() }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
                             .disabled(!canAddMoreControls)
                         Button("+ Fader") { onAddFader() }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
                             .disabled(!canAddFader)
                     }
                     .opacity(isEditing ? 1 : 0)
@@ -7163,6 +7163,7 @@ private struct CBControlSection: View {
                     }
                 }
                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: effectivelyCollapsed ? defaultCueColor : standardButtonColor))
+                .controlSize(.mini)
 
                 if !buttons.isEmpty {
                     Button(action: {
@@ -7174,11 +7175,11 @@ private struct CBControlSection: View {
                         }
                     }) {
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 14, weight: .medium))
-                            .frame(minWidth: 44, minHeight: 44)
+                            .font(.system(size: 12, weight: .medium))
+                            .frame(minWidth: 32, minHeight: 32)
                     }
                     .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: effectivelyCollapsed ? defaultCueColor : standardButtonColor))
-                    .controlSize(.small)
+                    .controlSize(.mini)
                     .contentShape(Rectangle())
                 }
             }
