@@ -4,6 +4,24 @@ This changelog is automatically generated from git commits.
 
 ---
 
+## 7ad1131 - Remove animation delay for control area expand/collapse transitions
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+Removed the 0.15s asyncAfter delays - both views now toggle immediately.
+The transition animations still happen smoothly due to the .move(edge: .bottom)
+transitions and spring animations, but without artificial delays.
+
+This makes the control area expand/collapse feel more immediate and responsive
+when pressing the chevron button.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
 ## 77add46 - Implement sequential animations for control area expand/collapse
 
 **Date:** 2025-12-10

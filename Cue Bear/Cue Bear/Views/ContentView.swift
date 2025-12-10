@@ -8679,7 +8679,7 @@ private struct CBControlSection: View {
         }
         .id("ctrl-container-\(isCtrlEditing)-sess-\(sessionNonce)-\(buttons.map { "\($0.gridCol ?? -1)-\($0.gridRow ?? -1)-\($0.colorHex ?? "nil")" }.joined(separator: ","))")
         .padding(EdgeInsets(
-            top: UIDevice.current.userInterfaceIdiom == .phone ? 18 : (gridPadding + 4),
+            top: 8,
             leading: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding,
             bottom: UIDevice.current.userInterfaceIdiom == .phone ? (verticalSizeClass == .compact ? 0 : columnSpacing) : (gridPadding + (verticalSizeClass == .compact ? 10 : 0)),
             trailing: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
