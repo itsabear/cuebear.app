@@ -4,7 +4,25 @@ This changelog is automatically generated from git commits.
 
 ---
 
-## 147fc0e - Redesign edit cue sheet with cleaner button layout
+## 8929ab8 - Update control editor sheet to match cue editor pattern
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+- Remove Done button from top-right, add Cancel to top-left
+- Move Delete action to More menu (⋯) in top-right when editing
+- Remove Delete button from bottom section
+- Keep only Save/Add buttons at bottom for cleaner layout
+
+Applies same UX pattern as cue editor sheet for consistency
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## df5d8eb - Redesign edit cue sheet with cleaner button layout
 
 **Date:** 2025-12-10
 **Author:** Omri Behr

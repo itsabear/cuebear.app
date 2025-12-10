@@ -1515,14 +1515,6 @@ struct CBControlEditorSheet: View {
                                 isDisabled: conflictOwner() != nil || isFilteredMIDI() || showSpaceWarning || isOutOfRoom || !canAddMore
                             )
                         }
-
-                        // Delete button - only show when editing existing control
-                        if isEditMode, onDelete != nil {
-                            DestructiveWideButton(
-                                title: draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"),
-                                action: { showDeleteAlert = true }
-                            )
-                        }
                     }
                     .padding(.vertical, 8)
                     .listRowBackground(Color.clear)
@@ -1551,13 +1543,31 @@ struct CBControlEditorSheet: View {
                 Text("You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.")
             }
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        // v1.0.8: Clear draft state on Done
+                // Cancel button on the left
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        // v1.0.8: Clear draft state on Cancel
                         draft.clear()
                         onCancel()
                     }
-                    .disabled(conflictOwner() != nil || isFilteredMIDI() || showSpaceWarning || isOutOfRoom)
+                }
+
+                // More menu on the right (only when editing existing control)
+                if isEditMode {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Menu {
+                            // Delete button
+                            if onDelete != nil {
+                                Button(role: .destructive) {
+                                    showDeleteAlert = true
+                                } label: {
+                                    Text(draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"))
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                    }
                 }
             }
             .onAppear {
