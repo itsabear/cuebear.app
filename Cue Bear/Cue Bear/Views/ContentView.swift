@@ -3459,8 +3459,8 @@ internal struct ContentView: View {
                         }
                     }
                     .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-                    .controlSize(.small)
-                    .frame(minWidth: 44, minHeight: 44)
+                    .controlSize(.mini)
+                    .frame(minWidth: 32, minHeight: 32)
                     .contentShape(Rectangle())
 
                     if !controlButtons.isEmpty {
@@ -3470,16 +3470,16 @@ internal struct ContentView: View {
                             }
                         }) {
                             Image(systemName: "chevron.up")
-                                .font(.system(size: 14, weight: .medium))
-                                .frame(minWidth: 44, minHeight: 44)
+                                .font(.system(size: 12, weight: .medium))
+                                .frame(minWidth: 32, minHeight: 32)
                         }
                         .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-                        .controlSize(.small)
+                        .controlSize(.mini)
                         .contentShape(Rectangle())
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.vertical, 2)
                 .background(.regularMaterial)
                 .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -6961,7 +6961,7 @@ private struct CBControlSection: View {
                                 }
                             }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.small)
+                            .controlSize(.mini)
 
                             if !buttons.isEmpty {
                                 Button(action: {
@@ -6970,15 +6970,15 @@ private struct CBControlSection: View {
                                     }
                                 }) {
                                     Image(systemName: "chevron.up")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .frame(minWidth: 28)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .frame(minWidth: 32, minHeight: 32)
                                 }
                                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                                .controlSize(.small)
+                                .controlSize(.mini)
                             }
                         }
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 2)
                         .background(controlAreaColor.opacity(0.9))
                         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
