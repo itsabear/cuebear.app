@@ -2857,6 +2857,7 @@ internal struct ContentView: View {
     @State private var controlAreaHeight: CGFloat = 0
     @State private var showCollapsedCapsule: Bool = false  // Control visibility for sequential animation
     @State private var showExpandedArea: Bool = false  // Control visibility for sequential animation
+    @State private var isAnimatingControlArea: Bool = false  // Track if control area is animating
     @State private var titleBarBottom: CGFloat = 88  // Bottom edge of title bar (default: safe area + title height)
     @State private var editCapsuleBottom: CGFloat = 0  // Bottom edge of edit/search capsules when visible
     @State private var capsuleBounds: [String: CGRect] = [:]  // Track all UI capsule bounds for collision detection
@@ -3921,14 +3922,16 @@ internal struct ContentView: View {
                             .background(
                                 GeometryReader { geo in
                                     Color.clear.onAppear {
-                                        // Report actual height when appearing
-                                        DispatchQueue.main.async {
+                                        // Report actual height only when not animating
+                                        if showExpandedArea && !isAnimatingControlArea {
                                             controlAreaHeight = geo.size.height
                                         }
                                     }
                                     .onChange(of: geo.size.height) { _, newHeight in
-                                        // Update height as it changes
-                                        controlAreaHeight = newHeight
+                                        // Only update height when not animating
+                                        if showExpandedArea && !isAnimatingControlArea {
+                                            controlAreaHeight = newHeight
+                                        }
                                     }
                                 }
                             )
@@ -3940,15 +3943,37 @@ internal struct ContentView: View {
                     .animation(.spring(response: 0.15, dampingFraction: 0.85), value: showCollapsedCapsule)
                     .animation(.spring(response: 0.15, dampingFraction: 0.85), value: showExpandedArea)
                     .onChange(of: effectivelyCollapsedForOverlay) { _, isCollapsed in
+                        // Mark as animating - prevents GeometryReader from updating height during animation
+                        isAnimatingControlArea = true
+
                         if isCollapsed {
                             // Collapsing: hide expanded area and show collapsed capsule immediately
                             showExpandedArea = false
                             showCollapsedCapsule = true
-                            controlAreaHeight = 0
+                            // Keep current height during animation - don't change it
                         } else {
                             // Expanding: hide collapsed capsule and show expanded area immediately
                             showCollapsedCapsule = false
                             showExpandedArea = true
+                            // Keep current height during animation - don't change it
+                        }
+
+                        // Update height only AFTER animation completes (0.15s spring + margin)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            isAnimatingControlArea = false
+
+                            // Now update to correct height based on final state
+                            if isCollapsed {
+                                controlAreaHeight = 56  // Collapsed capsule height
+                            } else if showExpandedArea {
+                                // Get actual height from bounds if available
+                                if let actualHeight = capsuleBounds["controlArea.main"]?.height {
+                                    controlAreaHeight = actualHeight
+                                } else {
+                                    // Fallback: conservative estimate
+                                    controlAreaHeight = 200
+                                }
+                            }
                         }
                     }
                     .onAppear {

@@ -62,8 +62,22 @@ struct CBPerformanceList: View {
     @State private var dragStartY: CGFloat = 0  // Track initial Y position of dragged item
     @State private var dragCurrentY: CGFloat = 0  // Track current Y position during drag
 
+    @Environment(\.verticalSizeClass) private var verticalSizeClass  // Detect orientation
+
     var body: some View {
-        ScrollViewReader { proxy in
+        let isLandscape = verticalSizeClass == .compact
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        // iPad: 36pt in portrait, 120pt in landscape for narrower cues
+        // iPhone: 16pt in portrait, 16pt in landscape (keep consistent)
+        let horizontalPadding: CGFloat = {
+            if isPhone {
+                return 16
+            } else {
+                return isLandscape ? 120 : 36
+            }
+        }()
+
+        return ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: true) {
                 LazyVStack(spacing: 12) {
                     // Empty state when no cues exist
@@ -234,11 +248,11 @@ struct CBPerformanceList: View {
                                 }
                             : nil
                         )
+                        .padding(.horizontal, horizontalPadding)  // Apply padding to each row
                         .id(s.id)
                     }
                     Color.clear.frame(height: 8)
                 }
-                .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .phone ? 16 : 36)  // Smaller padding on iPhone for wider cues
                 .padding(.top, isEditing ? 170 : 80)  // Slide down in edit mode - equal spacing with top bar
                 .padding(.bottom, 134)  // Fixed padding (100 for control area + 34 for home indicator safe area)
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
@@ -739,7 +753,6 @@ struct CBSetlistRow: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.clear)
         .contentShape(Rectangle())
         .onTapGesture {
