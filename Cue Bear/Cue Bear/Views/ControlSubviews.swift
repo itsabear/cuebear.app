@@ -77,7 +77,10 @@ struct CBPerformanceList: View {
             }
         }()
 
-        return ScrollViewReader { proxy in
+        return GeometryReader { geometry in
+            let maxWidth = geometry.size.width - (horizontalPadding * 2)
+
+            ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: true) {
                 LazyVStack(spacing: 12) {
                     // Empty state when no cues exist
@@ -248,7 +251,6 @@ struct CBPerformanceList: View {
                                 }
                             : nil
                         )
-                        .padding(.horizontal, horizontalPadding)  // Apply padding to each row
                         .id(s.id)
                     }
                     Color.clear.frame(height: 8)
@@ -276,7 +278,10 @@ struct CBPerformanceList: View {
                     dragPreviewView(for: draggedSong)
                 }
             }
-        }
+            .frame(maxWidth: maxWidth)  // Constrain to calculated width
+            .frame(maxWidth: .infinity)  // Center within parent
+            }  // End ScrollViewReader
+        }  // End GeometryReader
     }
 
     // Helper to build drag preview

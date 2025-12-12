@@ -3914,10 +3914,15 @@ internal struct ContentView: View {
                             let bottomPadding: CGFloat = 21
 
                             // Portrait: center, Landscape: align to bottom-right (matching collapsed capsule)
-                            AnyView(controlSectionView)
-                                .padding(.trailing, isLandscape ? 16 : 0)  // Match collapsed capsule trailing padding in landscape
-                                .padding(.bottom, bottomPadding)  // Position above home indicator with proper spacing
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isLandscape ? .bottomTrailing : .bottom)
+                            GeometryReader { geo in
+                                let controlWidth = isLandscape ? min(geo.size.width * 0.6, 600) : geo.size.width
+
+                                AnyView(controlSectionView)
+                                    .frame(width: controlWidth)  // Constrain width in landscape
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isLandscape ? .bottomTrailing : .bottom)
+                                    .padding(.trailing, isLandscape ? 16 : 0)  // Match collapsed capsule trailing padding in landscape
+                                    .padding(.bottom, bottomPadding)  // Position above home indicator with proper spacing
+                            }
                                 .ignoresSafeArea(edges: .bottom)
                             .background(
                                 GeometryReader { geo in
