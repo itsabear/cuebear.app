@@ -46,7 +46,7 @@ enum ProjectIO {
     // MARK: - Modern Format Save (v1.2.0+)
 
     /// Save project in modern format with multiple cue lists
-    static func save(name: String, cueLists: [CueList], activeCueListID: UUID?, library: [Song], controls: [ControlButton], isGlobalChannel: Bool? = nil, globalChannel: Int? = nil, theme: String? = nil) throws {
+    static func save(name: String, cueLists: [CueList], activeCueListID: UUID?, library: [Song], controls: [ControlButton], isGlobalChannel: Bool? = nil, globalChannel: Int? = nil, theme: String? = nil, appMode: AppMode? = nil, midiFiltersEnabled: Bool? = nil, midiFilter: Set<Int>? = nil, customMidiFilters: [(Int, String)]? = nil) throws {
         let payload = ProjectPayload(
             name: name,
             cueLists: cueLists,
@@ -56,6 +56,10 @@ enum ProjectIO {
             isGlobalChannel: isGlobalChannel,
             globalChannel: globalChannel,
             theme: theme,
+            appMode: appMode,
+            midiFiltersEnabled: midiFiltersEnabled,
+            midiFilter: midiFilter.map { Array($0) },
+            customMidiFilters: customMidiFilters?.map { CustomMIDIFilter(cc: $0.0, name: $0.1) },
             projectVersion: "1.2.0"
         )
         let encoder = JSONEncoder()

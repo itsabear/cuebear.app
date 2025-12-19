@@ -1,5 +1,11 @@
 import Foundation
 
+/// Custom MIDI filter with CC number and name
+struct CustomMIDIFilter: Codable, Equatable {
+    let cc: Int
+    let name: String
+}
+
 /// Shared project data structure supporting both legacy and modern formats
 ///
 /// **Legacy Format (v1.0.x - v1.1.x):**
@@ -23,6 +29,15 @@ struct ProjectPayload: Codable {
 
     /// App mode preference (regular, regularPlusRemote, or cue) - remembered per project
     var appMode: AppMode?
+
+    /// MIDI filters enabled state
+    var midiFiltersEnabled: Bool?
+
+    /// MIDI filter set (CC numbers to exclude from auto-assignment)
+    var midiFilter: [Int]?
+
+    /// Custom MIDI filters with labels
+    var customMidiFilters: [CustomMIDIFilter]?
 
     // MARK: - Legacy Format (v1.0.x - v1.1.x)
 
@@ -65,12 +80,18 @@ struct ProjectPayload: Codable {
         globalChannel: Int? = nil,
         theme: String? = nil,
         appMode: AppMode? = nil,
+        midiFiltersEnabled: Bool? = nil,
+        midiFilter: [Int]? = nil,
+        customMidiFilters: [CustomMIDIFilter]? = nil,
         projectVersion: String? = "1.2.0"
     ) {
         self.name = name
         self.cueLists = cueLists
         self.activeCueListID = activeCueListID
         self.appMode = appMode
+        self.midiFiltersEnabled = midiFiltersEnabled
+        self.midiFilter = midiFilter
+        self.customMidiFilters = customMidiFilters
         self.setlist = nil  // Don't save legacy format
         self.library = library
         self.controls = controls

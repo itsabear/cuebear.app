@@ -422,10 +422,9 @@ final class BridgeOutput: ObservableObject {
         
         // Use WiFi connection only (USB handled by ConnectionManager)
         let endpoint = item.endpoint
-        let useTLS = false
         debugPrint("BridgeOutput: Using WiFi connection to \(item.endpoint)")
-        
-        let conn = NWConnection(to: endpoint, using: useTLS ? .tls : .tcp)
+
+        let conn = NWConnection(to: endpoint, using: .tcp)
         connection = conn
         current = item
         debugPrint("🔌 DEBUG: NWConnection created, starting connection...")

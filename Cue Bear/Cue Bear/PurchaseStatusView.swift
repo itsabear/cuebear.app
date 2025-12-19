@@ -104,7 +104,7 @@ struct PurchaseStatusView: View {
                             Text("Transaction ID")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("\(transactionID)")
+                            Text(String(describing: transactionID))
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundColor(.secondary)
                         }

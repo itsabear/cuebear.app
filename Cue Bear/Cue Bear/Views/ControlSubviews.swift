@@ -67,19 +67,21 @@ struct CBPerformanceList: View {
     var body: some View {
         let isLandscape = verticalSizeClass == .compact
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-        // iPad: 36pt in portrait, 120pt in landscape for narrower cues
-        // iPhone: 16pt in portrait, 16pt in landscape (keep consistent)
+        // iPad: Padding must account for 1.08x scale effect that expands cues beyond layout bounds
+        // Scale effect adds ~4% expansion on each side, requiring significant extra padding
+        // Landscape: Need substantial padding to prevent scaled cues from reaching edges
+        // Portrait: Moderate padding with scale buffer
         let horizontalPadding: CGFloat = {
             if isPhone {
                 return 16
             } else {
-                return isLandscape ? 120 : 36
+                // Landscape: Base 120pt + 60pt scale buffer = 180pt
+                // Portrait: Base 32pt + 24pt scale buffer = 56pt
+                return isLandscape ? 180 : 56
             }
         }()
 
         return GeometryReader { geometry in
-            let maxWidth = geometry.size.width - (horizontalPadding * 2)
-
             ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: true) {
                 LazyVStack(spacing: 12) {
@@ -255,9 +257,10 @@ struct CBPerformanceList: View {
                     }
                     Color.clear.frame(height: 8)
                 }
+                .padding(.horizontal, horizontalPadding)  // Apply horizontal padding to content
                 .padding(.top, isEditing ? 170 : 80)  // Slide down in edit mode - equal spacing with top bar
-                .padding(.bottom, 134)  // Fixed padding (100 for control area + 34 for home indicator safe area)
-                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
+                .padding(.bottom, controlAreaCollapsed ? 134 : controlAreaHeight + CGFloat(cueHeight) + 24)  // Dynamic padding: collapsed (100pt + 34pt safe area) or expanded (control height + cue height + 2x cue spacing so bottom cue scrolls above control area)
+                .animation(.spring(response: 0.15, dampingFraction: 0.85), value: isEditing)
             }
             .onChange(of: cuedID) { _, newID in
                 // Scroll to selected cue in both Cue mode and Nav mode
@@ -278,8 +281,6 @@ struct CBPerformanceList: View {
                     dragPreviewView(for: draggedSong)
                 }
             }
-            .frame(maxWidth: maxWidth)  // Constrain to calculated width
-            .frame(maxWidth: .infinity)  // Center within parent
             }  // End ScrollViewReader
         }  // End GeometryReader
     }
@@ -455,8 +456,8 @@ struct CBPerformanceRow: View {
                 .fill(baseColor)
                 .frame(maxWidth: .infinity, minHeight: (isCued && !isEditing) ? cueHeight * 1.4 : cueHeight)
                 .opacity((isCued && !isEditing) ? 1.0 : 0.90)  // Always use normal opacity, regardless of conflicts
-                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
-                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isEditing)
+                .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isCued)
+                .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isEditing)
 
             HStack(spacing: 14) {
                 // Selection radial - show in batch select mode
@@ -590,8 +591,8 @@ struct CBPerformanceRow: View {
             (isCued && !isEditing) ? 1.08 : (isPressed ? 0.985 : 1.0),
             anchor: .center
         )
-        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
-        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isEditing)
+        .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isCued)
+        .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isEditing)
         .animation(.spring(response: 0.10, dampingFraction: 0.85), value: isPressed)
         // Shadow in light themes, colored glow in dark themes
         .shadow(
@@ -1895,6 +1896,7 @@ struct CBAddEditCueSheet: View {
     // Global channel support
     let isGlobalChannel: Bool
     let globalChannel: Int
+    let midiFiltersEnabled: Bool
     let midiFilter: Set<Int>
 
     @State private var name: String = ""
@@ -1962,6 +1964,12 @@ struct CBAddEditCueSheet: View {
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 Section(header: Text("MIDI").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
+                    if midiFiltersEnabled && !midiFilter.isEmpty {
+                        Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    }
                     Toggle(isOn: $midiEnabled) {
                         Text("Enable MIDI")
                     }

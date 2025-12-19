@@ -565,14 +565,9 @@ struct MIDINumberPicker: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Show filtered MIDI warning (only if filters are enabled)
+            // Show filtered MIDI warning (only for CC, notes are never filtered)
             if !midiFilter.isEmpty && kind == .cc && midiFilter.contains(number) {
                 Text("⚠️ This CC is filtered. Turn off filter to use it.")
-                    .font(.caption)
-                    .foregroundColor(selectedTheme.warningColor(for: colorScheme))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else if !midiFilter.isEmpty && kind == .note && midiFilter.contains(number) {
-                Text("⚠️ This Note is filtered. Turn off filter to use it.")
                     .font(.caption)
                     .foregroundColor(selectedTheme.warningColor(for: colorScheme))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1125,6 +1120,7 @@ struct CBControlEditorSheet: View {
     @Binding var pendingIsFader: Bool?
     let isGlobalChannel: Bool
     let globalChannel: Int
+    let midiFiltersEnabled: Bool
     let midiFilter: Set<Int>
     var onSave: (ControlButton, Bool) -> Void  // Added Bool parameter for andAddAnother
     var onCancel: () -> Void
@@ -1455,6 +1451,12 @@ struct CBControlEditorSheet: View {
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 Section(header: Text("MIDI")) {
+                    if midiFiltersEnabled && !midiFilter.isEmpty {
+                        Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    }
                     Toggle(isOn: $draft.autoAssign) {
                         Text("Assign MIDI automatically")
                     }
@@ -1515,6 +1517,14 @@ struct CBControlEditorSheet: View {
                                 isDisabled: conflictOwner() != nil || isFilteredMIDI() || showSpaceWarning || isOutOfRoom || !canAddMore
                             )
                         }
+
+                        // Delete button - only show when editing existing controls
+                        if isEditMode && onDelete != nil {
+                            DestructiveWideButton(
+                                title: draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"),
+                                action: { showDeleteAlert = true }
+                            )
+                        }
                     }
                     .padding(.vertical, 8)
                     .listRowBackground(Color.clear)
@@ -1552,23 +1562,6 @@ struct CBControlEditorSheet: View {
                     }
                 }
 
-                // More menu on the right (only when editing existing control)
-                if isEditMode {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Menu {
-                            // Delete button
-                            if onDelete != nil {
-                                Button(role: .destructive) {
-                                    showDeleteAlert = true
-                                } label: {
-                                    Text(draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"))
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
-                    }
-                }
             }
             .onAppear {
                 preset()
@@ -1816,7 +1809,7 @@ struct CBControlEditorSheet: View {
     }
 
     private func isFilteredMIDI() -> Bool {
-        return !midiFilter.isEmpty && midiFilter.contains(draft.number)
+        return !midiFilter.isEmpty && draft.kind == .cc && midiFilter.contains(draft.number)
     }
 
     private func assignFreeNumber() {
@@ -1934,8 +1927,9 @@ struct CBControlEditorSheet: View {
         b.isFader = (controlType == .fader)
         b.colorHex = draft.colorHex
 
-        // Auto-name if title is empty
-        if b.title.trimmingCharacters(in: .whitespaces).isEmpty {
+        // Auto-name only for NEW buttons (not when editing existing ones)
+        // This allows users to explicitly set empty titles for icon-only buttons
+        if b.title.trimmingCharacters(in: .whitespaces).isEmpty && editing == nil {
             if controlType == .fader {
                 // Count existing faders
                 let faderCount = allButtons.filter { $0.isFader == true && $0.id != b.id }.count
@@ -2089,6 +2083,7 @@ struct CBEditControlSheet: View {
     var onCancel: () -> Void
     var onDelete: ((ControlButton) -> Void)? = nil
     let icons: [String]
+    let midiFiltersEnabled: Bool
     let midiFilter: Set<Int>
 
     @Environment(\.colorScheme) private var colorScheme
@@ -2237,6 +2232,12 @@ struct CBEditControlSheet: View {
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
                 Section(header: Text("MIDI")) {
+                    if midiFiltersEnabled && !midiFilter.isEmpty {
+                        Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    }
                     Toggle(isOn: $autoAssign) {
                         Text("Assign MIDI automatically")
                     }
@@ -2412,7 +2413,7 @@ struct CBEditControlSheet: View {
     }
 
     private func isFilteredMIDI() -> Bool {
-        return !midiFilter.isEmpty && midiFilter.contains(number)
+        return !midiFilter.isEmpty && kind == .cc && midiFilter.contains(number)
     }
 
     private func ownerFor(kind: MIDIKind, number: Int, channel: Int) -> String? {
@@ -2674,24 +2675,13 @@ internal struct ContentView: View {
         "pause.circle.fill", "pause.fill",
         "play.circle.fill", "play.fill", "play.square.fill",
         "record.circle.fill",
-        "stop.circle.fill",
+        "stop.circle.fill", "stop.fill",
 
         // Music & Performance - Strings & Keys
-        "guitars",
-        "music.note.house", "music.note.house.fill",
         "pianokeys", "pianokeys.inverse",
 
-        // Music & Performance - Brass & Winds
-        "horn", "horn.fill",
-        "trumpet", "trumpet.fill",
-
         // Music & Performance - Vocals & Microphones
-        "music.mic",
         "mic.fill",
-
-        // Music & Performance - Rhythm & Tempo
-        "metronome", "metronome.fill",
-        "figure.disc.sports",
 
         // Music & Performance - Notes & Notation
         "music.note", "music.note.list", "music.quarternote.3",
@@ -2882,6 +2872,7 @@ internal struct ContentView: View {
     @State private var isLoadingProject: Bool = false
 
     // MIDI Filter - Default filters for common MIDI messages
+    @State private var midiFiltersEnabled: Bool = true  // Master toggle for MIDI filters
     @State private var midiFilter: Set<Int> = [1, 7, 10, 11, 64, 120, 121, 122, 123, 124, 125, 126, 127]
     @State private var customMidiFilters: [(Int, String)] = []  // User-added custom filters
 
@@ -3206,7 +3197,8 @@ internal struct ContentView: View {
                             editCapsuleBottom: editCapsuleBottom,
                             sizeMultiplier: cueCapsuleSize,
                             isControlAreaCollapsed: effectivelyCollapsedForOverlay,
-                            capsuleBounds: capsuleBounds
+                            capsuleBounds: capsuleBounds,
+                            hasControlButtons: !controlButtons.isEmpty
                         )
                         .zIndex(100)
                     }
@@ -3229,7 +3221,8 @@ internal struct ContentView: View {
                             editCapsuleBottom: editCapsuleBottom,
                             sizeMultiplier: navigationPillSize,
                             isControlAreaCollapsed: effectivelyCollapsedForOverlay,
-                            capsuleBounds: capsuleBounds
+                            capsuleBounds: capsuleBounds,
+                            hasControlButtons: !controlButtons.isEmpty
                         )
                         .zIndex(100)
                     }
@@ -3448,9 +3441,9 @@ internal struct ContentView: View {
                     }
                 )
             } else {
-                // Collapsed with buttons - Edit/Done + chevron
+                // Collapsed with buttons - 3 faders/checkmark + chevron
                 HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
-                    Button(controlEditMode ? "Done" : "Edit") {
+                    Button(action: {
                         withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
                             if !controlEditMode {
                                 // Entering edit mode: expand the control area
@@ -3458,10 +3451,11 @@ internal struct ContentView: View {
                             }
                             controlEditMode.toggle()
                         }
+                    }) {
+                        Text(controlEditMode ? "Done" : "Edit")
                     }
                     .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
                     .controlSize(.mini)
-                    .frame(minWidth: 32, minHeight: 32)
                     .contentShape(Rectangle())
 
                     if !controlButtons.isEmpty {
@@ -3914,15 +3908,10 @@ internal struct ContentView: View {
                             let bottomPadding: CGFloat = 21
 
                             // Portrait: center, Landscape: align to bottom-right (matching collapsed capsule)
-                            GeometryReader { geo in
-                                let controlWidth = isLandscape ? min(geo.size.width * 0.6, 600) : geo.size.width
-
-                                AnyView(controlSectionView)
-                                    .frame(width: controlWidth)  // Constrain width in landscape
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isLandscape ? .bottomTrailing : .bottom)
-                                    .padding(.trailing, isLandscape ? 16 : 0)  // Match collapsed capsule trailing padding in landscape
-                                    .padding(.bottom, bottomPadding)  // Position above home indicator with proper spacing
-                            }
+                            AnyView(controlSectionView)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isLandscape ? .bottomTrailing : .bottom)
+                                .padding(.trailing, isLandscape ? 16 : 0)  // Match collapsed capsule trailing padding in landscape
+                                .padding(.bottom, bottomPadding)  // Position above home indicator with proper spacing
                                 .ignoresSafeArea(edges: .bottom)
                             .background(
                                 GeometryReader { geo in
@@ -3985,6 +3974,22 @@ internal struct ContentView: View {
                         // Initialize visibility based on initial state
                         showCollapsedCapsule = effectivelyCollapsedForOverlay
                         showExpandedArea = !effectivelyCollapsedForOverlay
+
+                        // Initialize control area height based on initial state
+                        if effectivelyCollapsedForOverlay {
+                            controlAreaHeight = 56  // Collapsed capsule height
+                        } else {
+                            // For expanded state, try to get actual height from bounds or use estimate
+                            if let actualHeight = capsuleBounds["controlArea.main"]?.height {
+                                controlAreaHeight = actualHeight
+                            } else {
+                                // Calculate expanded height estimate based on device/orientation
+                                let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+                                let screenHeight = UIScreen.main.bounds.height
+                                let maxHeight = isPhone ? screenHeight * 0.6 : screenHeight * 0.7
+                                controlAreaHeight = maxHeight
+                            }
+                        }
                     }
                 }
 
@@ -4194,12 +4199,25 @@ internal struct ContentView: View {
                                 if isDirty && !isUntitledProject(projectName) {
                                     debugPrint("💾 App going to background, saving project: \(projectName)")
                                     do {
-                                        try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
+                                        try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID, appMode: store.mode, midiFiltersEnabled: midiFiltersEnabled, midiFilter: midiFilter, customMidiFilters: customMidiFilters)
                                         isDirty = false
                                         debugPrint("✅ Background save completed: \(projectName)")
                                     } catch {
                                         debugPrint("❌ Background save failed: \(error)")
                                     }
+                                }
+                            }
+                        }
+                        .onChange(of: store.mode) { _, newMode in
+                            // Immediately save mode changes to ensure they persist even on force-quit
+                            if !isUntitledProject(projectName) && !isLoadingProject {
+                                debugPrint("🔄 Mode changed to \(newMode), saving project: \(projectName)")
+                                do {
+                                    try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID, appMode: store.mode, midiFiltersEnabled: midiFiltersEnabled, midiFilter: midiFilter, customMidiFilters: customMidiFilters)
+                                    isDirty = false
+                                    debugPrint("✅ Mode change saved: \(newMode)")
+                                } catch {
+                                    debugPrint("❌ Mode change save failed: \(error)")
                                 }
                             }
                         }
@@ -4233,6 +4251,7 @@ internal struct ContentView: View {
                 controlButtons: $controlButtons,
                 isGlobalChannel: $isGlobalChannel,
                 globalChannel: $globalChannel,
+                midiFiltersEnabled: $midiFiltersEnabled,
                 midiFilter: $midiFilter,
                 customMidiFilters: $customMidiFilters,
                 onDismiss: { showMidiTable = false },
@@ -4312,6 +4331,7 @@ internal struct ContentView: View {
                 editContext: isEditing ? .cueList : .library,
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
+                midiFiltersEnabled: midiFiltersEnabled,
                 midiFilter: midiFilter
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
@@ -4349,6 +4369,7 @@ internal struct ContentView: View {
                 pendingIsFader: $pendingAddIsFader,
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
+                midiFiltersEnabled: midiFiltersEnabled,
                 midiFilter: midiFilter,
                 onSave: { updated, andAddAnother in
                     if let idx = controlButtons.firstIndex(where: { $0.id == updated.id }) {
@@ -4441,6 +4462,7 @@ internal struct ContentView: View {
                 pendingIsFader: $pendingAddIsFader,
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
+                midiFiltersEnabled: midiFiltersEnabled,
                 midiFilter: midiFilter,
                 onSave: { updated, andAddAnother in
                     if let idx = controlButtons.firstIndex(where: { $0.id == updated.id }) {
@@ -4842,6 +4864,11 @@ internal struct ContentView: View {
                 debugPrint("🌍 Global channel changed from \(oldValue) to \(newValue) - reapplying to all items")
                 applyGlobalChannel()
                 invalidateConflictCache()
+                markDirty()
+            }
+        }
+        .onChange(of: [midiFiltersEnabled ? 1 : 0, midiFilter.count, customMidiFilters.count]) { _, _ in
+            if !isLoadingProject {
                 markDirty()
             }
         }
@@ -5549,7 +5576,7 @@ internal struct ContentView: View {
 
     private func snapshotAndSave(as name: String, overwrite: Bool) {
         do {
-            try ProjectIO.save(name: name, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
+            try ProjectIO.save(name: name, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID, appMode: store.mode, midiFiltersEnabled: midiFiltersEnabled, midiFilter: midiFilter, customMidiFilters: customMidiFilters)
             projectName = name
             isDirty = false
             projectsList = ProjectIO.list()
@@ -5719,6 +5746,20 @@ internal struct ContentView: View {
             if let savedMode = payload.appMode {
                 store.mode = savedMode
                 debugPrint("✅ Restored app mode: \(savedMode)")
+            }
+
+            // Restore MIDI filter settings if saved
+            if let savedMidiFiltersEnabled = payload.midiFiltersEnabled {
+                midiFiltersEnabled = savedMidiFiltersEnabled
+                debugPrint("✅ Restored MIDI filters enabled: \(savedMidiFiltersEnabled)")
+            }
+            if let savedMidiFilter = payload.midiFilter {
+                midiFilter = Set(savedMidiFilter)
+                debugPrint("✅ Restored MIDI filter: \(savedMidiFilter.count) filters")
+            }
+            if let savedCustomFilters = payload.customMidiFilters {
+                customMidiFilters = savedCustomFilters.map { ($0.cc, $0.name) }
+                debugPrint("✅ Restored custom MIDI filters: \(savedCustomFilters.count) filters")
             }
 
             // Reset loading flag after a brief delay to allow onChange to process
@@ -5898,7 +5939,7 @@ internal struct ContentView: View {
                 if isDirty && !isUntitledProject(projectName) {
                     debugPrint("💾 Auto-saving project: \(projectName)")
                     do {
-                        try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID)
+                        try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID, appMode: store.mode, midiFiltersEnabled: midiFiltersEnabled, midiFilter: midiFilter, customMidiFilters: customMidiFilters)
                         isDirty = false
                         debugPrint("✅ Auto-save completed: \(projectName)")
                     } catch {
@@ -5966,6 +6007,20 @@ internal struct ContentView: View {
             controlButtons = payload.controls
             isGlobalChannel = payload.isGlobalChannel ?? false
             globalChannel = payload.globalChannel ?? 1
+
+            // Restore MIDI filter settings if saved
+            if let savedMidiFiltersEnabled = payload.midiFiltersEnabled {
+                midiFiltersEnabled = savedMidiFiltersEnabled
+                debugPrint("✅ Restored MIDI filters enabled: \(savedMidiFiltersEnabled)")
+            }
+            if let savedMidiFilter = payload.midiFilter {
+                midiFilter = Set(savedMidiFilter)
+                debugPrint("✅ Restored MIDI filter: \(savedMidiFilter.count) filters")
+            }
+            if let savedCustomFilters = payload.customMidiFilters {
+                customMidiFilters = savedCustomFilters.map { ($0.cc, $0.name) }
+                debugPrint("✅ Restored custom MIDI filters: \(savedCustomFilters.count) filters")
+            }
 
             // Reset loading flag after a brief delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -6978,7 +7033,7 @@ private struct CBControlSection: View {
                     .frame(height: 0)
                     .overlay(alignment: .bottomTrailing) {
                         HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
-                            Button(isEditing ? "Done" : "Edit") {
+                            Button(action: {
                                 withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
                                     if isEditing {
                                         isEditing = false
@@ -6989,6 +7044,8 @@ private struct CBControlSection: View {
                                         editSessionNonce &+= 1
                                     }
                                 }
+                            }) {
+                                Text(isEditing ? "Done" : "Edit")
                             }
                             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
                             .controlSize(.mini)
@@ -7060,7 +7117,6 @@ private struct CBControlSection: View {
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
 
         return HStack(spacing: isPhone ? 6 : 10) {
-            Text("Control Area").font(.subheadline).fontWeight(.medium).foregroundColor(textColor)
             Spacer()
 
             if isPhone {
@@ -7368,52 +7424,78 @@ private struct CBControlSection: View {
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
         let isLandscape = verticalSizeClass == .compact
 
-        // Calculate fixed grid width for both orientations (iPhone still uses actual width)
+        // Calculate grid width (fixed, based on screen size only)
         let gridWidthWithPadding: CGFloat? = {
             // iPhone: Only apply in landscape, use full width in portrait
             if isPhone && !isLandscape {
                 return nil
             }
 
-            debugPrint("🔄 Control area - applying fixed width based on portrait dimensions")
-            // Use tracked portrait width for consistent sizing - dynamically adapts to any iPad size
-            debugPrint("📐 Base width: \(portraitWidth)")
+            // iPad landscape: Calculate width based on full columns
+            if !isPhone && isLandscape {
+                // Use same cell size calculation as portrait for consistency
+                let totalSpacing = CGFloat(columns - 1) * columnSpacing
+                let actualHorizontalPadding = 16 + columnSpacing
+                let availableWidth = portraitWidth - (2 * actualHorizontalPadding) - totalSpacing
+                var cellSize = floor(availableWidth / CGFloat(columns))
 
-            // Calculate grid width manually
+                // Apply same height constraint logic
+                let screenHeight = UIScreen.main.bounds.height
+                let maxHeight = isPhone ? screenHeight * 0.6 : screenHeight * 0.7
+                let actualVerticalPadding: CGFloat = 18 + (isPhone ? 0 : 8)  // top + bottom
+                let extraPadding: CGFloat = 0
+                let availableGridHeight = maxHeight - actualVerticalPadding - extraPadding
+                // Always use 4 rows for consistent sizing regardless of edit mode
+                let displayRows = 4
+                let verticalGaps = max(0, displayRows - 1)
+                let maxCellSize = (availableGridHeight - CGFloat(verticalGaps) * rowSpacing) / CGFloat(displayRows)
+                cellSize = min(cellSize, floor(maxCellSize))
+
+                // Use full columns for fixed width
+                let gridWidth = CGFloat(columns) * cellSize + CGFloat(max(0, columns - 1)) * columnSpacing
+                // Capsule padding: 16pt left + 16pt right (added at line 7381)
+                let capsulePadding: CGFloat = 32
+                let finalWidth = gridWidth + (columnSpacing * 2) + capsulePadding
+                debugPrint("📐 Calculated control area width: \(finalWidth)")
+                return finalWidth
+            }
+
+            // iPhone landscape: Also use full width
             let totalSpacing = CGFloat(columns - 1) * columnSpacing
-            // Account for 16pt capsule padding on each side + columnSpacing
             let actualHorizontalPadding = 16 + columnSpacing
             let availableWidth = portraitWidth - (2 * actualHorizontalPadding) - totalSpacing
             var cellSize = floor(availableWidth / CGFloat(columns))
 
-            // Apply same height constraint logic
+            // Apply height constraint
             let screenHeight = UIScreen.main.bounds.height
-            let maxHeight = isPhone ? screenHeight * 0.6 : screenHeight * 0.7
-            let actualVerticalPadding: CGFloat = 18 + (isPhone ? 0 : 8)  // top + bottom
-            let extraPadding: CGFloat = 0
-            let availableGridHeight = maxHeight - actualVerticalPadding - extraPadding
-            // Always use 4 rows for consistent sizing regardless of edit mode
+            let maxHeight = screenHeight * 0.6
+            let actualVerticalPadding: CGFloat = 18
+            let availableGridHeight = maxHeight - actualVerticalPadding
             let displayRows = 4
             let verticalGaps = max(0, displayRows - 1)
             let maxCellSize = (availableGridHeight - CGFloat(verticalGaps) * rowSpacing) / CGFloat(displayRows)
             cellSize = min(cellSize, floor(maxCellSize))
 
+            // Use full columns for fixed width
             let gridWidth = CGFloat(columns) * cellSize + CGFloat(max(0, columns - 1)) * columnSpacing
-            // Capsule padding: 16pt left + 16pt right (added at line 7381)
             let capsulePadding: CGFloat = 32
             let finalWidth = gridWidth + (columnSpacing * 2) + capsulePadding
             debugPrint("📐 Calculated control area width: \(finalWidth)")
             return finalWidth
         }()
 
-        let baseView = VStack(spacing: 0) {
-            headerView
-            gridWithLifecycle
+        let baseView = Group {
+            VStack(spacing: 0) {
+                headerView
+                    .zIndex(0)  // Header stays behind
+                gridWithLifecycle
+                    .zIndex(1)  // Grid (with X buttons) renders on top
+            }
+            .background(.regularMaterial)
+            .background(controlAreaColor.opacity(0.5))
+            .cornerRadius(20)  // Use cornerRadius instead of clipShape to avoid clipping subviews
+            .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
         }
-        .background(.regularMaterial)
-        .background(controlAreaColor.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
 
         let shapedView = baseView
         .padding(.horizontal, 16)  // Add padding to keep capsule content from edges
@@ -7441,20 +7523,12 @@ private struct CBControlSection: View {
 
         // Apply width constraint (iPad: both orientations, iPhone: landscape only)
         if let width = gridWidthWithPadding {
-            debugPrint("✅ Applying width constraint: \(width)")
-            // In landscape, use maxWidth to allow outer frame alignment to work
-            // In portrait, use fixed width
-            if isLandscape {
-                return AnyView(
-                    controlCapsule
-                        .frame(maxWidth: width)  // maxWidth allows outer frame's .bottomTrailing to align correctly
-                )
-            } else {
-                return AnyView(
-                    controlCapsule
-                        .frame(width: width)  // Fixed width in portrait for centering
-                )
-            }
+            debugPrint("✅ Applying width constraint: \(width) (landscape: \(isLandscape), phone: \(isPhone))")
+            // Use fixed width in both orientations to allow outer frame alignment to work
+            return AnyView(
+                controlCapsule
+                    .frame(width: width)  // Fixed width allows outer frame's .bottomTrailing to align correctly
+            )
         } else {
             debugPrint("✅ Using natural width (iPhone portrait)")
             return AnyView(controlCapsule)
@@ -8367,9 +8441,9 @@ private struct CBControlSection: View {
                         }
                     }
 
-                    // Check for filtered MIDI
-                    if !midiFilter.isEmpty && midiFilter.contains(button.number) {
-                        let filteredMsg = "Filtered \(button.kind == .cc ? "CC" : "Note")"
+                    // Check for filtered MIDI (only filter CC, not notes)
+                    if !midiFilter.isEmpty && button.kind == .cc && midiFilter.contains(button.number) {
+                        let filteredMsg = "Filtered CC"
                         if let existing = warning {
                             warning = "\(existing) • \(filteredMsg)"
                         } else {
@@ -8803,16 +8877,23 @@ private struct ControlButtonTile: View {
             } label: {
                 VStack(spacing: isPhone ? 2 : 6) {
                         if button.symbol.isEmpty {
+                            // No icon: show title only
                             Text(button.title)
                                 .font(isPhone ? .caption.weight(.semibold) : .title3.weight(.semibold))
+                        } else if button.title.trimmingCharacters(in: .whitespaces).isEmpty {
+                            // Icon-only mode: center the icon without title or MIDI label
+                            Image(systemName: button.symbol)
+                                .font(.system(size: isPhone ? 20 : 32, weight: .semibold))
+                                .foregroundColor(textColor)
                         } else {
-                    Image(systemName: button.symbol)
-                        .font(.system(size: isPhone ? 16 : 24, weight: .semibold))
-                        .foregroundColor(textColor)
-                    Text(button.title).font(isPhone ? .caption2.weight(.semibold) : .footnote.weight(.semibold))
-                    Text(midiLabel())
-                        .font(isPhone ? .system(size: 8) : .caption2)
-                        .foregroundColor(textColor.opacity(0.9))
+                            // Icon + title mode: show all elements
+                            Image(systemName: button.symbol)
+                                .font(.system(size: isPhone ? 16 : 24, weight: .semibold))
+                                .foregroundColor(textColor)
+                            Text(button.title).font(isPhone ? .caption2.weight(.semibold) : .footnote.weight(.semibold))
+                            Text(midiLabel())
+                                .font(isPhone ? .system(size: 8) : .caption2)
+                                .foregroundColor(textColor.opacity(0.9))
                         }
                 }
                 .foregroundColor(textColor)
@@ -10632,6 +10713,7 @@ struct MidiTableSheet: View {
     @Binding var controlButtons: [ControlButton]
     @Binding var isGlobalChannel: Bool
     @Binding var globalChannel: Int
+    @Binding var midiFiltersEnabled: Bool
     @Binding var midiFilter: Set<Int>
     @Binding var customMidiFilters: [(Int, String)]
     var onDismiss: () -> Void
@@ -10676,7 +10758,7 @@ struct MidiTableSheet: View {
 
                 // Section 2: MIDI Filter
                 Section {
-                    NavigationLink(destination: MidiFilterView(midiFilter: $midiFilter, customMidiFilters: $customMidiFilters)) {
+                    NavigationLink(destination: MidiFilterView(midiFiltersEnabled: $midiFiltersEnabled, midiFilter: $midiFilter, customMidiFilters: $customMidiFilters)) {
                         Text("MIDI Filter")
                     }
                     .tint(selectedTheme.defaultCueColor(for: colorScheme))
@@ -10694,6 +10776,7 @@ struct MidiTableSheet: View {
                         controlButtons: $controlButtons,
                         isGlobalChannel: $isGlobalChannel,
                         globalChannel: $globalChannel,
+                        midiFiltersEnabled: midiFiltersEnabled,
                         midiFilter: midiFilter,
                         onApply: onApply,
                         onDismissAll: onDismiss
@@ -10728,6 +10811,7 @@ struct MidiAssignmentsView: View {
     @Binding var controlButtons: [ControlButton]
     @Binding var isGlobalChannel: Bool
     @Binding var globalChannel: Int
+    let midiFiltersEnabled: Bool
     let midiFilter: Set<Int>
     var onApply: (([MidiTableItem]) -> Void)? = nil
     var onDismissAll: (() -> Void)? = nil
@@ -10805,6 +10889,7 @@ struct MidiAssignmentsView: View {
                                 isGlobalChannel: isGlobalChannel,
                                 globalChannel: globalChannel,
                                     allowFullCCR: allowFullCCR,
+                                midiFiltersEnabled: midiFiltersEnabled,
                                 midiFilter: midiFilter,
                                 getEditableItems: { editableItems },
                                 onMidiChange: { item, newMidiType, newChannel, newValue in
@@ -11160,6 +11245,7 @@ struct MidiAssignmentEditSheet: View {
     let isGlobalChannel: Bool
     let globalChannel: Int
     let allowFullCCR: Bool
+    let midiFiltersEnabled: Bool
     let midiFilter: Set<Int>
     let getEditableItems: () -> [MidiTableItem]  // Closure to get current editableItems
     let onMidiChange: (MidiTableItem, MIDIKind, Int, Int) -> Void
@@ -11180,11 +11266,12 @@ struct MidiAssignmentEditSheet: View {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 
-    init(item: Binding<MidiTableItem>, isGlobalChannel: Bool, globalChannel: Int, allowFullCCR: Bool, midiFilter: Set<Int>, getEditableItems: @escaping () -> [MidiTableItem], onMidiChange: @escaping (MidiTableItem, MIDIKind, Int, Int) -> Void, getOwnerName: @escaping (MIDIKind, Int, Int, UUID, String) -> String?, onDismissAll: (() -> Void)? = nil, onApply: (([MidiTableItem]) -> Void)? = nil) {
+    init(item: Binding<MidiTableItem>, isGlobalChannel: Bool, globalChannel: Int, allowFullCCR: Bool, midiFiltersEnabled: Bool, midiFilter: Set<Int>, getEditableItems: @escaping () -> [MidiTableItem], onMidiChange: @escaping (MidiTableItem, MIDIKind, Int, Int) -> Void, getOwnerName: @escaping (MIDIKind, Int, Int, UUID, String) -> String?, onDismissAll: (() -> Void)? = nil, onApply: (([MidiTableItem]) -> Void)? = nil) {
         self._item = item
         self.isGlobalChannel = isGlobalChannel
         self.globalChannel = globalChannel
         self.allowFullCCR = allowFullCCR
+        self.midiFiltersEnabled = midiFiltersEnabled
         self.midiFilter = midiFilter
         self.getEditableItems = getEditableItems
         self.onMidiChange = onMidiChange
@@ -11217,6 +11304,12 @@ struct MidiAssignmentEditSheet: View {
                 }
 
                 Section(header: Text("MIDI Assignment")) {
+                    if midiFiltersEnabled && !midiFilter.isEmpty {
+                        Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    }
                     if item.type != .fader {
                         Picker("MIDI Type", selection: $editedType) {
                             Text("Control Change").tag(MIDIKind.cc)
@@ -11312,14 +11405,9 @@ struct MidiAssignmentEditSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        // Show filtered MIDI warning
+                        // Show filtered MIDI warning (only for CC, notes are never filtered)
                         if !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue) {
                             Text("⚠️ This CC is filtered. Turn off filter to use it.")
-                                .font(.caption)
-                                .foregroundColor(selectedTheme.warningColor(for: colorScheme))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else if !midiFilter.isEmpty && editedType == .note && midiFilter.contains(editedValue) {
-                            Text("⚠️ This Note is filtered. Turn off filter to use it.")
                                 .font(.caption)
                                 .foregroundColor(selectedTheme.warningColor(for: colorScheme))
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -11391,6 +11479,7 @@ struct MidiTableRow: View {
     let isGlobalChannel: Bool
     let globalChannel: Int
     let allowFullCCR: Bool
+    let midiFiltersEnabled: Bool
     let midiFilter: Set<Int>
     let getEditableItems: () -> [MidiTableItem]
     let onMidiChange: (MidiTableItem, MIDIKind, Int, Int) -> Void
@@ -11404,6 +11493,7 @@ struct MidiTableRow: View {
             isGlobalChannel: isGlobalChannel,
             globalChannel: globalChannel,
             allowFullCCR: allowFullCCR,
+            midiFiltersEnabled: midiFiltersEnabled,
             midiFilter: midiFilter,
             getEditableItems: getEditableItems,
             onMidiChange: onMidiChange,
@@ -11458,6 +11548,7 @@ struct MidiTableRow: View {
 
 // MARK: - MIDI Filter View
 struct MidiFilterView: View {
+    @Binding var midiFiltersEnabled: Bool
     @Binding var midiFilter: Set<Int>
     @Binding var customMidiFilters: [(Int, String)]
 
@@ -11480,6 +11571,15 @@ struct MidiFilterView: View {
 
     var body: some View {
         Form {
+            // Master toggle section
+            Section {
+                Toggle(isOn: $midiFiltersEnabled) {
+                    Text("Enable MIDI Filters")
+                }
+                .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
+                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+            }
+
             Section {
                 Text("Exclude these MIDI CC numbers from auto-assignment. Common performance controllers (mod wheel, volume, sustain) are filtered by default to prevent conflicts.")
                     .font(.subheadline)
@@ -11501,6 +11601,7 @@ struct MidiFilterView: View {
                 }
                 .tint(selectedTheme.defaultCueColor(for: colorScheme))
                 .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .disabled(!midiFiltersEnabled)
             }
 
             // Custom Filters Section
@@ -11530,6 +11631,7 @@ struct MidiFilterView: View {
                             }
                         }
                         .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
+                        .disabled(!midiFiltersEnabled)
                         .swipeActions {
                             Button(role: .destructive) {
                                 midiFilter.remove(cc)
@@ -11572,6 +11674,7 @@ struct MidiFilterView: View {
                         }
                     }
                     .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
+                    .disabled(!midiFiltersEnabled)
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
             }
@@ -11658,6 +11761,7 @@ struct DraggableNavigationCapsule: View {
     let sizeMultiplier: Double  // Appearance setting for pill size (0.7-1.5x)
     let isControlAreaCollapsed: Bool  // Whether control area is collapsed to small capsule
     let capsuleBounds: [String: CGRect]  // All UI capsule bounds for collision detection
+    let hasControlButtons: Bool  // Whether there are control buttons in the control area
 
     @State private var position: CGPoint = .zero
     @State private var isTrackingDrag: Bool = false
@@ -11678,7 +11782,7 @@ struct DraggableNavigationCapsule: View {
 
     // Collision detection: prevent nav pill from overlapping with UI capsules
     // Returns a position that doesn't collide, clamping to obstacle edges
-    private func clampPositionAvoidingCapsules(_ proposedPoint: CGPoint, previousPoint: CGPoint, screenBounds: CGRect) -> CGPoint {
+    private func clampPositionAvoidingCapsules(_ proposedPoint: CGPoint, previousPoint: CGPoint, screenBounds: CGRect, isDragging: Bool = false) -> CGPoint {
         // If no capsuleBounds to check, return proposed position (no collision possible)
         guard !capsuleBounds.isEmpty else {
             return proposedPoint
@@ -11686,22 +11790,13 @@ struct DraggableNavigationCapsule: View {
 
         // Filter out capsules that are off-screen (e.g., during transitions)
         // Only consider capsules that are actually visible on screen
-        // EXCLUDE nav pill from collision check (it shouldn't collide with itself!)
+        // EXCLUDE nav pill and cue capsule from collision check
         let visibleCapsules = capsuleBounds.filter { key, rect in
-            key != "navPill.bounds" && rect.intersects(screenBounds) && rect.minY < screenBounds.maxY && rect.maxY > 0
+            key != "navPill.bounds" && key != "cueCapsule.bounds" && rect.intersects(screenBounds) && rect.minY < screenBounds.maxY && rect.maxY > 0
         }
 
         // Get nav pill's actual bounds if available, otherwise calculate from position
         let navPillActualBounds = capsuleBounds["navPill.bounds"]
-
-        // DEBUG: Print capsule bounds
-        print("🔍 CAPSULE BOUNDS:")
-        for (key, rect) in visibleCapsules.sorted(by: { $0.key < $1.key }) {
-            print("   \(key): minY=\(rect.minY), maxY=\(rect.maxY)")
-        }
-        if let actualBounds = navPillActualBounds {
-            print("   Nav pill ACTUAL: minY=\(actualBounds.minY), maxY=\(actualBounds.maxY)")
-        }
 
         guard !visibleCapsules.isEmpty else {
             return proposedPoint
@@ -11749,7 +11844,36 @@ struct DraggableNavigationCapsule: View {
             return proposedPoint
         }
 
-        // If proposed position would collide, stay at previous position (stop movement)
+        // During drag, prevent jitter by staying at previous position if collision detected
+        // User can adjust their drag direction, collision will be resolved when drag ends
+        if isDragging {
+            return previousPoint
+        }
+
+        // If proposed position would collide, try to find a valid position nearby
+        // First, try moving up (away from control area) - search further up (200pt)
+        for yOffset in stride(from: -spacing, through: -200, by: -10) {
+            let testPoint = CGPoint(x: proposedPoint.x, y: proposedPoint.y + yOffset)
+            if isPositionValid(testPoint) {
+                return testPoint
+            }
+        }
+
+        // If still no valid position, try moving sideways
+        for xOffset in stride(from: -spacing, through: -50, by: -10) {
+            let testPoint = CGPoint(x: proposedPoint.x + xOffset, y: proposedPoint.y)
+            if isPositionValid(testPoint) {
+                return testPoint
+            }
+        }
+        for xOffset in stride(from: spacing, through: 50, by: 10) {
+            let testPoint = CGPoint(x: proposedPoint.x + xOffset, y: proposedPoint.y)
+            if isPositionValid(testPoint) {
+                return testPoint
+            }
+        }
+
+        // If no valid position found, stay at previous position (stop movement)
         return previousPoint
     }
 
@@ -11769,8 +11893,8 @@ struct DraggableNavigationCapsule: View {
             // Bottom: Can go to screen bottom - collision detection will prevent control area overlap
             let lowerLimit = height - (pillSize.height / 2) - 10
 
-            // Sides: Stay within screen with padding
-            let horizontalPadding = pillSize.width / 2 + 10
+            // Sides: Minimal padding to stay on screen, collision detection will prevent UI element overlap
+            let horizontalPadding = pillSize.width / 2 + 5
 
             VStack(spacing: 0) {
                 // Top button: Minus (PREVIOUS)
@@ -11968,14 +12092,19 @@ struct DraggableNavigationCapsule: View {
 
                         // Only update position if delay is complete
                         if isDragDelayComplete {
+                            // Mark as actively dragging to prevent onChange handlers from interfering
+                            if !isDragging {
+                                isDragging = true
+                            }
+
                             // Calculate proposed position
                             let proposedX = max(horizontalPadding, min(width - horizontalPadding, startDragPosition.x + value.translation.width))
                             let proposedY = max(upperLimit, min(lowerLimit, startDragPosition.y + value.translation.height))
                             let proposedPoint = CGPoint(x: proposedX, y: proposedY)
 
-                            // Apply real-time collision detection
+                            // Apply real-time collision detection (skipped during drag to prevent jitter)
                             let screenBounds = CGRect(x: 0, y: 0, width: width, height: height)
-                            let validPosition = clampPositionAvoidingCapsules(proposedPoint, previousPoint: position, screenBounds: screenBounds)
+                            let validPosition = clampPositionAvoidingCapsules(proposedPoint, previousPoint: position, screenBounds: screenBounds, isDragging: isDragging)
 
                             // Update distance from control area top for following behavior
                             distanceFromControlAreaTop = (height - effectiveControlHeight) - validPosition.y
@@ -12017,43 +12146,83 @@ struct DraggableNavigationCapsule: View {
                     }
             )
             .position(position)
-            .task(id: "\(width)-\(height)-\(controlAreaHeight)") {
+            .task(id: "\(width)-\(height)") {
                 guard width > 0 && height > 0 else { return }
 
-                // Initialize position immediately - use default bottom-right, ignore saved values for now
+                // Initialize position on first load or when screen size changes
                 if position == .zero {
                     let defaultY = height - effectiveControlHeight - (pillSize.height / 2) - 50
                     let defaultX = width - (pillSize.width / 2) - 50
 
-                    position = CGPoint(x: defaultX, y: defaultY)
+                    // Clamp to screen bounds
+                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, defaultX))
+                    let clampedY = max(upperLimit, min(lowerLimit, defaultY))
+
+                    position = CGPoint(x: clampedX, y: clampedY)
                     userDesiredPosition = position  // Store as user's desired position
 
                     // Clear any bad saved values
                     UserDefaults.standard.removeObject(forKey: "navigationCapsule.x")
                     UserDefaults.standard.removeObject(forKey: "navigationCapsule.y")
                 } else {
-                    // Position exists but control area height changed
-                    let spacing: CGFloat = 10
-                    let controlAreaTop = height - controlAreaHeight
+                    // Screen size changed - adjust position to stay within bounds
+                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, position.x))
+                    let clampedY = max(upperLimit, min(lowerLimit, position.y))
 
-                    // Use userDesiredPosition if it exists, otherwise use current position
-                    let basePosition = userDesiredPosition != .zero ? userDesiredPosition : position
-                    let capsuleBottom = basePosition.y + (pillSize.height / 2)
-
-                    // Check if capsule would collide with control area at desired position
-                    if capsuleBottom > controlAreaTop - spacing {
-                        // Push up to avoid collision
-                        let newY = controlAreaTop - spacing - (pillSize.height / 2)
-                        let clampedY = max(upperLimit, min(height - controlAreaHeight - spacing - (pillSize.height / 2), newY))
-
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            position = CGPoint(x: basePosition.x, y: clampedY)
+                    // Only update if position needs clamping
+                    if position.x != clampedX || position.y != clampedY {
+                        position = CGPoint(x: clampedX, y: clampedY)
+                        if userDesiredPosition != .zero {
+                            userDesiredPosition = position
                         }
-                    } else {
-                        // No collision - return to desired position
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            position = basePosition
-                        }
+                    }
+                }
+            }
+            .onChange(of: capsuleBounds) { oldBounds, newBounds in
+                if isDragging { return }
+                guard position != .zero else { return }
+
+                // Only react to control area bounds changes
+                guard let bounds = newBounds["controlArea.main"], bounds.height > 0 else { return }
+
+                // Use actual control area bounds for immediate response
+                let spacing: CGFloat = 30  // Extra spacing to prevent overlap
+                let controlAreaTop = bounds.minY
+
+                // Calculate where pill's bottom edge is (current and desired)
+                let pillBottom = position.y + (pillSize.height / 2)
+                let desiredPosition = userDesiredPosition != .zero ? userDesiredPosition : position
+                let desiredBottom = desiredPosition.y + (pillSize.height / 2)
+
+                // Calculate pill's horizontal bounds
+                let pillLeft = position.x - (pillSize.width / 2)
+                let pillRight = position.x + (pillSize.width / 2)
+                let controlAreaLeft = bounds.minX
+                let controlAreaRight = bounds.maxX
+
+                // Check if pill overlaps horizontally with control area
+                let horizontalOverlap = pillRight > controlAreaLeft && pillLeft < controlAreaRight
+
+                // Check if pill would overlap with control area at current OR desired position
+                // Only push up if there's both vertical AND horizontal overlap
+                if horizontalOverlap && (pillBottom > controlAreaTop - spacing || desiredBottom > controlAreaTop - spacing) {
+                    // Push up to avoid collision
+                    let targetY = controlAreaTop - spacing - (pillSize.height / 2)
+                    let clampedY = max(upperLimit, targetY)
+                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, position.x))
+
+                    // Animate the capsule following the control area (match control area spring animation)
+                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                        position = CGPoint(x: clampedX, y: clampedY)
+                    }
+                } else {
+                    // Control area retracted - return to desired position with slower animation
+                    let clampedY = max(upperLimit, min(lowerLimit, desiredPosition.y))
+                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, position.x))
+
+                    // Slower retraction to match control area closing speed
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        position = CGPoint(x: clampedX, y: clampedY)
                     }
                 }
             }
@@ -12061,48 +12230,27 @@ struct DraggableNavigationCapsule: View {
                 if isDragging { return }
                 guard position != .zero else { return }
 
-                // Maintain distance from control area top when it changes
-                let spacing: CGFloat = 10
+                // Fallback: react to height changes when bounds aren't available yet
+                // This ensures capsules react on first load in new projects
+                let spacing: CGFloat = 30
                 let controlAreaTop = height - newHeight
-                let targetY = controlAreaTop - spacing - distanceFromControlAreaTop
 
-                // Clamp to screen bounds
-                let clampedY = max(upperLimit, min(height - newHeight - spacing - (pillSize.height / 2), targetY))
+                // Calculate where pill's bottom edge is (current and desired)
+                let pillBottom = position.y + (pillSize.height / 2)
+                let desiredPosition = userDesiredPosition != .zero ? userDesiredPosition : position
+                let desiredBottom = desiredPosition.y + (pillSize.height / 2)
 
-                // Proposed position after following control area
-                let proposedPosition = CGPoint(x: position.x, y: clampedY)
+                // Check if pill would overlap with control area at current OR desired position
+                if pillBottom > controlAreaTop - spacing || desiredBottom > controlAreaTop - spacing {
+                    // Push up to avoid collision
+                    let targetY = controlAreaTop - spacing - (pillSize.height / 2)
+                    let clampedY = max(upperLimit, targetY)
+                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, position.x))
 
-                // Apply collision detection to ensure we don't overlap with the control area capsule
-                let screenBounds = CGRect(x: 0, y: 0, width: width, height: height)
-                let validPosition = clampPositionAvoidingCapsules(proposedPosition, previousPoint: position, screenBounds: screenBounds)
-
-                // Animate the capsule following the control area
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    position = validPosition
-                }
-
-                // Update saved position
-                UserDefaults.standard.set(validPosition.x, forKey: "navigationCapsule.x")
-                UserDefaults.standard.set(validPosition.y, forKey: "navigationCapsule.y")
-            }
-            .onChange(of: capsuleBounds) { _, _ in
-                // When UI capsule bounds change (e.g., control area expands/collapses),
-                // revalidate nav pill position to ensure it doesn't overlap
-                if isDragging { return }
-                guard position != .zero else { return }
-
-                let screenBounds = CGRect(x: 0, y: 0, width: width, height: height)
-                let validPosition = clampPositionAvoidingCapsules(position, previousPoint: position, screenBounds: screenBounds)
-
-                // Only animate if position actually changed
-                if validPosition != position {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        position = validPosition
+                    // Animate the capsule following the control area
+                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                        position = CGPoint(x: clampedX, y: clampedY)
                     }
-
-                    // Update saved position
-                    UserDefaults.standard.set(validPosition.x, forKey: "navigationCapsule.x")
-                    UserDefaults.standard.set(validPosition.y, forKey: "navigationCapsule.y")
                 }
             }
         }
@@ -12140,6 +12288,7 @@ struct SimpleDraggableTransportDock: View {
     let sizeMultiplier: Double  // Appearance setting for capsule size (0.8-1.5x)
     let isControlAreaCollapsed: Bool  // Whether control area is collapsed to small capsule
     let capsuleBounds: [String: CGRect]  // Tracked UI capsule bounds for collision detection
+    let hasControlButtons: Bool  // Whether there are control buttons in the control area
 
     @State private var position: CGPoint = .zero
     @State private var isTrackingDrag: Bool = false
@@ -12157,7 +12306,7 @@ struct SimpleDraggableTransportDock: View {
 
     // Collision detection: prevent cue capsule from overlapping with UI capsules
     // Returns a position that doesn't collide, clamping to obstacle edges
-    private func clampPositionAvoidingCapsules(_ proposedPoint: CGPoint, previousPoint: CGPoint, screenBounds: CGRect) -> CGPoint {
+    private func clampPositionAvoidingCapsules(_ proposedPoint: CGPoint, previousPoint: CGPoint, screenBounds: CGRect, isDragging: Bool = false) -> CGPoint {
         // If no capsuleBounds to check, return proposed position (no collision possible)
         guard !capsuleBounds.isEmpty else {
             return proposedPoint
@@ -12219,7 +12368,23 @@ struct SimpleDraggableTransportDock: View {
             return proposedPoint
         }
 
-        // If proposed position would collide, stay at previous position (stop movement)
+        // During drag, prevent jitter by staying at previous position if collision detected
+        // User can adjust their drag direction, collision will be resolved when drag ends
+        if isDragging {
+            return previousPoint
+        }
+
+        // If proposed position would collide, try to find a valid position nearby
+        // Only try moving up (away from control area), NOT sideways - search further up (200pt)
+        // This keeps the capsule at its horizontal position while avoiding collisions
+        for yOffset in stride(from: -spacing, through: -200, by: -10) {
+            let testPoint = CGPoint(x: proposedPoint.x, y: proposedPoint.y + yOffset)
+            if isPositionValid(testPoint) {
+                return testPoint
+            }
+        }
+
+        // If no valid position found moving up, stay at previous position (stop movement)
         // This prevents the capsule from jumping to unexpected locations
         return previousPoint
     }
@@ -12242,9 +12407,9 @@ struct SimpleDraggableTransportDock: View {
 
             // Calculate proper boundaries accounting for parent padding
             // CBPerformanceList has 36pt horizontal padding, extend bounds to get closer to screen edges
-            // but leave a small margin (8pt) for visual breathing room
+            // Minimal margin to stay on screen, collision detection will prevent UI element overlap
             let parentPadding: CGFloat = 36
-            let edgeMargin: CGFloat = 8
+            let edgeMargin: CGFloat = 5
             let minX = scaledDockSize.width / 2 - parentPadding + edgeMargin
             let maxX = width - scaledDockSize.width / 2 + parentPadding - edgeMargin
 
@@ -12314,9 +12479,9 @@ struct SimpleDraggableTransportDock: View {
                             let proposedY = max(upperLimit, min(lowerLimit, startDragPosition.y + value.translation.height))
                             let proposedPoint = CGPoint(x: proposedX, y: proposedY)
 
-                            // Apply real-time collision detection
+                            // Apply real-time collision detection (skipped during drag to prevent jitter)
                             let screenBounds = CGRect(x: 0, y: 0, width: width, height: height)
-                            let validPosition = clampPositionAvoidingCapsules(proposedPoint, previousPoint: position, screenBounds: screenBounds)
+                            let validPosition = clampPositionAvoidingCapsules(proposedPoint, previousPoint: position, screenBounds: screenBounds, isDragging: isDragging)
 
                             // Update distance from control area top for following behavior
                             distanceFromControlAreaTop = (height - effectiveControlHeight) - validPosition.y
@@ -12345,69 +12510,117 @@ struct SimpleDraggableTransportDock: View {
                         }
                     }
             )
+            .background(
+                // Report cue capsule bounds for collision detection with nav pill
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: CapsuleBoundsPreferenceKey.self,
+                        value: ["cueCapsule.bounds": geo.frame(in: .global)]
+                    )
+                }
+            )
             .position(position)
-            .task(id: "\(width)-\(height)-\(controlAreaHeight)") {
+            .task(id: "\(width)-\(height)") {
                 guard width > 0 && height > 0 else { return }
 
-                // Initialize position immediately - bottom right with spacing from control area
+                // Initialize position on first load or when screen size changes
                 if position == .zero {
                     let defaultY = height - effectiveControlHeight - (scaledDockSize.height / 2) - 50
                     let defaultX = maxX - 50
-                    position = CGPoint(x: defaultX, y: defaultY)
+
+                    // Clamp to screen bounds
+                    let clampedX = max(minX, min(maxX, defaultX))
+                    let clampedY = max(upperLimit, min(lowerLimit, defaultY))
+
+                    position = CGPoint(x: clampedX, y: clampedY)
                     userDesiredPosition = position  // Store as user's desired position
                 } else {
-                    // Position exists but control area height changed
-                    let spacing: CGFloat = 10
-                    let controlAreaTop = height - controlAreaHeight
+                    // Screen size changed - adjust position to stay within bounds
+                    let clampedX = max(minX, min(maxX, position.x))
+                    let clampedY = max(upperLimit, min(lowerLimit, position.y))
 
-                    // Use userDesiredPosition if it exists, otherwise use current position
-                    let basePosition = userDesiredPosition != .zero ? userDesiredPosition : position
-                    let capsuleBottom = basePosition.y + (scaledDockSize.height / 2)
-
-                    // Check if capsule would collide with control area at desired position
-                    if capsuleBottom > controlAreaTop - spacing {
-                        // Push up to avoid collision
-                        let newY = controlAreaTop - spacing - (scaledDockSize.height / 2)
-                        let clampedY = max(upperLimit, newY)
-
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            position = CGPoint(x: basePosition.x, y: clampedY)
+                    // Only update if position needs clamping
+                    if position.x != clampedX || position.y != clampedY {
+                        position = CGPoint(x: clampedX, y: clampedY)
+                        if userDesiredPosition != .zero {
+                            userDesiredPosition = position
                         }
-                    } else {
-                        // No collision - return to desired position
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            position = basePosition
-                        }
+                    }
+                }
+            }
+            .onChange(of: capsuleBounds) { oldBounds, newBounds in
+                if isDragging { return }
+                guard position != .zero else { return }
+
+                // Only react to control area bounds changes
+                guard let bounds = newBounds["controlArea.main"], bounds.height > 0 else { return }
+
+                // Use actual control area bounds for immediate response
+                let spacing: CGFloat = 30  // Extra spacing to prevent overlap
+                let controlAreaTop = bounds.minY
+
+                // Calculate where capsule's bottom edge is (current and desired)
+                let capsuleBottom = position.y + (scaledDockSize.height / 2)
+                let desiredPosition = userDesiredPosition != .zero ? userDesiredPosition : position
+                let desiredBottom = desiredPosition.y + (scaledDockSize.height / 2)
+
+                // Calculate capsule's horizontal bounds
+                let capsuleLeft = position.x - (scaledDockSize.width / 2)
+                let capsuleRight = position.x + (scaledDockSize.width / 2)
+                let controlAreaLeft = bounds.minX
+                let controlAreaRight = bounds.maxX
+
+                // Check if capsule overlaps horizontally with control area
+                let horizontalOverlap = capsuleRight > controlAreaLeft && capsuleLeft < controlAreaRight
+
+                // Check if capsule would overlap with control area at current OR desired position
+                // Only push up if there's both vertical AND horizontal overlap
+                if horizontalOverlap && (capsuleBottom > controlAreaTop - spacing || desiredBottom > controlAreaTop - spacing) {
+                    // Push up to avoid collision
+                    let targetY = controlAreaTop - spacing - (scaledDockSize.height / 2)
+                    let clampedY = max(upperLimit, targetY)
+                    let clampedX = max(minX, min(maxX, position.x))
+
+                    // Animate the capsule following the control area (match control area spring animation)
+                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                        position = CGPoint(x: clampedX, y: clampedY)
+                    }
+                } else {
+                    // Control area retracted - return to desired position with slower animation
+                    let clampedY = max(upperLimit, min(lowerLimit, desiredPosition.y))
+                    let clampedX = max(minX, min(maxX, position.x))
+
+                    // Slower retraction to match control area closing speed
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        position = CGPoint(x: clampedX, y: clampedY)
                     }
                 }
             }
             .onChange(of: controlAreaHeight) { oldHeight, newHeight in
                 if isDragging { return }
+                guard position != .zero else { return }
 
-                // If position is zero, initialize it
-                if position == .zero {
-                    let bottomCenterY = max(upperLimit, height - newHeight - 10 - (scaledDockSize.height / 2))
-                    let bottomRightX = maxX
-
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        position = CGPoint(x: bottomRightX, y: bottomCenterY)
-                    }
-                    return
-                }
-
-                // Maintain distance from control area top when it changes
-                let spacing: CGFloat = 10
+                // Fallback: react to height changes when bounds aren't available yet
+                // This ensures capsules react on first load in new projects
+                let spacing: CGFloat = 30
                 let controlAreaTop = height - newHeight
-                let targetY = controlAreaTop - spacing - distanceFromControlAreaTop
 
-                // Clamp to screen bounds
-                let clampedY = max(upperLimit, min(height - newHeight - spacing - (scaledDockSize.height / 2), targetY))
+                // Calculate where capsule's bottom edge is (current and desired)
+                let capsuleBottom = position.y + (scaledDockSize.height / 2)
+                let desiredPosition = userDesiredPosition != .zero ? userDesiredPosition : position
+                let desiredBottom = desiredPosition.y + (scaledDockSize.height / 2)
 
-                // Animate the capsule following the control area
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    position = CGPoint(x: position.x, y: clampedY)
+                // Check if capsule would overlap with control area at current OR desired position
+                if capsuleBottom > controlAreaTop - spacing || desiredBottom > controlAreaTop - spacing {
+                    // Push up to avoid collision
+                    let targetY = controlAreaTop - spacing - (scaledDockSize.height / 2)
+                    let clampedY = max(upperLimit, targetY)
+                    let clampedX = max(minX, min(maxX, position.x))
+
+                    // Animate the capsule following the control area
+                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                        position = CGPoint(x: clampedX, y: clampedY)
+                    }
                 }
             }
         }
