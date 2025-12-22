@@ -11925,15 +11925,7 @@ struct DraggableNavigationCapsule: View {
             // Calculate control area height
             let effectiveControlHeight: CGFloat = isControlAreaCollapsed ? 56 : controlAreaHeight
 
-            // Calculate movement boundaries
-            // Top: Can go to screen edge (safe area top)
-            let upperLimit = safeTop + (pillSize.height / 2)
-
-            // Bottom: Can go to screen bottom - collision detection will prevent control area overlap
-            let lowerLimit = height - (pillSize.height / 2) - 10
-
-            // Sides: Minimal padding to stay on screen, collision detection will prevent UI element overlap
-            let horizontalPadding = pillSize.width / 2 + 5
+            // Nav pill is now fixed to right edge, no movement boundaries needed
 
             VStack(spacing: 0) {
                 if isExpanded {
@@ -12119,6 +12111,26 @@ struct DraggableNavigationCapsule: View {
                 radius: isDragDelayComplete ? 20 : 10,
                 x: 0,
                 y: isDragDelayComplete ? 8 : 6
+            )
+            .overlay(
+                // Border and chevron when expanded
+                Group {
+                    if isExpanded {
+                        ZStack(alignment: .leading) {
+                            // Border stroke
+                            Capsule()
+                                .strokeBorder(Color.primary.opacity(0.2), lineWidth: 2)
+
+                            // Chevron on left side to indicate collapse
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.primary.opacity(0.6))
+                                .frame(width: 30, height: pillSize.height)
+                                .background(Color.clear)
+                                .offset(x: -45)  // Position on left edge outside the pill
+                        }
+                    }
+                }
             )
             .contentShape(Capsule())
             // Nav pill is now fixed to right edge, not draggable
