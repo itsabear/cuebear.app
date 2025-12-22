@@ -595,7 +595,25 @@ struct CBPerformanceRow: View {
                 return bgLuminance < 0.5 ? 0 : 6  // No y-offset for glow, offset for shadow
             }()
         )
+        .scaleEffect(isPressed ? 0.97 : 1.0)
+        .shadow(
+            color: isCued ? baseColor.opacity(0.6) : Color.black.opacity(isPressed ? 0.1 : 0.2),
+            radius: isPressed ? 4 : 8,
+            x: 0,
+            y: {
+                let bgLuminance = relativeLuminance(hex: song.colorHex ?? defaultCueColorHex)
+                return bgLuminance < 0.5 ? 0 : (isPressed ? 3 : 6)
+            }()
+        )
         .zIndex(isCued ? 1 : 0)  // Elevate selected cue above others
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .updating($isPressed) { _, state, _ in
+                    if !isEditing && !state {
+                        state = true
+                    }
+                }
+        )
         .onTapGesture(perform: handleTap)  // Tap detection works with ScrollView
         .contextMenu {
             // Show context menu only in edit mode (not in batch select or reorder mode)
