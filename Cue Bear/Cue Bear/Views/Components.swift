@@ -141,17 +141,19 @@ struct CBTransportDock: View {
     @State private var isGoPressed = false
 
     var body: some View {
-        // Vertical layout similar to navigation pill
-        let pillWidth: CGFloat = 70
-        let pillHeight: CGFloat = 140
+        // Vertical layout with GO button in center
+        let pillWidth: CGFloat = 100
+        let pillHeight: CGFloat = 260
+        let buttonHeight: CGFloat = 60
+        let goButtonSize: CGFloat = 120
 
         VStack(spacing: 0) {
             // Top button: Minus (PREVIOUS)
             Button(action: onPrev) {
                 Image(systemName: "minus")
-                    .font(.system(size: 35, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundColor(canPrev ? .primary : .secondary)
-                    .frame(width: pillWidth, height: pillHeight / 2)
+                    .frame(width: pillWidth, height: buttonHeight)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -161,18 +163,39 @@ struct CBTransportDock: View {
             Divider()
                 .frame(height: 1)
 
+            // Middle: GO button
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                onGo()
+            }) {
+                Text("GO")
+                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(width: goButtonSize, height: goButtonSize)
+                    .background(isGoEnabled ? Color.accentColor : Color.gray)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+            }
+            .buttonStyle(.plain)
+            .disabled(!isGoEnabled || isDragging)
+            .padding(.vertical, 8)
+
+            // Divider
+            Divider()
+                .frame(height: 1)
+
             // Bottom button: Plus (NEXT)
             Button(action: onNext) {
                 Image(systemName: "plus")
-                    .font(.system(size: 35, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundColor(canNext ? .primary : .secondary)
-                    .frame(width: pillWidth, height: pillHeight / 2)
+                    .frame(width: pillWidth, height: buttonHeight)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!canNext || isDragging)
         }
-        .frame(width: pillWidth, height: pillHeight)
+        .frame(width: pillWidth + 40, height: pillHeight)
         .background(
             GeometryReader { geo in
                 RoundedRectangle(cornerRadius: 20)

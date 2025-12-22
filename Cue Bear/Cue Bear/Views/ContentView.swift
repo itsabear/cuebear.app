@@ -11763,9 +11763,14 @@ struct DraggableNavigationCapsule: View {
     @State private var distanceFromControlAreaTop: CGFloat = 100  // Distance to maintain from control area
     @State private var justFinishedDragging: Bool = false  // Prevent button clicks right after drag
     @State private var userDesiredPosition: CGPoint = .zero  // User's actual desired position (before collision adjustments)
+    @State private var isExpanded: Bool = false  // Whether pill is expanded or collapsed
 
-    // Vertical pill size (reduced from 166×365 based on user feedback)
-    private var pillSize: CGSize { CGSize(width: 125 * sizeMultiplier, height: 275 * sizeMultiplier) }
+    // Vertical pill size - changes based on expanded state
+    private var pillSize: CGSize {
+        isExpanded
+            ? CGSize(width: 125 * sizeMultiplier, height: 275 * sizeMultiplier)
+            : CGSize(width: 40 * sizeMultiplier, height: 100 * sizeMultiplier)  // Collapsed tongue size
+    }
 
     // Collision detection: prevent nav pill from overlapping with UI capsules
     // Returns a position that doesn't collide, clamping to obstacle edges
@@ -11931,21 +11936,22 @@ struct DraggableNavigationCapsule: View {
             let horizontalPadding = pillSize.width / 2 + 5
 
             VStack(spacing: 0) {
-                // Top button: Minus (PREVIOUS)
-                Button(action: {
-                    guard canPrev && !isTrackingDrag && !isDragDelayComplete && !isDragging && !justFinishedDragging else { return }
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onPrev()
-                    flashPrev()
-                }) {
-                    Image(systemName: "minus")
-                        .font(.system(size: 35, weight: .bold))  // Scaled down proportionally
-                        .foregroundColor(canPrev ? .primary : .secondary)
-                        .frame(width: pillSize.width, height: pillSize.height / 2)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(!canPrev || isDragging)
+                if isExpanded {
+                    // Top button: Minus (PREVIOUS)
+                    Button(action: {
+                        guard canPrev && !isTrackingDrag && !isDragDelayComplete && !isDragging && !justFinishedDragging else { return }
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onPrev()
+                        flashPrev()
+                    }) {
+                        Image(systemName: "minus")
+                            .font(.system(size: 35, weight: .bold))
+                            .foregroundColor(canPrev ? .primary : .secondary)
+                            .frame(width: pillSize.width, height: pillSize.height / 2)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canPrev || isDragging)
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { _ in
@@ -11970,53 +11976,77 @@ struct DraggableNavigationCapsule: View {
                                 }
                             }
                         }
-                )
+                    )
 
-                // Divider
-                Divider()
-                    .frame(height: 1)
+                    // Divider
+                    Divider()
+                        .frame(height: 1)
 
-                // Bottom button: Plus (NEXT)
-                Button(action: {
-                    guard canNext && !isTrackingDrag && !isDragDelayComplete && !isDragging && !justFinishedDragging else { return }
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onNext()
-                    flashNext()
-                }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 35, weight: .bold))  // Scaled down proportionally
-                        .foregroundColor(canNext ? .primary : .secondary)
-                        .frame(width: pillSize.width, height: pillSize.height / 2)
-                        .contentShape(Rectangle())
+                    // Bottom button: Plus (NEXT)
+                    Button(action: {
+                        guard canNext && !isTrackingDrag && !isDragDelayComplete && !isDragging && !justFinishedDragging else { return }
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onNext()
+                        flashNext()
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 35, weight: .bold))
+                            .foregroundColor(canNext ? .primary : .secondary)
+                            .frame(width: pillSize.width, height: pillSize.height / 2)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canNext || isDragging)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in
+                                // Show press animation only if not dragging the capsule
+                                if !isNextPressed && canNext && !isDragDelayComplete && !isTrackingDrag {
+                                    withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
+                                        isNextPressed = true
+                                    }
+                                }
+                                // Clear press animation if capsule starts dragging
+                                if (isDragDelayComplete || isTrackingDrag) && isNextPressed {
+                                    withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
+                                        isNextPressed = false
+                                    }
+                                }
+                            }
+                            .onEnded { _ in
+                                // Only clear press state if not tracking a drag
+                                if !isTrackingDrag && !isDragDelayComplete {
+                                    withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
+                                        isNextPressed = false
+                                    }
+                                }
+                            }
+                    )
+                } else {
+                    // Collapsed tongue with chevron
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.primary)
+                        .frame(width: pillSize.width, height: pillSize.height)
                 }
-                .buttonStyle(.plain)
-                .disabled(!canNext || isDragging)
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            // Show press animation only if not dragging the capsule
-                            if !isNextPressed && canNext && !isDragDelayComplete && !isTrackingDrag {
-                                withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
-                                    isNextPressed = true
-                                }
-                            }
-                            // Clear press animation if capsule starts dragging
-                            if (isDragDelayComplete || isTrackingDrag) && isNextPressed {
-                                withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
-                                    isNextPressed = false
-                                }
-                            }
-                        }
-                        .onEnded { _ in
-                            // Only clear press state if not tracking a drag
-                            if !isTrackingDrag && !isDragDelayComplete {
-                                withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
-                                    isNextPressed = false
-                                }
-                            }
-                        }
-                )
             }
+            .gesture(
+                // Swipe gesture to expand/collapse
+                DragGesture(minimumDistance: 20, coordinateSpace: .local)
+                    .onEnded { value in
+                        if value.translation.width < -30 && !isExpanded {
+                            // Swipe left to expand
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isExpanded = true
+                            }
+                        } else if value.translation.width > 30 && isExpanded {
+                            // Swipe right to collapse
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isExpanded = false
+                            }
+                        }
+                    }
+            )
             .frame(width: pillSize.width, height: pillSize.height)
             .background(
                 GeometryReader { geo in
@@ -12091,7 +12121,8 @@ struct DraggableNavigationCapsule: View {
                 y: isDragDelayComplete ? 8 : 6
             )
             .contentShape(Capsule())
-            .simultaneousGesture(
+            // Nav pill is now fixed to right edge, not draggable
+            /*.simultaneousGesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in
                         // Start delay timer on first change
@@ -12178,115 +12209,53 @@ struct DraggableNavigationCapsule: View {
                             }
                         }
                     }
-            )
+            )*/
             .position(position)
-            .task(id: "\(width)-\(height)") {
+            .task(id: "\(width)-\(height)-\(editCapsuleBottom)-\(effectiveControlHeight)") {
                 guard width > 0 && height > 0 else { return }
 
-                // Initialize position on first load or when screen size changes
-                if position == .zero {
-                    let defaultY = height - effectiveControlHeight - (pillSize.height / 2) - 50
-                    let defaultX = width - (pillSize.width / 2) - 50
+                // Fixed to right edge, centered between control area top and edit capsule bottom
+                let rightEdgeX = width - (pillSize.width / 2) - 10  // 10pt padding from edge
 
-                    // Clamp to screen bounds
-                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, defaultX))
-                    let clampedY = max(upperLimit, min(lowerLimit, defaultY))
+                // Calculate Y position: middle between control area top and edit capsule bottom
+                let controlAreaTop = height - effectiveControlHeight
+                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : safeTop
+                let centerY = (topBoundary + controlAreaTop) / 2
 
-                    position = CGPoint(x: clampedX, y: clampedY)
-                    userDesiredPosition = position  // Store as user's desired position
+                position = CGPoint(x: rightEdgeX, y: centerY)
+            }
+            // Nav pill is fixed, no collision detection needed
+            .onChange(of: editCapsuleBottom) { _, _ in
+                // Recalculate position when edit capsule moves
+                let rightEdgeX = width - (pillSize.width / 2) - 10
+                let controlAreaTop = height - effectiveControlHeight
+                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : safeTop
+                let centerY = (topBoundary + controlAreaTop) / 2
 
-                    // Clear any bad saved values
-                    UserDefaults.standard.removeObject(forKey: "navigationCapsule.x")
-                    UserDefaults.standard.removeObject(forKey: "navigationCapsule.y")
-                } else {
-                    // Screen size changed - adjust position to stay within bounds
-                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, position.x))
-                    let clampedY = max(upperLimit, min(lowerLimit, position.y))
-
-                    // Only update if position needs clamping
-                    if position.x != clampedX || position.y != clampedY {
-                        position = CGPoint(x: clampedX, y: clampedY)
-                        if userDesiredPosition != .zero {
-                            userDesiredPosition = position
-                        }
-                    }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    position = CGPoint(x: rightEdgeX, y: centerY)
                 }
             }
-            .onChange(of: capsuleBounds) { oldBounds, newBounds in
-                if isDragging || isTrackingDrag { return }  // Don't adjust during any drag interaction
-                guard position != .zero else { return }
+            .onChange(of: effectiveControlHeight) { _, _ in
+                // Recalculate position when control area height changes
+                let rightEdgeX = width - (pillSize.width / 2) - 10
+                let controlAreaTop = height - effectiveControlHeight
+                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : safeTop
+                let centerY = (topBoundary + controlAreaTop) / 2
 
-                // Only react to control area bounds changes
-                guard let bounds = newBounds["controlArea.main"], bounds.height > 0 else { return }
-
-                // Use actual control area bounds for immediate response
-                // Near-zero spacing for rounded shapes - they can nestle very close
-                let spacing: CGFloat = 0.5
-                let controlAreaTop = bounds.minY
-
-                // Calculate where pill's bottom edge is (current and desired)
-                let pillBottom = position.y + (pillSize.height / 2)
-                let desiredPosition = userDesiredPosition != .zero ? userDesiredPosition : position
-                let desiredBottom = desiredPosition.y + (pillSize.height / 2)
-
-                // Calculate pill's horizontal bounds with minimal tolerance for rounded edges
-                let horizontalTolerance: CGFloat = 8
-                let pillLeft = position.x - (pillSize.width / 2)
-                let pillRight = position.x + (pillSize.width / 2)
-                let controlAreaLeft = bounds.minX
-                let controlAreaRight = bounds.maxX
-
-                // Check if pill overlaps horizontally with control area (with tolerance)
-                let horizontalOverlap = (pillRight - horizontalTolerance) > controlAreaLeft && (pillLeft + horizontalTolerance) < controlAreaRight
-
-                // Check if pill would overlap with control area at current OR desired position
-                // Only push up if there's both vertical AND horizontal overlap
-                if horizontalOverlap && (pillBottom > controlAreaTop - spacing || desiredBottom > controlAreaTop - spacing) {
-                    // Push up to avoid collision - position for flush edge contact
-                    let targetY = controlAreaTop - (pillSize.height / 2) - spacing
-                    let clampedY = max(upperLimit, targetY)
-                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, position.x))
-
-                    // Animate the capsule following the control area (match control area spring animation)
-                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
-                        position = CGPoint(x: clampedX, y: clampedY)
-                    }
-                } else {
-                    // Control area retracted - return to desired position with slower animation
-                    let clampedY = max(upperLimit, min(lowerLimit, desiredPosition.y))
-                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, position.x))
-
-                    // Slower retraction to match control area closing speed
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        position = CGPoint(x: clampedX, y: clampedY)
-                    }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    position = CGPoint(x: rightEdgeX, y: centerY)
                 }
             }
-            .onChange(of: controlAreaHeight) { oldHeight, newHeight in
-                if isDragging { return }
-                guard position != .zero else { return }
+            .onChange(of: isExpanded) { _, _ in
+                // Recalculate position when expand/collapse state changes
+                let rightEdgeX = width - (pillSize.width / 2) - 10
+                let controlAreaTop = height - effectiveControlHeight
+                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : safeTop
+                let centerY = (topBoundary + controlAreaTop) / 2
 
-                // Fallback: react to height changes when bounds aren't available yet
-                // This ensures capsules react on first load in new projects
-                let spacing: CGFloat = 30
-                let controlAreaTop = height - newHeight
-
-                // Calculate where pill's bottom edge is (current and desired)
-                let pillBottom = position.y + (pillSize.height / 2)
-                let desiredPosition = userDesiredPosition != .zero ? userDesiredPosition : position
-                let desiredBottom = desiredPosition.y + (pillSize.height / 2)
-
-                // Check if pill would overlap with control area at current OR desired position
-                if pillBottom > controlAreaTop - spacing || desiredBottom > controlAreaTop - spacing {
-                    // Push up to avoid collision
-                    let targetY = controlAreaTop - spacing - (pillSize.height / 2)
-                    let clampedY = max(upperLimit, targetY)
-                    let clampedX = max(horizontalPadding, min(width - horizontalPadding, position.x))
-
-                    // Animate the capsule following the control area
-                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
-                        position = CGPoint(x: clampedX, y: clampedY)
-                    }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    position = CGPoint(x: rightEdgeX, y: centerY)
                 }
             }
         }
