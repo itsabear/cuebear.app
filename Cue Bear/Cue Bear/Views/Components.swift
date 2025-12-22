@@ -141,102 +141,49 @@ struct CBTransportDock: View {
     @State private var isGoPressed = false
 
     var body: some View {
-        let chipHeight: CGFloat = 28
-        VStack(spacing: 6) {
-            ZStack {
-            if let name = cuedName {
-                HStack(spacing: 8) {
-                    // v1.0.9: Truncate to 19 characters with ellipsis
-                    Text("Next: \(String(name.prefix(19)))\(name.count > 19 ? "..." : "")")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.primary)
-                    Button(action: onClear) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(6)
+        // Vertical layout similar to navigation pill
+        let pillWidth: CGFloat = 70
+        let pillHeight: CGFloat = 140
+
+        VStack(spacing: 0) {
+            // Top button: Minus (PREVIOUS)
+            Button(action: onPrev) {
+                Image(systemName: "minus")
+                    .font(.system(size: 35, weight: .bold))
+                    .foregroundColor(canPrev ? .primary : .secondary)
+                    .frame(width: pillWidth, height: pillHeight / 2)
                     .contentShape(Rectangle())
-                    .accessibilityLabel("Clear cued item")
-                }
-                .padding(.horizontal, 12)
-                .background(Color.clear)
-                .clipShape(Capsule())
-                }
             }
-            .frame(height: chipHeight)
+            .buttonStyle(.plain)
+            .disabled(!canPrev || isDragging)
 
-            HStack(spacing: 24) {
-                Button(action: onPrev) {
-                    Image(systemName: "backward.fill")
-                        .font(.system(size: 22.5, weight: .semibold))
-                        .frame(width: 57, height: 57)
-                        .background(Color.clear)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .disabled(!canPrev || isDragging)
-                .opacity(canPrev ? 1.0 : 0.5)
+            // Divider
+            Divider()
+                .frame(height: 1)
 
-                Button(action: {
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                    onGo()
-                }) {
-                    Text("GO")
-                        .font(.system(size: 30, weight: .heavy, design: .rounded))
-                        .foregroundColor(.white)
-                        .frame(width: 95, height: 95)
-                        .background(isGoEnabled ? Color.accentColor : Color.gray)
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-                }
-                .buttonStyle(.plain)
-                .disabled(!isGoEnabled || isDragging)
-                // v1.0.9: Add tap animation like control area buttons
-                .scaleEffect(isGoPressed ? 1.05 : 1.0)
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            if !isGoPressed {
-                                withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-                                    isGoPressed = true
-                                }
-                            }
-                        }
-                        .onEnded { _ in
-                            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-                                isGoPressed = false
-                            }
-                        }
-                )
-                .zIndex(1)  // Layer GO button above capsule background
-
-                Button(action: onNext) {
-                    Image(systemName: "forward.fill")
-                        .font(.system(size: 22.5, weight: .semibold))
-                        .frame(width: 57, height: 57)
-                        .background(Color.clear)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .disabled(!canNext || isDragging)
-                .opacity(canNext ? 1.0 : 0.5)
+            // Bottom button: Plus (NEXT)
+            Button(action: onNext) {
+                Image(systemName: "plus")
+                    .font(.system(size: 35, weight: .bold))
+                    .foregroundColor(canNext ? .primary : .secondary)
+                    .frame(width: pillWidth, height: pillHeight / 2)
+                    .contentShape(Rectangle())
             }
-            .padding(.horizontal, 13.5)
-            .padding(.vertical, 9)
-            .background(
-                GeometryReader { geo in
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .preference(
-                            key: CapsuleBoundsPreferenceKey.self,
-                            value: ["cueCapsule.bounds": geo.frame(in: .global)]
-                        )
-                }
-            )
-            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 6)
+            .buttonStyle(.plain)
+            .disabled(!canNext || isDragging)
         }
+        .frame(width: pillWidth, height: pillHeight)
+        .background(
+            GeometryReader { geo in
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+                    .preference(
+                        key: CapsuleBoundsPreferenceKey.self,
+                        value: ["cueCapsule.bounds": geo.frame(in: .global)]
+                    )
+            }
+        )
+        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 6)
     }
 }
 
