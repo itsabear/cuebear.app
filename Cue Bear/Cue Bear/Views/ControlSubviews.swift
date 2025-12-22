@@ -262,6 +262,8 @@ struct CBPerformanceList: View {
                 .padding(.bottom, controlAreaCollapsed ? 134 : controlAreaHeight + CGFloat(cueHeight) + 24)  // Dynamic padding: collapsed (100pt + 34pt safe area) or expanded (control height + cue height + 2x cue spacing so bottom cue scrolls above control area)
                 .animation(.spring(response: 0.15, dampingFraction: 0.85), value: isEditing)
             }
+            .scrollDisabled(false)  // Explicitly enable scrolling
+            .frame(width: geometry.size.width, height: geometry.size.height)  // Explicit frame for ScrollView
             .onChange(of: cuedID) { _, newID in
                 // Scroll to selected cue in both Cue mode and Nav mode
                 guard let id = newID else { return }
@@ -398,50 +400,27 @@ struct CBPerformanceRow: View {
     }
 
     var body: some View {
-        let press = DragGesture(minimumDistance: 0)
-            .updating($isPressed) { _, state, _ in
-                // Only allow press animation if not in edit mode
-                if !isEditing && !state {
-                    state = true
-                }
+        // Tap handler function
+        let handleTap = {
+            // In batch select mode: toggle selection
+            if batchSelectMode {
+                onToggleSelection()
             }
-            .onChanged { value in
-                let delta = abs(value.translation.width) + abs(value.translation.height)
-                if delta > 8 {
-                    didDrag = true
+            // In edit mode (not batch select or reorder): open Edit Cue sheet
+            else if isEditing && !reorderMode {
+                onRename()
+            } else if isEditing {
+                // Reorder mode: do nothing (handled by drag handles)
+            } else {
+                // Normal mode: send MIDI on quick tap
+                // Only flash/haptic when actually sending MIDI (regular mode, not cued)
+                if !isCueMode {
+                    flash()
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
+                onTap()
             }
-            .onEnded { _ in
-                // In batch select mode: toggle selection
-                if batchSelectMode {
-                    if !didDrag {
-                        onToggleSelection()
-                    }
-                }
-                // In edit mode (not batch select or reorder): open Edit Cue sheet
-                else if isEditing && !reorderMode {
-                    if !didDrag {
-                        onRename()
-                    }
-                } else if isEditing {
-                    // Reorder mode: do nothing (handled by drag handles)
-                } else {
-                    // Normal mode: send MIDI on quick tap (allow taps even with conflicts)
-                    if !didDrag {
-                        // Only flash/haptic when actually sending MIDI (regular mode, not cued)
-                        if !isCueMode {
-                            flash()
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        }
-                        onTap()
-                    }
-                }
-
-                // Delay resetting didDrag to ensure flash check completes
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    didDrag = false
-                }
-            }
+        }
 
         // Use custom color if set, otherwise use theme default cue color
         let baseColor: Color = {
@@ -617,7 +596,7 @@ struct CBPerformanceRow: View {
             }()
         )
         .zIndex(isCued ? 1 : 0)  // Elevate selected cue above others
-        .simultaneousGesture(press)
+        .onTapGesture(perform: handleTap)  // Tap detection works with ScrollView
         .contextMenu {
             // Show context menu only in edit mode (not in batch select or reorder mode)
             if isEditing && !batchSelectMode && !reorderMode {

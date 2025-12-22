@@ -3172,7 +3172,6 @@ internal struct ContentView: View {
                     conflictFor: conflictLookup()
                 )
                 .onAppear { /* Start with blank data for shipping */ }
-            .contentShape(Rectangle())
                 .overlay(alignment: .center) {
                     // Show draggable transport dock in cue mode (hide in edit mode)
                     if store.mode == .cue && !isEditing {
@@ -3441,37 +3440,23 @@ internal struct ContentView: View {
                     }
                 )
             } else {
-                // Collapsed with buttons - 3 faders/checkmark + chevron
+                // Collapsed with buttons - three faders icon with "Controls" text
                 HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
                     Button(action: {
                         withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
-                            if !controlEditMode {
-                                // Entering edit mode: expand the control area
-                                controlAreaCollapsed = false
-                            }
-                            controlEditMode.toggle()
+                            controlAreaCollapsed = false
                         }
                     }) {
-                        Text(controlEditMode ? "Done" : "Edit")
+                        HStack(spacing: 6) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 20, weight: .medium))
+                            Text("Controls")
+                        }
+                        .frame(minHeight: 32)
                     }
                     .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
                     .controlSize(.mini)
                     .contentShape(Rectangle())
-
-                    if !controlButtons.isEmpty {
-                        Button(action: {
-                            withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
-                                controlAreaCollapsed = false
-                            }
-                        }) {
-                            Image(systemName: "chevron.up")
-                                .font(.system(size: 12, weight: .medium))
-                                .frame(minWidth: 32, minHeight: 32)
-                        }
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-                        .controlSize(.mini)
-                        .contentShape(Rectangle())
-                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 2)
@@ -8832,7 +8817,9 @@ private struct ControlButtonTile: View {
         let isToggle = button.isToggle ?? false
 
         // Determine if button should show as "on" (pressed/active)
-        let isOn = isToggle ? button.toggleState : down
+        // iPad toggle buttons: only use toggleState (no flash on press)
+        // Regular buttons or iPhone: use down state for press effect
+        let isOn = (isToggle && !isPhone) ? button.toggleState : (isToggle ? button.toggleState : down)
 
         // Accent color (same for both modes)
         let accentColor: Color = {
@@ -11802,8 +11789,9 @@ struct DraggableNavigationCapsule: View {
             return proposedPoint
         }
 
-        // Add spacing buffer around obstacles for visual breathing room and shadow clearance
-        let spacing: CGFloat = 10
+        // Add spacing buffer around obstacles
+        // Near-zero spacing for rounded shapes - they can nestle very close
+        let spacing: CGFloat = 0.5
 
         // Helper function to check if a position collides with any UI capsule and is within screen bounds
         func isPositionValid(_ point: CGPoint) -> Bool {
@@ -11844,13 +11832,59 @@ struct DraggableNavigationCapsule: View {
             return proposedPoint
         }
 
-        // During drag, prevent jitter by staying at previous position if collision detected
-        // User can adjust their drag direction, collision will be resolved when drag ends
+        // During drag, allow movement along edges by only constraining the problematic axis
         if isDragging {
+            // Calculate drag direction to prioritize the right axis
+            let deltaX = abs(proposedPoint.x - previousPoint.x)
+            let deltaY = abs(proposedPoint.y - previousPoint.y)
+
+            // Prioritize the axis with more movement
+            if deltaY > deltaX {
+                // Vertical movement is stronger - try Y first (for sliding down corners)
+                let yOnlyPoint = CGPoint(x: previousPoint.x, y: proposedPoint.y)
+                if isPositionValid(yOnlyPoint) {
+                    return yOnlyPoint
+                }
+
+                // Then try X movement
+                let xOnlyPoint = CGPoint(x: proposedPoint.x, y: previousPoint.y)
+                if isPositionValid(xOnlyPoint) {
+                    return xOnlyPoint
+                }
+            } else {
+                // Horizontal movement is stronger - try X first (for sliding along edges)
+                let xOnlyPoint = CGPoint(x: proposedPoint.x, y: previousPoint.y)
+                if isPositionValid(xOnlyPoint) {
+                    return xOnlyPoint
+                }
+
+                // Then try Y movement
+                let yOnlyPoint = CGPoint(x: previousPoint.x, y: proposedPoint.y)
+                if isPositionValid(yOnlyPoint) {
+                    return yOnlyPoint
+                }
+            }
+
+            // Try diagonal movement with near-zero spacing for rounded edges
+            let reducedSpacing: CGFloat = 0.5
+            let testRect = CGRect(x: proposedPoint.x - pillSize.width / 2, y: proposedPoint.y - pillSize.height / 2, width: pillSize.width, height: pillSize.height)
+            var hasCollision = false
+            for (_, capsuleRect) in visibleCapsules {
+                let expandedRect = capsuleRect.insetBy(dx: -reducedSpacing, dy: -reducedSpacing)
+                if testRect.intersects(expandedRect) {
+                    hasCollision = true
+                    break
+                }
+            }
+            if !hasCollision {
+                return proposedPoint
+            }
+
+            // If all else fails, stay at previous position
             return previousPoint
         }
 
-        // If proposed position would collide, try to find a valid position nearby
+        // If proposed position would collide when not dragging, try to find a valid position nearby
         // First, try moving up (away from control area) - search further up (200pt)
         for yOffset in stride(from: -spacing, through: -200, by: -10) {
             let testPoint = CGPoint(x: proposedPoint.x, y: proposedPoint.y + yOffset)
@@ -12179,14 +12213,15 @@ struct DraggableNavigationCapsule: View {
                 }
             }
             .onChange(of: capsuleBounds) { oldBounds, newBounds in
-                if isDragging { return }
+                if isDragging || isTrackingDrag { return }  // Don't adjust during any drag interaction
                 guard position != .zero else { return }
 
                 // Only react to control area bounds changes
                 guard let bounds = newBounds["controlArea.main"], bounds.height > 0 else { return }
 
                 // Use actual control area bounds for immediate response
-                let spacing: CGFloat = 30  // Extra spacing to prevent overlap
+                // Near-zero spacing for rounded shapes - they can nestle very close
+                let spacing: CGFloat = 0.5
                 let controlAreaTop = bounds.minY
 
                 // Calculate where pill's bottom edge is (current and desired)
@@ -12194,20 +12229,21 @@ struct DraggableNavigationCapsule: View {
                 let desiredPosition = userDesiredPosition != .zero ? userDesiredPosition : position
                 let desiredBottom = desiredPosition.y + (pillSize.height / 2)
 
-                // Calculate pill's horizontal bounds
+                // Calculate pill's horizontal bounds with minimal tolerance for rounded edges
+                let horizontalTolerance: CGFloat = 8
                 let pillLeft = position.x - (pillSize.width / 2)
                 let pillRight = position.x + (pillSize.width / 2)
                 let controlAreaLeft = bounds.minX
                 let controlAreaRight = bounds.maxX
 
-                // Check if pill overlaps horizontally with control area
-                let horizontalOverlap = pillRight > controlAreaLeft && pillLeft < controlAreaRight
+                // Check if pill overlaps horizontally with control area (with tolerance)
+                let horizontalOverlap = (pillRight - horizontalTolerance) > controlAreaLeft && (pillLeft + horizontalTolerance) < controlAreaRight
 
                 // Check if pill would overlap with control area at current OR desired position
                 // Only push up if there's both vertical AND horizontal overlap
                 if horizontalOverlap && (pillBottom > controlAreaTop - spacing || desiredBottom > controlAreaTop - spacing) {
-                    // Push up to avoid collision
-                    let targetY = controlAreaTop - spacing - (pillSize.height / 2)
+                    // Push up to avoid collision - position for flush edge contact
+                    let targetY = controlAreaTop - (pillSize.height / 2) - spacing
                     let clampedY = max(upperLimit, targetY)
                     let clampedX = max(horizontalPadding, min(width - horizontalPadding, position.x))
 
@@ -12326,8 +12362,9 @@ struct SimpleDraggableTransportDock: View {
             return proposedPoint
         }
 
-        // Add spacing buffer around obstacles for visual breathing room and shadow clearance
-        let spacing: CGFloat = 10
+        // Add spacing buffer around obstacles
+        // Account for 1.05 scale effect during drag + near-zero spacing for rounded shapes
+        let spacing: CGFloat = 2
 
         // Helper function to check if a position collides with any UI capsule and is within screen bounds
         func isPositionValid(_ point: CGPoint) -> Bool {
@@ -12368,13 +12405,64 @@ struct SimpleDraggableTransportDock: View {
             return proposedPoint
         }
 
-        // During drag, prevent jitter by staying at previous position if collision detected
-        // User can adjust their drag direction, collision will be resolved when drag ends
+        // During drag, allow movement along edges by only constraining the problematic axis
         if isDragging {
+            // Calculate drag direction to prioritize the right axis
+            let deltaX = abs(proposedPoint.x - previousPoint.x)
+            let deltaY = abs(proposedPoint.y - previousPoint.y)
+
+            // Prioritize the axis with more movement
+            if deltaY > deltaX {
+                // Vertical movement is stronger - try Y first (for sliding down corners)
+                let yOnlyPoint = CGPoint(x: previousPoint.x, y: proposedPoint.y)
+                if isPositionValid(yOnlyPoint) {
+                    return yOnlyPoint
+                }
+
+                // Then try X movement
+                let xOnlyPoint = CGPoint(x: proposedPoint.x, y: previousPoint.y)
+                if isPositionValid(xOnlyPoint) {
+                    return xOnlyPoint
+                }
+            } else {
+                // Horizontal movement is stronger - try X first (for sliding along edges)
+                let xOnlyPoint = CGPoint(x: proposedPoint.x, y: previousPoint.y)
+                if isPositionValid(xOnlyPoint) {
+                    return xOnlyPoint
+                }
+
+                // Then try Y movement
+                let yOnlyPoint = CGPoint(x: previousPoint.x, y: proposedPoint.y)
+                if isPositionValid(yOnlyPoint) {
+                    return yOnlyPoint
+                }
+            }
+
+            // Try diagonal movement with near-zero spacing for rounded edges
+            let reducedSpacing: CGFloat = 0.5
+            let testRect = CGRect(
+                x: proposedPoint.x - scaledDockSize.width / 2,
+                y: proposedPoint.y - scaledDockSize.height / 2,
+                width: scaledDockSize.width,
+                height: scaledDockSize.height
+            )
+            var hasCollision = false
+            for (_, capsuleRect) in visibleCapsules {
+                let expandedRect = capsuleRect.insetBy(dx: -reducedSpacing, dy: -reducedSpacing)
+                if testRect.intersects(expandedRect) {
+                    hasCollision = true
+                    break
+                }
+            }
+            if !hasCollision {
+                return proposedPoint
+            }
+
+            // If all else fails, stay at previous position
             return previousPoint
         }
 
-        // If proposed position would collide, try to find a valid position nearby
+        // If proposed position would collide when not dragging, try to find a valid position nearby
         // Only try moving up (away from control area), NOT sideways - search further up (200pt)
         // This keeps the capsule at its horizontal position while avoiding collisions
         for yOffset in stride(from: -spacing, through: -200, by: -10) {
@@ -12495,6 +12583,14 @@ struct SimpleDraggableTransportDock: View {
                         }
                     }
                     .onEnded { value in
+                        // Save user's desired position after drag (before resetting state)
+                        let wasActuallyDragged = isDragDelayComplete
+                        if wasActuallyDragged {
+                            userDesiredPosition = position
+                            UserDefaults.standard.set(position.x, forKey: "cueCapsule.x")
+                            UserDefaults.standard.set(position.y, forKey: "cueCapsule.y")
+                        }
+
                         // Reset drag state
                         dragDelayTask?.cancel()
                         dragDelayTask = nil
@@ -12502,11 +12598,6 @@ struct SimpleDraggableTransportDock: View {
                         isDragging = false  // Reset dragging state to re-enable buttons
                         withAnimation(.easeOut(duration: 0.15)) {
                             isDragDelayComplete = false
-                        }
-
-                        // Save user's desired position after drag
-                        if isDragDelayComplete {
-                            userDesiredPosition = position
                         }
                     }
             )
@@ -12525,12 +12616,20 @@ struct SimpleDraggableTransportDock: View {
 
                 // Initialize position on first load or when screen size changes
                 if position == .zero {
+                    // Try to load saved position from UserDefaults
+                    let savedX = UserDefaults.standard.object(forKey: "cueCapsule.x") as? CGFloat
+                    let savedY = UserDefaults.standard.object(forKey: "cueCapsule.y") as? CGFloat
+
                     let defaultY = height - effectiveControlHeight - (scaledDockSize.height / 2) - 50
                     let defaultX = maxX - 50
 
+                    // Use saved position if available, otherwise use default
+                    let initialX = savedX ?? defaultX
+                    let initialY = savedY ?? defaultY
+
                     // Clamp to screen bounds
-                    let clampedX = max(minX, min(maxX, defaultX))
-                    let clampedY = max(upperLimit, min(lowerLimit, defaultY))
+                    let clampedX = max(minX, min(maxX, initialX))
+                    let clampedY = max(upperLimit, min(lowerLimit, initialY))
 
                     position = CGPoint(x: clampedX, y: clampedY)
                     userDesiredPosition = position  // Store as user's desired position
@@ -12549,14 +12648,14 @@ struct SimpleDraggableTransportDock: View {
                 }
             }
             .onChange(of: capsuleBounds) { oldBounds, newBounds in
-                if isDragging { return }
+                if isDragging || isTrackingDrag { return }  // Don't adjust during any drag interaction
                 guard position != .zero else { return }
 
                 // Only react to control area bounds changes
                 guard let bounds = newBounds["controlArea.main"], bounds.height > 0 else { return }
 
                 // Use actual control area bounds for immediate response
-                let spacing: CGFloat = 30  // Extra spacing to prevent overlap
+                let spacing: CGFloat = 15  // Reduced from 30 to 15 for less aggressive collision avoidance
                 let controlAreaTop = bounds.minY
 
                 // Calculate where capsule's bottom edge is (current and desired)

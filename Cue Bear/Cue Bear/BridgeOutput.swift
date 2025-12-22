@@ -804,7 +804,7 @@ final class BridgeOutput: ObservableObject {
     func restartDiscovery() {
         debugPrint("BridgeOutput: Manually restarting discovery")
         restartBrowsing()
-    }
+    }   
     
     // MARK: - Connection Quality Monitoring
     
