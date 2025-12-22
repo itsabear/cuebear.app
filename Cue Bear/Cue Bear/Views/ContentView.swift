@@ -12022,23 +12022,6 @@ struct DraggableNavigationCapsule: View {
                         .frame(width: pillSize.width, height: pillSize.height)
                 }
             }
-            .gesture(
-                // Swipe gesture to expand/collapse
-                DragGesture(minimumDistance: 20, coordinateSpace: .local)
-                    .onEnded { value in
-                        if value.translation.width < -30 && !isExpanded {
-                            // Swipe left to expand
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                isExpanded = true
-                            }
-                        } else if value.translation.width > 30 && isExpanded {
-                            // Swipe right to collapse
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                isExpanded = false
-                            }
-                        }
-                    }
-            )
             .frame(width: pillSize.width, height: pillSize.height)
             .background(
                 GeometryReader { geo in
@@ -12133,6 +12116,23 @@ struct DraggableNavigationCapsule: View {
                 }
             )
             .contentShape(Capsule())
+            .simultaneousGesture(
+                // Swipe gesture to expand/collapse - works alongside button presses
+                DragGesture(minimumDistance: 30, coordinateSpace: .local)
+                    .onEnded { value in
+                        if value.translation.width < -40 && !isExpanded {
+                            // Swipe left to expand
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isExpanded = true
+                            }
+                        } else if value.translation.width > 40 && isExpanded {
+                            // Swipe right to collapse
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isExpanded = false
+                            }
+                        }
+                    }
+            )
             // Nav pill is now fixed to right edge, not draggable
             /*.simultaneousGesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .global)
