@@ -10504,21 +10504,22 @@ private struct iPadControlTile: View {
                 }
             }
             
-            // Delete button in edit mode - positioned inside cell to avoid clipping
+            // Delete button in edit mode
             if isEditing {
                 Button(action: onDelete) {
                     ZStack {
                         Circle()
                             .fill(Color.gray.opacity(0.9))
-                            .frame(width: isPhone ? 20 : 24, height: isPhone ? 20 : 24)  // Slightly smaller on iPad to fit inside
+                            .frame(width: isPhone ? 20 : 30, height: isPhone ? 20 : 30)  // iPhone: 20pt (like homescreen), iPad: 30pt
                         Image(systemName: "xmark")
-                            .font(.system(size: isPhone ? 10 : 11, weight: .bold))
+                            .font(.system(size: isPhone ? 10 : 13, weight: .bold))  // iPhone: smaller X
                             .foregroundColor(Color(uiColor: .systemBackground))
                     }
                 }
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
-                .frame(width: 44, height: 44)  // Standard hit area
+                .frame(width: isPhone ? 44 : 70, height: isPhone ? 44 : 70)  // iPhone: smaller hit area
+                .offset(x: isPhone ? -10 : -30, y: isPhone ? -10 : -30)  // iPhone: position at corner, half sticking out
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
