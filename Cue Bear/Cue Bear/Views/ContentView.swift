@@ -12612,9 +12612,7 @@ struct DraggableNavigationCapsule: View {
                     floatOffset: tutorialFloatOffset,
                     onDismiss: {
                         showNavPillTutorial = false
-                        #if !DEBUG
                         UserDefaults.standard.set(true, forKey: config.tutorialUserDefaultsKey)
-                        #endif
                         // Resume any interrupted tutorial
                         onTutorialDismiss?()
                     }
@@ -12765,21 +12763,13 @@ struct DraggableNavigationCapsule: View {
                 // Hide tutorial when user interacts with nav pill
                 showNavPillTutorial = false
 
-                // Mark tutorial as seen (only in release builds)
-                #if !DEBUG
+                // Mark tutorial as seen
                 UserDefaults.standard.set(true, forKey: config.tutorialUserDefaultsKey)
-                #endif
             }
             .onAppear {
-                // Check if user has seen tutorial (only in release builds)
-                #if DEBUG
-                // In debug builds, always show tutorial for testing
-                let shouldShowTutorial = true
-                #else
-                // In release builds, only show once
+                // Check if user has seen tutorial
                 let hasSeenTutorial = UserDefaults.standard.bool(forKey: config.tutorialUserDefaultsKey)
                 let shouldShowTutorial = !hasSeenTutorial
-                #endif
 
                 if shouldShowTutorial {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -12885,9 +12875,7 @@ struct SimpleDraggableTransportDock: View {
                     floatOffset: tutorialFloatOffset,
                     onDismiss: {
                         showCueCapsuleTutorial = false
-                        #if !DEBUG
                         UserDefaults.standard.set(true, forKey: config.tutorialUserDefaultsKey)
-                        #endif
                         // Resume any interrupted tutorial
                         onTutorialDismiss?()
                     }
@@ -13039,21 +13027,13 @@ struct SimpleDraggableTransportDock: View {
                 // Hide tutorial when user interacts
                 showCueCapsuleTutorial = false
 
-                // Mark tutorial as seen (only in release builds)
-                #if !DEBUG
+                // Mark tutorial as seen
                 UserDefaults.standard.set(true, forKey: config.tutorialUserDefaultsKey)
-                #endif
             }
             .onAppear {
-                // Check if user has seen tutorial (only in release builds)
-                #if DEBUG
-                // In debug builds, always show tutorial for testing
-                let shouldShowTutorial = true
-                #else
-                // In release builds, only show once
+                // Check if user has seen tutorial
                 let hasSeenTutorial = UserDefaults.standard.bool(forKey: config.tutorialUserDefaultsKey)
                 let shouldShowTutorial = !hasSeenTutorial
-                #endif
 
                 if shouldShowTutorial {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
