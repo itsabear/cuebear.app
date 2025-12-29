@@ -402,12 +402,14 @@ struct CBPerformanceRow: View {
     var body: some View {
         // Tap handler function
         let handleTap = {
+            debugPrint("👆 [CUE TAP] song: \(song.name), isEditing: \(isEditing), reorderMode: \(reorderMode), batchSelectMode: \(batchSelectMode)")
             // In batch select mode: toggle selection
             if batchSelectMode {
                 onToggleSelection()
             }
             // In edit mode (not batch select or reorder): open Edit Cue sheet
             else if isEditing && !reorderMode {
+                debugPrint("👆 [CUE TAP] Opening edit sheet for: \(song.name)")
                 onRename()
             } else if isEditing {
                 // Reorder mode: do nothing (handled by drag handles)
@@ -607,15 +609,8 @@ struct CBPerformanceRow: View {
         )
         .animation(.easeOut(duration: 0.05), value: isPressed)
         .zIndex(isCued ? 1 : 0)  // Elevate selected cue above others
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .updating($isPressed) { _, state, _ in
-                    if !isEditing && !isCueMode && !state {
-                        state = true
-                    }
-                }
-        )
-        .onTapGesture(perform: handleTap)  // Tap detection works with ScrollView
+        .contentShape(Rectangle())  // Ensure full row is tappable
+        .onTapGesture(perform: handleTap)  // Tap detection - must come before drag gesture
         .contextMenu {
             // Show context menu only in edit mode (not in batch select or reorder mode)
             if isEditing && !batchSelectMode && !reorderMode {
@@ -2016,30 +2011,6 @@ struct CBAddEditCueSheet: View {
                     Text(err).foregroundColor(selectedTheme.errorColor(for: colorScheme))
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 }
-
-                // Action buttons section
-                Section {
-                    VStack(spacing: 12) {
-                        // Primary action button (Save/Add)
-                        PrimaryWideButton(
-                            title: editingSong == nil ? "Add" : "Save",
-                            action: { save(andAddAnother: false) },
-                            isDisabled: (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
-                        )
-
-                        // "Save & Add Another" button - only show when adding new cue
-                        if editingSong == nil {
-                            SecondaryWideButton(
-                                title: "Save & Add Another",
-                                action: { save(andAddAnother: true) },
-                                isDisabled: (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
-                            )
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                }
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
@@ -2072,33 +2043,54 @@ struct CBAddEditCueSheet: View {
                     Button("Cancel") { onCancel() }
                 }
 
-                // More menu on the right (only when editing existing cue)
-                if editingSong != nil {
-                    ToolbarItem(placement: .confirmationAction) {
+                // Right side buttons
+                ToolbarItem(placement: .confirmationAction) {
+                    let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
+                    HStack(spacing: 16) {
+                        // More menu (3 dots)
                         Menu {
-                            // Duplicate button
-                            if onDuplicate != nil {
+                            if editingSong == nil {
+                                // Add mode: Save & Add Another option
                                 Button {
-                                    if let song = editingSong {
-                                        onDuplicate?(song)
-                                    }
+                                    save(andAddAnother: true)
                                 } label: {
-                                    Text("Duplicate Cue")
+                                    Label("Save & Add Another", systemImage: "plus")
                                 }
-                            }
+                                .disabled(isDisabled)
+                            } else {
+                                // Edit mode: Duplicate and Delete options
+                                if onDuplicate != nil {
+                                    Button {
+                                        if let song = editingSong {
+                                            onDuplicate?(song)
+                                        }
+                                    } label: {
+                                        Label("Duplicate Cue", systemImage: "doc.on.doc")
+                                    }
+                                }
 
-                            // Delete/Remove button
-                            if onDelete != nil {
-                                Button(role: .destructive) {
-                                    // Show confirmation alert for both contexts
-                                    showDeleteAlert = true
-                                } label: {
-                                    Text(editContext == .cueList ? "Remove" : "Delete Cue")
+                                if onDelete != nil {
+                                    Button(role: .destructive) {
+                                        showDeleteAlert = true
+                                    } label: {
+                                        Label(editContext == .cueList ? "Remove" : "Delete Cue", systemImage: "trash")
+                                    }
                                 }
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
                         }
+
+                        // Primary action button (checkmark)
+                        Button {
+                            save(andAddAnother: false)
+                        } label: {
+                            Image(systemName: "checkmark")
+                                .fontWeight(.semibold)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .disabled(isDisabled)
                     }
                 }
             }

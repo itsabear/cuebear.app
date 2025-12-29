@@ -1794,37 +1794,6 @@ struct CBControlEditorSheet: View {
                     }
                 }
 
-                // Action buttons section
-                Section {
-                    VStack(spacing: 12) {
-                        // Primary action button
-                        PrimaryWideButton(
-                            title: isEditMode ? "Save" : (draft.isFader ? "Add Fader" : "Add Button"),
-                            action: { saveControl(andAddAnother: false) },
-                            isDisabled: conflictOwner() != nil || isFilteredMIDI() || showSpaceWarning || isOutOfRoom
-                        )
-
-                        // "Save & Add Another" button - only show when adding new controls
-                        if !isEditMode {
-                            SecondaryWideButton(
-                                title: "Save & Add Another",
-                                action: { saveControl(andAddAnother: true) },
-                                isDisabled: conflictOwner() != nil || isFilteredMIDI() || showSpaceWarning || isOutOfRoom || !canAddMore
-                            )
-                        }
-
-                        // Delete button - only show when editing existing controls
-                        if isEditMode && onDelete != nil {
-                            DestructiveWideButton(
-                                title: draft.isFader ? "Delete Fader" : (draft.isSmall ? "Delete Small Button" : "Delete Button"),
-                                action: { showDeleteAlert = true }
-                            )
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                }
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
@@ -1857,6 +1826,46 @@ struct CBControlEditorSheet: View {
                     }
                 }
 
+                // Right side buttons
+                ToolbarItem(placement: .confirmationAction) {
+                    let isDisabled = isOutOfRoom || (midiFiltersEnabled && conflictOwner() != nil) || (midiFiltersEnabled && isFilteredMIDI())
+                    HStack(spacing: 16) {
+                        // More menu (3 dots)
+                        Menu {
+                            if !isEditMode {
+                                // Add mode: Save & Add Another option
+                                Button {
+                                    saveControl(andAddAnother: true)
+                                } label: {
+                                    Label("Save & Add Another", systemImage: "plus")
+                                }
+                                .disabled(isDisabled)
+                            } else {
+                                // Edit mode: Delete option
+                                if onDelete != nil {
+                                    Button(role: .destructive) {
+                                        showDeleteAlert = true
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+
+                        // Primary action button (checkmark)
+                        Button {
+                            saveControl(andAddAnother: false)
+                        } label: {
+                            Image(systemName: "checkmark")
+                                .fontWeight(.semibold)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .disabled(isDisabled)
+                    }
+                }
             }
             .onAppear {
                 preset()
