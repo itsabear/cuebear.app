@@ -84,6 +84,9 @@ struct AboutSheet: View {
                         // Bug Report Button (custom button, not a link)
                         bugReportButton()
 
+                        // Reset Tutorials Button
+                        resetTutorialsButton()
+
                         #if DEBUG
                         // TEST CRASH BUTTON - Only visible in debug builds
                         testCrashButton()
@@ -138,6 +141,38 @@ struct AboutSheet: View {
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(linkColor.opacity(0.1))
+            .foregroundColor(linkColor)
+            .cornerRadius(12)
+        }
+    }
+
+    private func resetTutorialsButton() -> some View {
+        let linkColor = selectedTheme.defaultCueColor(for: colorScheme)
+
+        return Button(action: {
+            // Reset all tutorial flags
+            UserDefaults.standard.removeObject(forKey: "hasSeenTutorial1")
+            UserDefaults.standard.removeObject(forKey: "hasSeenTutorial2")
+            UserDefaults.standard.removeObject(forKey: "hasSeenTutorial2b")
+            UserDefaults.standard.removeObject(forKey: "hasSeenTutorial2c")
+            UserDefaults.standard.removeObject(forKey: "hasSeenTutorial3")
+            // Also reset nav pill tutorial
+            UserDefaults.standard.removeObject(forKey: "hasSeenNavPillTutorial")
+            // Also reset onboarding so it shows first
+            UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
+            // Dismiss the sheet
+            dismiss()
+        }) {
+            HStack {
+                Image(systemName: "arrow.counterclockwise")
+                    .frame(width: 24)
+                Text("Reset Tutorials")
+                    .font(.body.weight(.medium))
+                Spacer()
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -362,8 +397,6 @@ struct AppearanceSettingsSheet: View {
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @AppStorage("showMIDIData") private var showMIDIData: Bool = true
     @AppStorage("cueHeight") private var cueHeight: Double = 86
-    @AppStorage("navigationPillSize") private var navigationPillSize: Double = 1.0
-    @AppStorage("cueCapsuleSize") private var cueCapsuleSize: Double = 1.0
     @AppStorage("fontSize") private var fontSize: Double = 1.0
     @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
@@ -487,83 +520,11 @@ struct AppearanceSettingsSheet: View {
                 }
                 .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
-                // Navigation Pill Size Section
-                Section {
-                    VStack(spacing: 16) {
-                        HStack {
-                            Text("Scale")
-                                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
-                            Spacer()
-                            Text("\(Int(navigationPillSize * 100))%")
-                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                                .font(.system(.body, design: .monospaced))
-                        }
-
-                        Slider(value: $navigationPillSize, in: 0.7...1.5, step: 0.05)
-                            .tint(selectedTheme.defaultCueColor(for: colorScheme))
-
-                        HStack {
-                            Text("70%")
-                                .font(.caption)
-                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                            Spacer()
-                            Text("150%")
-                                .font(.caption)
-                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                        }
-                    }
-                    .padding(.vertical, 8)
-                } header: {
-                    Text("NAVIGATION PILL SIZE")
-                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                } footer: {
-                    Text("Adjusts the size of the prev/next navigation pill")
-                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-
-                // Cue Capsule Size Section
-                Section {
-                    VStack(spacing: 16) {
-                        HStack {
-                            Text("Scale")
-                                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
-                            Spacer()
-                            Text("\(Int(cueCapsuleSize * 100))%")
-                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                                .font(.system(.body, design: .monospaced))
-                        }
-
-                        Slider(value: $cueCapsuleSize, in: 0.8...1.5, step: 0.05)
-                            .tint(selectedTheme.defaultCueColor(for: colorScheme))
-
-                        HStack {
-                            Text("80%")
-                                .font(.caption)
-                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                            Spacer()
-                            Text("150%")
-                                .font(.caption)
-                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                        }
-                    }
-                    .padding(.vertical, 8)
-                } header: {
-                    Text("CUE CAPSULE SIZE")
-                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                } footer: {
-                    Text("Adjusts the size of the GO capsule transport controls")
-                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-
                 // Reset Section
                 Section {
                     Button {
                         showMIDIData = true
                         cueHeight = 86
-                        navigationPillSize = 1.0
-                        cueCapsuleSize = 1.0
                         fontSize = 1.0
                         customDefaultCueColorStorage = ""
                         showColorPicker = false

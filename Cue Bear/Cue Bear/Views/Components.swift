@@ -141,61 +141,65 @@ struct CBTransportDock: View {
     @State private var isGoPressed = false
 
     var body: some View {
-        // Vertical layout with GO button in center
-        let pillWidth: CGFloat = 100
-        let pillHeight: CGFloat = 260
-        let buttonHeight: CGFloat = 80  // Increased from 60 for taller - and + buttons
-        let goButtonSize: CGFloat = 120
+        GeometryReader { geo in
+            // Scale everything to fit the container
+            let containerWidth = geo.size.width
+            let containerHeight = geo.size.height
+            let goButtonSize = min(containerWidth - 20, 100)  // Leave 10px padding on each side
+            let buttonHeight = (containerHeight - goButtonSize - 20) / 2  // Split remaining height for +/- buttons
 
-        VStack(spacing: 0) {
-            // Top button: Minus (PREVIOUS)
-            Button(action: onPrev) {
-                Image(systemName: "minus")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(canPrev ? .primary : .secondary)
-                    .frame(width: pillWidth, height: buttonHeight)
-                    .contentShape(Rectangle())
+            VStack(spacing: 0) {
+                // Top button: Minus (PREVIOUS)
+                Button(action: onPrev) {
+                    Image(systemName: "minus")
+                        .font(.system(size: min(28, containerWidth * 0.22), weight: .bold))
+                        .foregroundColor(canPrev ? .primary : .secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canPrev || isDragging)
+                .frame(height: buttonHeight)
+
+                // Divider
+                Divider()
+                    .frame(height: 1)
+
+                // Middle: GO button
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                    onGo()
+                }) {
+                    Text("GO")
+                        .font(.system(size: min(32, containerWidth * 0.25), weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                        .frame(width: goButtonSize, height: goButtonSize)
+                        .background(isGoEnabled ? Color.accentColor : Color.gray)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 3)
+                }
+                .buttonStyle(.plain)
+                .disabled(!isGoEnabled || isDragging)
+                .padding(.vertical, 4)
+
+                // Divider
+                Divider()
+                    .frame(height: 1)
+
+                // Bottom button: Plus (NEXT)
+                Button(action: onNext) {
+                    Image(systemName: "plus")
+                        .font(.system(size: min(28, containerWidth * 0.22), weight: .bold))
+                        .foregroundColor(canNext ? .primary : .secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canNext || isDragging)
+                .frame(height: buttonHeight)
             }
-            .buttonStyle(.plain)
-            .disabled(!canPrev || isDragging)
-
-            // Divider
-            Divider()
-                .frame(height: 1)
-
-            // Middle: GO button
-            Button(action: {
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                onGo()
-            }) {
-                Text("GO")
-                    .font(.system(size: 32, weight: .heavy, design: .rounded))
-                    .foregroundColor(.white)
-                    .frame(width: goButtonSize, height: goButtonSize)
-                    .background(isGoEnabled ? Color.accentColor : Color.gray)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-            }
-            .buttonStyle(.plain)
-            .disabled(!isGoEnabled || isDragging)
-            .padding(.vertical, 8)
-
-            // Divider
-            Divider()
-                .frame(height: 1)
-
-            // Bottom button: Plus (NEXT)
-            Button(action: onNext) {
-                Image(systemName: "plus")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(canNext ? .primary : .secondary)
-                    .frame(width: pillWidth, height: buttonHeight)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(!canNext || isDragging)
+            .frame(width: containerWidth, height: containerHeight)
         }
-        .frame(width: pillWidth + 40, height: pillHeight)
     }
 }
 

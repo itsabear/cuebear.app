@@ -96,7 +96,7 @@ struct CBPerformanceList: View {
                                 .font(.title3)
                                 .foregroundColor(.gray)
 
-                            Text("To add cues, click the edit button on the top right corner and then + to add your first cue")
+                            Text("Cues are MIDI buttons arranged like a scrollable set list. Click \"Edit\" to add your first cues.")
                                 .font(.body)
                                 .foregroundColor(.gray.opacity(0.7))
                                 .multilineTextAlignment(.center)

@@ -31,6 +31,14 @@ struct TutorialWidthPreferenceKey: PreferenceKey {
     }
 }
 
+// PreferenceKey for tracking tutorial target button frames
+struct TutorialButtonFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
 // MARK: - Swipeable Capsule Configuration
 // Shared settings for nav pill and cue capsule collapsible behavior
 
@@ -129,10 +137,184 @@ struct SwipeableCapsuleTutorial: View {
                 )
             }
         )
+        .offset(y: floatOffset)
         .position(position)
+        .animation(.easeInOut(duration: 0.525).repeatForever(autoreverses: true), value: floatOffset)
         .onTapGesture {
             onDismiss()
         }
+    }
+}
+
+// MARK: - Onboarding Tutorial Views
+
+/// Tutorial bubble that points upward to a target element (for top-area UI elements)
+struct UpwardTutorial: View {
+    let message: String
+    let targetFrame: CGRect
+    let onDismiss: () -> Void
+
+    @State private var floatOffset: CGFloat = 4  // Start at bottom of float range
+    @State private var hasStartedAnimation = false
+    @State private var bubbleSize: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geo in
+            let screenWidth = geo.size.width
+            let padding: CGFloat = 16
+            let estimatedBubbleWidth = bubbleSize.width > 0 ? bubbleSize.width : 280
+
+            // Target X where the arrow should point
+            let targetX = targetFrame.midX
+
+            // Clamp bubble center X so bubble stays within screen bounds
+            let minBubbleX = padding + estimatedBubbleWidth / 2
+            let maxBubbleX = screenWidth - padding - estimatedBubbleWidth / 2
+            let clampedBubbleX = min(max(targetX, minBubbleX), maxBubbleX)
+
+            // Arrow offset from bubble center to point at target
+            let arrowOffset = targetX - clampedBubbleX
+
+            let tooltipY = targetFrame.maxY + 30  // Position below target (closer)
+
+            VStack(spacing: 0) {
+                // Arrow pointing up - offset horizontally to point at target
+                Image(systemName: "arrowtriangle.up.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.blue)
+                    .offset(x: arrowOffset, y: 2)
+
+                // Main tutorial bubble
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.tap")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white)
+
+                    Text(message)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [Color.purple, Color.blue],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 4)
+                .background(
+                    GeometryReader { bubbleGeo in
+                        Color.clear.onAppear {
+                            bubbleSize = bubbleGeo.size
+                        }
+                    }
+                )
+            }
+            .fixedSize()
+            .offset(y: floatOffset)
+            .position(x: clampedBubbleX, y: tooltipY)
+            .onTapGesture {
+                onDismiss()
+            }
+            .onAppear {
+                guard !hasStartedAnimation else { return }
+                hasStartedAnimation = true
+                // Animate from +4 to -4 (bobs up and down from center)
+                withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                    floatOffset = -4
+                }
+            }
+        }
+        .allowsHitTesting(true)
+    }
+}
+
+/// Tutorial bubble that points downward to a target element (for bottom-area UI elements like Controls capsule)
+struct DownwardTutorial: View {
+    let message: String
+    let targetFrame: CGRect
+    let onDismiss: () -> Void
+
+    @State private var floatOffset: CGFloat = 4  // Start at bottom of float range
+    @State private var hasStartedAnimation = false
+    @State private var bubbleSize: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geo in
+            let screenWidth = geo.size.width
+            let padding: CGFloat = 16
+            let estimatedBubbleWidth = bubbleSize.width > 0 ? bubbleSize.width : 280
+
+            // Target X where the arrow should point
+            let targetX = targetFrame.midX
+
+            // Clamp bubble center X so bubble stays within screen bounds
+            let minBubbleX = padding + estimatedBubbleWidth / 2
+            let maxBubbleX = screenWidth - padding - estimatedBubbleWidth / 2
+            let clampedBubbleX = min(max(targetX, minBubbleX), maxBubbleX)
+
+            // Arrow offset from bubble center to point at target
+            let arrowOffset = targetX - clampedBubbleX
+
+            let tooltipY = targetFrame.minY - 70  // Position above target (further away)
+
+            VStack(spacing: 0) {
+                // Main tutorial bubble
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.tap")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white)
+
+                    Text(message)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [Color.purple, Color.blue],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 4)
+                .background(
+                    GeometryReader { bubbleGeo in
+                        Color.clear.onAppear {
+                            bubbleSize = bubbleGeo.size
+                        }
+                    }
+                )
+
+                // Arrow pointing down - offset horizontally to point at target
+                Image(systemName: "arrowtriangle.down.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.blue)
+                    .offset(x: arrowOffset, y: -2)
+            }
+            .fixedSize()
+            .offset(y: floatOffset)
+            .position(x: clampedBubbleX, y: tooltipY)
+            .onTapGesture {
+                onDismiss()
+            }
+            .onAppear {
+                guard !hasStartedAnimation else { return }
+                hasStartedAnimation = true
+                // Animate from +4 to -4 (bobs up and down from center)
+                withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                    floatOffset = -4
+                }
+            }
+        }
+        .allowsHitTesting(true)
     }
 }
 
@@ -2908,8 +3090,26 @@ internal struct ContentView: View {
     @StateObject private var cueEditorDraft = CueEditorDraft()
     @StateObject private var controlEditorDraft = ControlEditorDraft()
 
-    // Tutorial - TODO: Integrate when ready
-    // @StateObject private var tutorialCoordinator = TutorialCoordinator()
+    // Onboarding Tutorial State
+    // Flow: Onboarding → T1 (Edit btn) → T2 (+ btn) → T2b (Library btn) → exit edit → T2c (cue list name) → T3 (Controls)
+    @AppStorage("hasSeenTutorial1") private var hasSeenTutorial1 = false  // Tutorial 1: Edit button
+    @AppStorage("hasSeenTutorial2") private var hasSeenTutorial2 = false  // Tutorial 2: + button
+    @AppStorage("hasSeenTutorial2b") private var hasSeenTutorial2b = false  // Tutorial 2b: Library button
+    @AppStorage("hasSeenTutorial2c") private var hasSeenTutorial2c = false  // Tutorial 2c: Cue list name
+    @AppStorage("hasSeenTutorial3") private var hasSeenTutorial3 = false  // Tutorial 3: Controls capsule
+    @State private var showTutorial1 = false  // Tutorial 1: Edit button (after onboarding)
+    @State private var showTutorial2 = false  // Tutorial 2: + button (after clicking Edit)
+    @State private var showTutorial2b = false  // Tutorial 2b: Library button
+    @State private var showTutorial2c = false  // Tutorial 2c: Cue list name button (after exiting edit)
+    @State private var showTutorial3 = false  // Tutorial 3: Controls capsule
+    @State private var interruptedTutorial: Int? = nil  // Track which tutorial was interrupted by nav/cue capsule tutorial (1, 2, 2 for 2b, 3 for 2c, 4 for 3)
+
+    // Tutorial frame tracking (for positioning tutorials)
+    @State private var editButtonFrame: CGRect = .zero  // Edit button in top right capsule
+    @State private var addCueButtonFrame: CGRect = .zero  // + button in edit mode
+    @State private var libraryButtonFrame: CGRect = .zero  // Library button (book icon)
+    @State private var cueListNameButtonFrame: CGRect = .zero  // Cue list name button (top left)
+    @State private var controlsCapsuleFrame: CGRect = .zero  // Controls capsule (bottom right)
 
     // Projects
     @State private var showProjects = false
@@ -3038,8 +3238,8 @@ internal struct ContentView: View {
     // Appearance Settings
     @AppStorage("showMIDIData") private var showMIDIData: Bool = true
     @AppStorage("cueHeight") private var cueHeight: Double = 86
-    @AppStorage("navigationPillSize") private var navigationPillSize: Double = 1.0
-    @AppStorage("cueCapsuleSize") private var cueCapsuleSize: Double = 1.0
+    @AppStorage("navigationPillSize") private var navigationPillSize: Double = 0.85
+    @AppStorage("cueCapsuleSize") private var cueCapsuleSize: Double = 0.85
     @AppStorage("fontSize") private var fontSize: Double = 1.0
     @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
@@ -3110,6 +3310,13 @@ internal struct ContentView: View {
                     // Don't exit edit mode when adding a new cue
                     editingSong = nil
                     showAddEdit = true
+
+                    // Tutorial 2b: Show Library tutorial after clicking + button
+                    if showTutorial2 {
+                        showTutorial2 = false
+                        hasSeenTutorial2 = true
+                    }
+                    // Will trigger tutorial 2b after the add sheet closes
                 },
                 onUndo: { performUndo() },
                 onRedo: { performRedo() },
@@ -3314,7 +3521,8 @@ internal struct ContentView: View {
                             isControlAreaCollapsed: effectivelyCollapsedForOverlay,
                             capsuleBounds: capsuleBounds,
                             hasControlButtons: !controlButtons.isEmpty,
-                            themeColor: currentTheme.titleBarColor(for: colorScheme)
+                            themeColor: currentTheme.titleBarColor(for: colorScheme),
+                            onTutorialDismiss: { resumeInterruptedTutorial() }
                         )
                         .offset(x: isEditing ? UIScreen.main.bounds.width : 0)
                         .animation(.easeInOut(duration: 0.3), value: isEditing)
@@ -3341,7 +3549,8 @@ internal struct ContentView: View {
                             isControlAreaCollapsed: effectivelyCollapsedForOverlay,
                             capsuleBounds: capsuleBounds,
                             hasControlButtons: !controlButtons.isEmpty,
-                            themeColor: currentTheme.titleBarColor(for: colorScheme)
+                            themeColor: currentTheme.titleBarColor(for: colorScheme),
+                            onTutorialDismiss: { resumeInterruptedTutorial() }
                         )
                         .offset(x: isEditing ? UIScreen.main.bounds.width : 0)
                         .animation(.easeInOut(duration: 0.3), value: isEditing)
@@ -3567,6 +3776,14 @@ internal struct ContentView: View {
                 )
             }
         )
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: TutorialButtonFramePreferenceKey.self,
+                    value: ["controlsCapsule": geo.frame(in: .global)]
+                )
+            }
+        )
     }
 
     private var controlSectionView: some View {
@@ -3735,10 +3952,11 @@ internal struct ContentView: View {
                                     .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                                 Spacer()
                             }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
 
                         // Regular + Remote (navigation capsule)
                         Button(action: {
@@ -3761,10 +3979,11 @@ internal struct ContentView: View {
                                     .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                                 Spacer()
                             }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
 
                         // Cue Mode (GO capsule)
                         Button(action: {
@@ -3787,10 +4006,11 @@ internal struct ContentView: View {
                                     .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                                 Spacer()
                             }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
                     }
 
                     Divider()
@@ -3871,9 +4091,9 @@ internal struct ContentView: View {
                                 .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                             Spacer()
                         }
-                        .contentShape(Rectangle())
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
+                        .contentShape(Rectangle())
                         .onTapGesture {
                             if isEditing { isEditing = false }
                             showAboutSheet = true
@@ -3891,10 +4111,27 @@ internal struct ContentView: View {
                             closeMenu()
                         })
                         #endif
-                    }
 
-                    Divider()
-                        .padding(.horizontal, 24)
+                        // Reset Tutorials button (in Help section)
+                        sideMenuButton("Reset Tutorials", icon: "arrow.counterclockwise", action: {
+                            // Reset all tutorial flags
+                            hasSeenTutorial1 = false
+                            hasSeenTutorial2 = false
+                            hasSeenTutorial2b = false
+                            hasSeenTutorial2c = false
+                            hasSeenTutorial3 = false
+                            // Also reset nav pill and cue capsule tutorials
+                            UserDefaults.standard.removeObject(forKey: "hasSeenNavPillTutorial")
+                            UserDefaults.standard.removeObject(forKey: "hasSeenCueCapsuleTutorial")
+                            // Reset onboarding so it shows again
+                            UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
+                            closeMenu()
+                            // Show onboarding immediately after menu closes
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                showOnboarding = true
+                            }
+                        })
+                    }
 
                     Spacer()
                 }
@@ -3931,11 +4168,11 @@ internal struct ContentView: View {
                     .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                 Spacer()
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 12)
     }
 
     private func closeMenu() {
@@ -4238,6 +4475,102 @@ internal struct ContentView: View {
                     handlePedalNext()
                     return .handled
                 }
+                // MARK: - Tutorial Overlays
+                .overlay {
+                    ZStack {
+                        // Tutorial 1: Edit button (after onboarding)
+                        if showTutorial1 && editButtonFrame != .zero {
+                            UpwardTutorial(
+                                message: "Open edit mode to add your first cue",
+                                targetFrame: editButtonFrame,
+                                onDismiss: {
+                                    showTutorial1 = false
+                                    hasSeenTutorial1 = true
+                                }
+                            )
+                        }
+
+                        // Tutorial 2: + button (after clicking Edit)
+                        if showTutorial2 && addCueButtonFrame != .zero {
+                            UpwardTutorial(
+                                message: "Click here your first cue",
+                                targetFrame: addCueButtonFrame,
+                                onDismiss: {
+                                    showTutorial2 = false
+                                    hasSeenTutorial2 = true
+                                    // Show Tutorial 2b after dismissing
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        if !hasSeenTutorial2b {
+                                            showTutorial2b = true
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        // Tutorial 2b: Library button (after tutorial 2 or adding cue)
+                        if showTutorial2b && libraryButtonFrame != .zero {
+                            UpwardTutorial(
+                                message: "All your cues live in the cue library.",
+                                targetFrame: libraryButtonFrame,
+                                onDismiss: {
+                                    showTutorial2b = false
+                                    hasSeenTutorial2b = true
+                                }
+                            )
+                        }
+
+                        // Tutorial 2c: Cue list name button (after exiting edit mode)
+                        if showTutorial2c && cueListNameButtonFrame != .zero {
+                            UpwardTutorial(
+                                message: "Create as many cue lists as you want",
+                                targetFrame: cueListNameButtonFrame,
+                                onDismiss: {
+                                    showTutorial2c = false
+                                    hasSeenTutorial2c = true
+                                    // Show Tutorial 3 after dismissing
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        if !hasSeenTutorial3 {
+                                            showTutorial3 = true
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        // Tutorial 3: Controls capsule (after tutorial 2c)
+                        if showTutorial3 && controlsCapsuleFrame != .zero {
+                            DownwardTutorial(
+                                message: "Add buttons and faders for extra MIDI control",
+                                targetFrame: controlsCapsuleFrame,
+                                onDismiss: {
+                                    showTutorial3 = false
+                                    hasSeenTutorial3 = true
+                                }
+                            )
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.3), value: showTutorial1)
+                    .animation(.easeInOut(duration: 0.3), value: showTutorial2)
+                    .animation(.easeInOut(duration: 0.3), value: showTutorial2b)
+                    .animation(.easeInOut(duration: 0.3), value: showTutorial2c)
+                    .animation(.easeInOut(duration: 0.3), value: showTutorial3)
+                    .onChange(of: showTutorial1) { _, newValue in
+                        debugPrint("📖 [Tutorial] showTutorial1 changed to \(newValue), editButtonFrame=\(editButtonFrame), frame != .zero: \(editButtonFrame != .zero)")
+                    }
+                    .onChange(of: showTutorial2) { _, newValue in
+                        debugPrint("📖 [Tutorial] showTutorial2 changed to \(newValue), addCueButtonFrame=\(addCueButtonFrame)")
+                    }
+                    .onChange(of: showTutorial2b) { _, newValue in
+                        debugPrint("📖 [Tutorial] showTutorial2b changed to \(newValue), libraryButtonFrame=\(libraryButtonFrame)")
+                    }
+                    .onChange(of: showTutorial2c) { _, newValue in
+                        debugPrint("📖 [Tutorial] showTutorial2c changed to \(newValue), cueListNameButtonFrame=\(cueListNameButtonFrame)")
+                    }
+                    .onChange(of: showTutorial3) { _, newValue in
+                        debugPrint("📖 [Tutorial] showTutorial3 changed to \(newValue), controlsCapsuleFrame=\(controlsCapsuleFrame)")
+                    }
+                }
         }
     }
 
@@ -4252,10 +4585,45 @@ internal struct ContentView: View {
                         .onPreferenceChange(CapsuleBoundsPreferenceKey.self) { value in
                             capsuleBounds = value  // Update all capsule bounds for collision detection
                         }
+                        .onPreferenceChange(TutorialButtonFramePreferenceKey.self) { value in
+                            // Update tutorial button frames
+                            if let frame = value["editButton"] {
+                                editButtonFrame = frame
+                                debugPrint("📍 [Tutorial] editButton frame: \(frame)")
+                            }
+                            if let frame = value["addCueButton"] {
+                                addCueButtonFrame = frame
+                                debugPrint("📍 [Tutorial] addCueButton frame: \(frame)")
+                            }
+                            if let frame = value["libraryButton"] {
+                                libraryButtonFrame = frame
+                                debugPrint("📍 [Tutorial] libraryButton frame: \(frame)")
+                            }
+                            if let frame = value["cueListNameButton"] {
+                                cueListNameButtonFrame = frame
+                                debugPrint("📍 [Tutorial] cueListNameButton frame: \(frame)")
+                            }
+                            if let frame = value["controlsCapsule"] {
+                                controlsCapsuleFrame = frame
+                                debugPrint("📍 [Tutorial] controlsCapsule frame: \(frame)")
+                            }
+                        }
                         .onChange(of: isEditing) { oldValue, newValue in
                             if newValue {
                                 // Entering edit mode - save current mode
                                 modeBeforeEditing = store.mode
+
+                                // Tutorial 2: Show + button tutorial after clicking Edit
+                                if showTutorial1 {
+                                    // Dismiss Tutorial 1 first
+                                    showTutorial1 = false
+                                    hasSeenTutorial1 = true
+                                }
+                                if !hasSeenTutorial2 {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        showTutorial2 = true
+                                    }
+                                }
                             } else {
                                 // Exiting edit mode - restore previous mode if it was cue or regularPlusRemote
                                 if let previousMode = modeBeforeEditing,
@@ -4263,6 +4631,14 @@ internal struct ContentView: View {
                                     store.mode = previousMode
                                 }
                                 modeBeforeEditing = nil
+
+                                // Tutorial 2c: Show cue list name tutorial after exiting edit mode
+                                // Only if Tutorial 2b has been seen
+                                if hasSeenTutorial2b && !hasSeenTutorial2c {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        showTutorial2c = true
+                                    }
+                                }
                             }
                         }
                         .onChange(of: scenePhase) { _, phase in
@@ -4305,6 +4681,28 @@ internal struct ContentView: View {
                                     debugPrint("✅ Mode change saved: \(newMode)")
                                 } catch {
                                     debugPrint("❌ Mode change save failed: \(error)")
+                                }
+                            }
+
+                            // Tutorial interruption: When switching to Navigator or Cue mode, pause current tutorial
+                            // so the nav pill or cue capsule tutorial can show first
+                            if newMode == .regularPlusRemote || newMode == .cue {
+                                // Check if any tutorial is currently showing and save it
+                                if showTutorial1 {
+                                    interruptedTutorial = 1
+                                    showTutorial1 = false
+                                } else if showTutorial2 {
+                                    interruptedTutorial = 2
+                                    showTutorial2 = false
+                                } else if showTutorial2b {
+                                    interruptedTutorial = 3  // Using 3 for 2b
+                                    showTutorial2b = false
+                                } else if showTutorial2c {
+                                    interruptedTutorial = 4  // Using 4 for 2c
+                                    showTutorial2c = false
+                                } else if showTutorial3 {
+                                    interruptedTutorial = 5  // Using 5 for 3
+                                    showTutorial3 = false
                                 }
                             }
                         }
@@ -4376,7 +4774,14 @@ internal struct ContentView: View {
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
             .presentationCornerRadius(20)
         }
-        .sheet(isPresented: $showAddEdit) {
+        .sheet(isPresented: $showAddEdit, onDismiss: {
+            // Tutorial 2b: Show Library tutorial after adding a cue
+            if hasSeenTutorial2 && !hasSeenTutorial2b && isEditing {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showTutorial2b = true
+                }
+            }
+        }) {
             CBAddEditCueSheet(
                 editingSong: $editingSong,
                 conflictFor: conflictLookup(),
@@ -4633,20 +5038,21 @@ internal struct ContentView: View {
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
             .presentationCornerRadius(20)
         }
-        .sheet(isPresented: $showOnboarding) {
+        .sheet(isPresented: $showOnboarding, onDismiss: {
+            // Tutorial 1: Show Edit button tutorial after onboarding dismisses
+            debugPrint("📖 [Tutorial] Onboarding dismissed. hasSeenTutorial1=\(hasSeenTutorial1)")
+            if !hasSeenTutorial1 {
+                debugPrint("📖 [Tutorial] Scheduling Tutorial 1 (Edit button)")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    debugPrint("📖 [Tutorial] Setting showTutorial1 = true")
+                    showTutorial1 = true
+                }
+            }
+        }) {
             OnboardingView()
                 .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
                 .presentationCornerRadius(20)
                 .interactiveDismissDisabled(false)
-                // TODO: Integrate tutorial when ready
-                // .onDisappear {
-                //     // Start tutorial after onboarding if user hasn't completed it
-                //     if TutorialCoordinator.shouldShowTutorial() {
-                //         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                //             tutorialCoordinator.start()
-                //         }
-                //     }
-                // }
         }
         .sheet(isPresented: $showAboutSheet) {
             AboutSheet()
@@ -5316,6 +5722,31 @@ internal struct ContentView: View {
             store.cuedSong = store.activeSongs.first
         }
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    // MARK: - Tutorial Resume
+    /// Resumes a tutorial that was interrupted by nav pill or cue capsule tutorial
+    private func resumeInterruptedTutorial() {
+        guard let interrupted = interruptedTutorial else { return }
+        interruptedTutorial = nil
+
+        // Small delay to let the capsule tutorial fully dismiss
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            switch interrupted {
+            case 1:
+                showTutorial1 = true
+            case 2:
+                showTutorial2 = true
+            case 3:
+                showTutorial2b = true
+            case 4:
+                showTutorial2c = true
+            case 5:
+                showTutorial3 = true
+            default:
+                break
+            }
+        }
     }
 
     // MARK: - Regular Mode Navigation (for Navigation Capsule)
@@ -6501,6 +6932,14 @@ private struct CBTopBar: View {
             }
         }
         .buttonStyle(.plain)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: TutorialButtonFramePreferenceKey.self,
+                    value: ["cueListNameButton": geo.frame(in: .global)]
+                )
+            }
+        )
         .popover(isPresented: $showCueListChooser, arrowEdge: .top) {
             CueListChooserPopover(
                 cueLists: $cueLists,
@@ -6595,6 +7034,14 @@ private struct CBTopBar: View {
                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
                 .transition(.opacity.combined(with: .scale))
                 .id("libraryButton")
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: TutorialButtonFramePreferenceKey.self,
+                            value: ["libraryButton": geo.frame(in: .global)]
+                        )
+                    }
+                )
                 .popover(isPresented: $showLibraryPopover, arrowEdge: .top) {
                     SongLibraryPopover(
                         library: $songLibrary,
@@ -6644,6 +7091,14 @@ private struct CBTopBar: View {
                 }
                 .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
                 .transition(.opacity.combined(with: .scale))
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: TutorialButtonFramePreferenceKey.self,
+                            value: ["addCueButton": geo.frame(in: .global)]
+                        )
+                    }
+                )
             }
 
             // Edit/Done button (morphs between states)
@@ -6658,6 +7113,14 @@ private struct CBTopBar: View {
                         .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
                         .transition(.opacity.combined(with: .scale))
                         .id("editButton")
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: TutorialButtonFramePreferenceKey.self,
+                                    value: ["editButton": geo.frame(in: .global)]
+                                )
+                            }
+                        )
                 }
             }
         }
@@ -11924,6 +12387,7 @@ struct DraggableNavigationCapsule: View {
     let capsuleBounds: [String: CGRect]  // All UI capsule bounds for collision detection
     let hasControlButtons: Bool  // Whether there are control buttons in the control area
     let themeColor: Color  // Theme color for background
+    var onTutorialDismiss: (() -> Void)? = nil  // Called when tutorial is dismissed, to resume interrupted tutorial
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -11943,7 +12407,7 @@ struct DraggableNavigationCapsule: View {
     @State private var isExpanded: Bool = true  // Whether pill is expanded or collapsed - default is open
     @State private var hasSeenNavPillTutorial: Bool = false  // Track if user has seen the tutorial
     @State private var showNavPillTutorial: Bool = false  // Show tutorial popup
-    @State private var tutorialFloatOffset: CGFloat = 0  // For continuous ghost-like floating animation
+    @State private var tutorialFloatOffset: CGFloat = 4  // For continuous ghost-like floating animation (start at bottom)
     @State private var tutorialPosition: CGPoint = .zero  // Tutorial's calculated position
     @State private var tutorialWidth: CGFloat = 0  // Tutorial's measured width
 
@@ -12142,11 +12606,14 @@ struct DraggableNavigationCapsule: View {
                         #if !DEBUG
                         UserDefaults.standard.set(true, forKey: config.tutorialUserDefaultsKey)
                         #endif
+                        // Resume any interrupted tutorial
+                        onTutorialDismiss?()
                     }
                 )
                 .onPreferenceChange(TutorialWidthPreferenceKey.self) { width in
                     tutorialWidth = width
                 }
+                .zIndex(1000)  // Ensure tutorial appears above control area
             }
 
             VStack(spacing: 0) {
@@ -12308,9 +12775,9 @@ struct DraggableNavigationCapsule: View {
                 if shouldShowTutorial {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         showNavPillTutorial = true
-                        // Start ghost-like floating animation
+                        // Start ghost-like floating animation (bobs up and down from center)
                         withAnimation(.easeInOut(duration: config.tutorialFloatDuration).repeatForever(autoreverses: true)) {
-                            tutorialFloatOffset = -config.tutorialFloatDistance
+                            tutorialFloatOffset = -4  // Animate from +4 to -4
                         }
                     }
                 }
@@ -12352,13 +12819,14 @@ struct SimpleDraggableTransportDock: View {
     let capsuleBounds: [String: CGRect]
     let hasControlButtons: Bool
     let themeColor: Color  // Theme color for background
+    var onTutorialDismiss: (() -> Void)? = nil  // Called when tutorial is dismissed, to resume interrupted tutorial
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @State private var position: CGPoint = .zero
     @State private var isExpanded: Bool = true  // Default is open
     @State private var showCueCapsuleTutorial: Bool = false
-    @State private var tutorialFloatOffset: CGFloat = 0
+    @State private var tutorialFloatOffset: CGFloat = 4  // Start at bottom of float range
     @State private var tutorialWidth: CGFloat = 0
 
     private let config = SwipeableCapsuleConfig.cueCapsule
@@ -12411,11 +12879,14 @@ struct SimpleDraggableTransportDock: View {
                         #if !DEBUG
                         UserDefaults.standard.set(true, forKey: config.tutorialUserDefaultsKey)
                         #endif
+                        // Resume any interrupted tutorial
+                        onTutorialDismiss?()
                     }
                 )
                 .onPreferenceChange(TutorialWidthPreferenceKey.self) { width in
                     tutorialWidth = width
                 }
+                .zIndex(1000)  // Ensure tutorial appears above control area
             }
 
             VStack(spacing: 0) {
@@ -12578,9 +13049,9 @@ struct SimpleDraggableTransportDock: View {
                 if shouldShowTutorial {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         showCueCapsuleTutorial = true
-                        // Start ghost-like floating animation
+                        // Start ghost-like floating animation (bobs up and down from center)
                         withAnimation(.easeInOut(duration: config.tutorialFloatDuration).repeatForever(autoreverses: true)) {
-                            tutorialFloatOffset = -config.tutorialFloatDistance
+                            tutorialFloatOffset = -4  // Animate from +4 to -4
                         }
                     }
                 }
