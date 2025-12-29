@@ -595,21 +595,22 @@ struct CBPerformanceRow: View {
                 return bgLuminance < 0.5 ? 0 : 6  // No y-offset for glow, offset for shadow
             }()
         )
-        .scaleEffect(isPressed ? 0.97 : 1.0)
+        .scaleEffect(isPressed && !isCueMode ? 0.995 : 1.0)
         .shadow(
-            color: isCued ? baseColor.opacity(0.6) : Color.black.opacity(isPressed ? 0.1 : 0.2),
-            radius: isPressed ? 4 : 8,
+            color: isCued ? baseColor.opacity(0.6) : Color.black.opacity(isPressed && !isCueMode ? 0.18 : 0.2),
+            radius: isPressed && !isCueMode ? 7.5 : 8,
             x: 0,
             y: {
                 let bgLuminance = relativeLuminance(hex: song.colorHex ?? defaultCueColorHex)
-                return bgLuminance < 0.5 ? 0 : (isPressed ? 3 : 6)
+                return bgLuminance < 0.5 ? 0 : (isPressed && !isCueMode ? 5.5 : 6)
             }()
         )
+        .animation(.easeOut(duration: 0.05), value: isPressed)
         .zIndex(isCued ? 1 : 0)  // Elevate selected cue above others
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .updating($isPressed) { _, state, _ in
-                    if !isEditing && !state {
+                    if !isEditing && !isCueMode && !state {
                         state = true
                     }
                 }
@@ -1922,8 +1923,8 @@ struct CBAddEditCueSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("SONG").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
-                    TextField("Name", text: $name, prompt: Text(defaultName).foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme)))
+                    Section(header: Text("SONG").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
+                        TextField("Name", text: $name, prompt: Text(defaultName).foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme)))
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(false)
                         .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))

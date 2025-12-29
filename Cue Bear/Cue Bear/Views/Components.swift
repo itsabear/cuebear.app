@@ -144,7 +144,7 @@ struct CBTransportDock: View {
         // Vertical layout with GO button in center
         let pillWidth: CGFloat = 100
         let pillHeight: CGFloat = 260
-        let buttonHeight: CGFloat = 60
+        let buttonHeight: CGFloat = 80  // Increased from 60 for taller - and + buttons
         let goButtonSize: CGFloat = 120
 
         VStack(spacing: 0) {
@@ -196,17 +196,6 @@ struct CBTransportDock: View {
             .disabled(!canNext || isDragging)
         }
         .frame(width: pillWidth + 40, height: pillHeight)
-        .background(
-            GeometryReader { geo in
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-                    .preference(
-                        key: CapsuleBoundsPreferenceKey.self,
-                        value: ["cueCapsule.bounds": geo.frame(in: .global)]
-                    )
-            }
-        )
-        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 6)
     }
 }
 
