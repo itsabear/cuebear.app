@@ -8071,10 +8071,17 @@ private struct CBControlSection: View {
                 gridWithLifecycle
                     .zIndex(1)  // Grid (with X buttons) renders on top
             }
-            .background(.regularMaterial)
-            .background(controlAreaColor.opacity(0.5))
-            .cornerRadius(20)  // Use cornerRadius instead of clipShape to avoid clipping subviews
-            .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
+            .background(
+                // Background layers with rounded corners - doesn't clip content
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.regularMaterial)
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(controlAreaColor.opacity(0.5))
+                }
+                .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
+            )
+            // Content is NOT clipped - X buttons can extend beyond bounds
         }
 
         let shapedView = baseView
@@ -10497,22 +10504,21 @@ private struct iPadControlTile: View {
                 }
             }
             
-            // Delete button in edit mode
+            // Delete button in edit mode - positioned inside cell to avoid clipping
             if isEditing {
                 Button(action: onDelete) {
                     ZStack {
                         Circle()
                             .fill(Color.gray.opacity(0.9))
-                            .frame(width: isPhone ? 20 : 30, height: isPhone ? 20 : 30)  // iPhone: 20pt (like homescreen), iPad: 30pt
+                            .frame(width: isPhone ? 20 : 24, height: isPhone ? 20 : 24)  // Slightly smaller on iPad to fit inside
                         Image(systemName: "xmark")
-                            .font(.system(size: isPhone ? 10 : 13, weight: .bold))  // iPhone: smaller X
+                            .font(.system(size: isPhone ? 10 : 11, weight: .bold))
                             .foregroundColor(Color(uiColor: .systemBackground))
                     }
                 }
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
-                .frame(width: isPhone ? 44 : 70, height: isPhone ? 44 : 70)  // iPhone: smaller hit area
-                .offset(x: isPhone ? -10 : -30, y: isPhone ? -10 : -30)  // iPhone: position at corner, half sticking out
+                .frame(width: 44, height: 44)  // Standard hit area
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
