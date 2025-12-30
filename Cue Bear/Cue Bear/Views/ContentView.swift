@@ -7694,127 +7694,66 @@ private struct CBControlSection: View {
     }
     
     private var mainHeader: some View {
-        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        HStack(spacing: 12) {
+            // Left side - edit mode buttons in shared capsule
+            if isEditing && !isCollapsed {
+                HStack(spacing: 0) {
+                    // Undo
+                    Button(action: onUndo) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(canUndo ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .frame(width: 44, height: 44)
+                    }
+                    .disabled(!canUndo)
 
-        return HStack(spacing: isPhone ? 6 : 10) {
+                    // Redo
+                    Button(action: onRedo) {
+                        Image(systemName: "arrow.uturn.forward")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(canRedo ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .frame(width: 44, height: 44)
+                    }
+                    .disabled(!canRedo)
+
+                    // Divider
+                    Rectangle()
+                        .fill(defaultCueColor.opacity(0.2))
+                        .frame(width: 1, height: 24)
+
+                    // + Button (text)
+                    Button(action: onAddButton) {
+                        Text("+ Button")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(canAddMoreControls ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .padding(.horizontal, 12)
+                            .frame(height: 44)
+                    }
+                    .disabled(!canAddMoreControls)
+
+                    // + Fader (text)
+                    Button(action: onAddFader) {
+                        Text("+ Fader")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(canAddFader ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .padding(.horizontal, 12)
+                            .frame(height: 44)
+                    }
+                    .disabled(!canAddFader)
+                }
+                .background(
+                    Capsule()
+                        .fill(lightButtonBackgroundColor)
+                        .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                )
+            }
+
             Spacer()
 
-            if isPhone {
-                // iPhone: Compact button layout
-                if !isCollapsed {
-                    if isEditing {
-                        // Edit mode: Chevron, Done, Redo, Undo, More (right to left order)
-                        HStack(spacing: 6) {
-                            Button(action: {
-                                withAnimation(.easeOut(duration: 0.1)) {
-                                    isEditing = false  // Exit edit mode when folding
-                                    isCollapsed.toggle()
-                                }
-                            }) {
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .frame(minWidth: 32, minHeight: 32)
-                            }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-                            .contentShape(Rectangle())
-
-                            Button("Done") {
-                                withAnimation(.easeInOut) {
-                                    isEditing = false
-                                    clearDragState(reason: "done button")
-                                }
-                            }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-
-                            Button(action: onRedo) {
-                                Image(systemName: "arrow.uturn.forward")
-                            }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-                            .disabled(!canRedo)
-
-                            Button(action: onUndo) {
-                                Image(systemName: "arrow.uturn.backward")
-                            }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-                            .disabled(!canUndo)
-
-                            Button(action: { showControlAddMenu = true }) {
-                                Image(systemName: "ellipsis")
-                            }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-                            .confirmationDialog("Add Control", isPresented: $showControlAddMenu) {
-                                Button("+ Button") {
-                                    onAddButton()
-                                }
-                                .disabled(!canAddMoreControls)
-                                Button("+ Fader") {
-                                    onAddFader()
-                                }
-                                .disabled(!canAddFader)
-                                Button("Cancel", role: .cancel) {}
-                            }
-                        }
-                    } else {
-                        // Not editing: Edit, Chevron
-                        HStack(spacing: 6) {
-                            Button("Edit") {
-                                withAnimation(.easeInOut) {
-                                    isEditing = true
-                                    editSessionNonce &+= 1
-                                    clearDragState(reason: "edit button")
-                                }
-                            }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-
-                            if !buttons.isEmpty {
-                                Button(action: {
-                                    withAnimation(.easeOut(duration: 0.1)) {
-                                        isCollapsed.toggle()
-                                    }
-                                }) {
-                                    Image(systemName: "chevron.down")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .frame(minWidth: 32, minHeight: 32)
-                                }
-                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                                .controlSize(.mini)
-                                .contentShape(Rectangle())
-                            }
-                        }
-                    }
-                }
-            } else {
-                // iPad: Original button layout
-                if !isCollapsed {
-                    HStack(spacing: 6) {
-                        Button(action: onUndo) { Image(systemName: "arrow.uturn.backward") }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-                            .disabled(!canUndo)
-                        Button(action: onRedo) { Image(systemName: "arrow.uturn.forward") }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-                            .disabled(!canRedo)
-                        Button("+ Button") { onAddButton() }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-                            .disabled(!canAddMoreControls)
-                        Button("+ Fader") { onAddFader() }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
-                            .disabled(!canAddFader)
-                    }
-                    .opacity(isEditing ? 1 : 0)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isEditing)
-                }
-
-                Button(isEditing ? "Done" : "Edit") {
+            // Right side - Edit/Done + chevron in shared capsule
+            HStack(spacing: 0) {
+                // Edit/Done button (text)
+                Button(action: {
                     withAnimation(.easeInOut) {
                         isEditing.toggle()
                         if !isEditing {
@@ -7827,10 +7766,15 @@ private struct CBControlSection: View {
                             clearDragState(reason: "main edit button - entering edit mode")
                         }
                     }
+                }) {
+                    Text(isEditing ? "Done" : "Edit")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(defaultCueColor)
+                        .padding(.horizontal, 12)
+                        .frame(height: 44)
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: effectivelyCollapsed ? defaultCueColor : standardButtonColor))
-                .controlSize(.mini)
 
+                // Chevron collapse button
                 if !buttons.isEmpty {
                     Button(action: {
                         withAnimation(.easeOut(duration: 0.1)) {
@@ -7841,19 +7785,21 @@ private struct CBControlSection: View {
                         }
                     }) {
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .medium))
-                            .frame(minWidth: 32, minHeight: 32)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(defaultCueColor)
+                            .frame(width: 44, height: 44)
                     }
-                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: effectivelyCollapsed ? defaultCueColor : standardButtonColor))
-                    .controlSize(.mini)
-                    .contentShape(Rectangle())
                 }
             }
+            .background(
+                Capsule()
+                    .fill(lightButtonBackgroundColor)
+                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+            )
         }
-        .padding(.horizontal, isPhone ? 8 : 16)
-        .padding(.top, 2)
-        .padding(.bottom, 2)
-        .frame(height: isPhone ? 44 : nil)  // Fixed height on iPhone to prevent title bar from growing
+        .padding(.horizontal, 12)
+        .padding(.top, 8)  // Match sheet toolbar top spacing
+        .frame(height: 56)  // Taller to accommodate top padding + 44pt buttons
     }
     
 
