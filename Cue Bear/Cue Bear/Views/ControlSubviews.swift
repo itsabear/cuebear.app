@@ -258,7 +258,7 @@ struct CBPerformanceList: View {
                     Color.clear.frame(height: 8)
                 }
                 .padding(.horizontal, horizontalPadding)  // Apply horizontal padding to content
-                .padding(.top, isEditing ? 170 : 80)  // Slide down in edit mode - equal spacing with top bar
+                .padding(.top, isEditing ? 150 : 80)  // Slide down in edit mode - equal spacing with top bar
                 .padding(.bottom, controlAreaCollapsed ? 134 : controlAreaHeight + CGFloat(cueHeight) + 24)  // Dynamic padding: collapsed (100pt + 34pt safe area) or expanded (control height + cue height + 2x cue spacing so bottom cue scrolls above control area)
                 .animation(.spring(response: 0.15, dampingFraction: 0.85), value: isEditing)
             }
@@ -2856,10 +2856,12 @@ struct SongLibraryPopover: View {
                         Image(systemName: "arrow.up.arrow.down")
                             .font(.system(size: 18))
                             .foregroundColor(defaultCueColor)
-                            .frame(width: 36, height: 36)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Capsule()
+                                    .fill(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+                                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                            )
                     }
                 }
 
@@ -2875,10 +2877,12 @@ struct SongLibraryPopover: View {
                     Image(systemName: batchSelectMode ? "xmark" : "checklist")
                         .font(.system(size: 18))
                         .foregroundColor(defaultCueColor)
-                        .frame(width: 36, height: 36)
-                        .background(.regularMaterial)
-                        .background(titleBarColor.opacity(0.5))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Capsule()
+                                .fill(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+                                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                        )
                 }
             }
             .padding(.horizontal, 16)
@@ -3228,10 +3232,12 @@ struct CueListChooserPopover: View {
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(defaultCueColor)
-                            .frame(width: 36, height: 36)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Capsule()
+                                    .fill(theme.lightButtonBackgroundColor(for: colorScheme))
+                                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                            )
                     }
                 }
 
@@ -3310,10 +3316,12 @@ struct CueListChooserPopover: View {
                         Image(systemName: "arrow.up.arrow.down")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(defaultCueColor)
-                            .frame(width: 36, height: 36)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Capsule()
+                                    .fill(theme.lightButtonBackgroundColor(for: colorScheme))
+                                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                            )
                     }
                 }
 
@@ -3329,10 +3337,12 @@ struct CueListChooserPopover: View {
                     Image(systemName: batchSelectMode ? "xmark" : "checklist")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(defaultCueColor)
-                        .frame(width: 36, height: 36)
-                        .background(.regularMaterial)
-                        .background(titleBarColor.opacity(0.5))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Capsule()
+                                .fill(theme.lightButtonBackgroundColor(for: colorScheme))
+                                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                        )
                 }
             }
             .padding(.horizontal, 16)

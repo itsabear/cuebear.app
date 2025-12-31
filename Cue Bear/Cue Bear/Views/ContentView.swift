@@ -77,7 +77,7 @@ struct SwipeableCapsuleConfig {
 
     static let cueCapsule = SwipeableCapsuleConfig(
         expandedWidth: 140,
-        expandedHeight: 300,
+        expandedHeight: 275,
         collapsedWidth: 40,
         collapsedHeight: 100,
         tutorialText: "Swipe right to collapse",
@@ -3592,68 +3592,51 @@ internal struct ContentView: View {
                     // Search and action capsules overlay (only in edit mode) - cues scroll underneath
                     if isEditing {
                         HStack(spacing: 12) {
-                            // Search capsule - match height of select/reorder
-                            HStack(spacing: 12) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "magnifyingglass")
-                                        .imageScale(.medium)
-                                        .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                            // Search capsule - Apple-like capsule style
+                            HStack(spacing: 8) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
 
-                                    TextField("Search cues...", text: $setlistQuery)
-                                        .textFieldStyle(.plain)
-                                        .font(.system(size: 16))
-                                        .foregroundStyle(currentTheme.primaryTextColor(for: colorScheme))
-                                }
+                                TextField("Search cues...", text: $setlistQuery)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(currentTheme.primaryTextColor(for: colorScheme))
 
                                 if !setlistQuery.isEmpty {
                                     Button(action: { setlistQuery = "" }) {
                                         Image(systemName: "xmark.circle.fill")
-                                            .imageScale(.large)
-                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                            .font(.system(size: 16))
+                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme).opacity(0.6))
                                     }
-                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-                                } else {
-                                    // Invisible spacer button to maintain height when no clear button
-                                    Button(action: {}) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .imageScale(.large)
-                                            .foregroundStyle(.clear)
-                                    }
-                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: .clear, strokeColor: .clear))
-                                    .disabled(true)
-                                    .opacity(0)
+                                    .buttonStyle(.plain)
                                 }
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 14)
+                            .frame(height: 44)
                             .background(.regularMaterial)
-                            .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .clipShape(Capsule())
                             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
 
-                            // Select/Reorder capsule with action buttons
+                            // Select/Reorder capsule with action buttons - Apple-like capsule style
                             HStack(spacing: 0) {
                                 if setlistBatchMode {
                                     // Select mode: action buttons on left, X on right
                                     Button("Clear") {
                                         setlistSelected.removeAll()
                                     }
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(.system(size: 15, weight: .medium))
                                     .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    .padding(.horizontal, 8)
                                     .transition(.scale.combined(with: .opacity))
-
-                                    Spacer()
-                                        .frame(width: 16)
 
                                     Button("Select All") {
                                         setlistSelected = Set(filteredActiveSongs.map { $0.id })
                                     }
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(.system(size: 15, weight: .medium))
                                     .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    .padding(.horizontal, 8)
                                     .transition(.scale.combined(with: .opacity))
-
-                                    Spacer()
-                                        .frame(width: 16)
 
                                     Button("Remove") {
                                         // Remove all selected cues
@@ -3664,21 +3647,18 @@ internal struct ContentView: View {
                                         setlistSelected.removeAll()
                                         isDirty = true
                                     }
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(.system(size: 15, weight: .medium))
                                     .foregroundStyle(.red)
                                     .disabled(setlistSelected.isEmpty)
                                     .opacity(setlistSelected.isEmpty ? 0.5 : 1.0)
+                                    .padding(.horizontal, 8)
                                     .transition(.scale.combined(with: .opacity))
 
-                                    Spacer()
-                                        .frame(width: 20)
-
-                                    Divider()
-                                        .frame(height: 24)
+                                    Rectangle()
+                                        .fill(currentTheme.defaultCueColor(for: colorScheme).opacity(0.2))
+                                        .frame(width: 1, height: 24)
+                                        .padding(.horizontal, 8)
                                         .transition(.scale.combined(with: .opacity))
-
-                                    Spacer()
-                                        .frame(width: 12)
 
                                     // X button on the right
                                     Button(action: {
@@ -3688,10 +3668,11 @@ internal struct ContentView: View {
                                         }
                                     }) {
                                         Image(systemName: "xmark")
-                                            .font(.system(size: 20))
+                                            .font(.system(size: 16, weight: .medium))
                                             .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                            .frame(width: 44, height: 44)
                                     }
-                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                                    .buttonStyle(.plain)
                                 } else {
                                     // Normal mode: select and reorder buttons (select on left, reorder on right)
                                     Button(action: {
@@ -3701,10 +3682,11 @@ internal struct ContentView: View {
                                         }
                                     }) {
                                         Image(systemName: "checklist")
-                                            .font(.system(size: 20))
+                                            .font(.system(size: 18))
                                             .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                            .frame(width: 44, height: 44)
                                     }
-                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                                    .buttonStyle(.plain)
                                     .transition(.scale.combined(with: .opacity))
 
                                     Button(action: {
@@ -3713,21 +3695,20 @@ internal struct ContentView: View {
                                         }
                                     }) {
                                         Image(systemName: reorderMode ? "checkmark" : "list.bullet")
-                                            .font(.system(size: 20))
+                                            .font(.system(size: 18))
                                             .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                            .frame(width: 44, height: 44)
                                     }
-                                    .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
+                                    .buttonStyle(.plain)
                                 }
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
+                            .frame(height: 44)
                             .background(.regularMaterial)
-                            .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .clipShape(Capsule())
                             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         }
                         .padding(.horizontal, 16)
-                        .padding(.top, 88)  // Position below the top bar (increased from 68)
+                        .padding(.top, 68)  // Position below the top bar
                         .background(
                             GeometryReader { geo in
                                 Color.clear.preference(key: EditCapsuleBottomPreferenceKey.self, value: geo.frame(in: .global).maxY)
@@ -6873,11 +6854,10 @@ private struct CBTopBar: View {
                     mainMenuButton
                     projectNameButton
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 14)
+                .frame(height: 44)
                 .background(.regularMaterial)
-                .background(titleBarColor.opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .clipShape(Capsule())
                 .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                 .padding(.leading, 16)
                 .background(
@@ -6895,11 +6875,10 @@ private struct CBTopBar: View {
 
             // RIGHT CAPSULE: Unified controls that morph between states
             rightCapsuleControls
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 14)
+            .frame(height: 44)
             .background(.regularMaterial)
-            .background(titleBarColor.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(Capsule())
             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
             .padding(.trailing, 16)
             .padding(.leading, isPhone && isEditing ? 16 : 0)  // iPhone edit mode: expand to left edge
@@ -6921,19 +6900,11 @@ private struct CBTopBar: View {
     private var projectNameButton: some View {
         Button(action: { showCueListChooser.toggle() }) {
             HStack(spacing: 6) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(projectTitle)
-                        .font(themeFont(17, .semibold))
-                        .foregroundStyle(textColor)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Text(activeCueList?.name ?? "Untitled")
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundStyle(textColor.opacity(0.6))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
+                Text(activeCueList?.name ?? "Untitled")
+                    .font(themeFont(17, .semibold))
+                    .foregroundStyle(textColor)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Image(systemName: showCueListChooser ? "chevron.up" : "chevron.down")
                     .font(.system(size: 12, weight: .semibold))
@@ -7799,9 +7770,10 @@ private struct CBControlSection: View {
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)  // Match sheet toolbar top spacing
-        .frame(height: 56)  // Taller to accommodate top padding + 44pt buttons
+        .padding(.bottom, 12)  // Space between header capsules and button grid (prevents X button clipping)
+        .frame(height: 68)  // Taller to accommodate top + bottom padding + 44pt buttons
     }
-    
+
 
     var body: some View {
         // Early return for collapsed/empty states - skip grid creation entirely
