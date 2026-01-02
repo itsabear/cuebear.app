@@ -2770,75 +2770,91 @@ struct SongLibraryPopover: View {
             HStack(spacing: 12) {
                 Spacer()
 
-                // Select mode action buttons
+                // Select mode action buttons in shared capsule
                 if batchSelectMode {
-                    // Select All button
-                    Button(action: {
-                        selectedSongs = Set(filteredSongs.map { $0.id })
-                    }) {
-                        Text("Select All")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(defaultCueColor)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
+                    HStack(spacing: 0) {
+                        // Select All button
+                        Button(action: {
+                            selectedSongs = Set(filteredSongs.map { $0.id })
+                        }) {
+                            Text("Select All")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(.plain)
 
-                    // Clear selection button
-                    Button(action: {
-                        selectedSongs.removeAll()
-                    }) {
-                        Text("Clear")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(defaultCueColor)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
+                        // Clear selection button
+                        Button(action: {
+                            selectedSongs.removeAll()
+                        }) {
+                            Text("Clear")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(.plain)
 
-                    // Add selected button
-                    Button(action: {
-                        // Add all selected songs that are not already in cue list
-                        for songID in selectedSongs {
-                            if let song = library.first(where: { $0.id == songID }),
-                               !activeSongIDs.contains(songID) {
-                                onAddToCueList(song)
+                        // Add selected button
+                        Button(action: {
+                            // Add all selected songs that are not already in cue list
+                            for songID in selectedSongs {
+                                if let song = library.first(where: { $0.id == songID }),
+                                   !activeSongIDs.contains(songID) {
+                                    onAddToCueList(song)
+                                }
                             }
+                            selectedSongs.removeAll()
+                            UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
+                        }) {
+                            Text("Add")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .green)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
                         }
-                        selectedSongs.removeAll()
-                        UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
-                    }) {
-                        Text("Add")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .green)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-                    .disabled(selectedSongs.isEmpty)
+                        .buttonStyle(.plain)
+                        .disabled(selectedSongs.isEmpty)
 
-                    // Delete selected button
-                    Button(action: {
-                        if !selectedSongs.isEmpty {
-                            showBatchDeleteConfirmation = true
+                        // Delete selected button
+                        Button(action: {
+                            if !selectedSongs.isEmpty {
+                                showBatchDeleteConfirmation = true
+                            }
+                        }) {
+                            Text("Delete")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .red)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
                         }
-                    }) {
-                        Text("Delete")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .red)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .buttonStyle(.plain)
+                        .disabled(selectedSongs.isEmpty)
+
+                        Rectangle()
+                            .fill(defaultCueColor.opacity(0.2))
+                            .frame(width: 1, height: 24)
+                            .padding(.horizontal, 4)
+
+                        // X button to exit select mode
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                batchSelectMode = false
+                                selectedSongs.removeAll()
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .disabled(selectedSongs.isEmpty)
+                    .background(.regularMaterial)
+                    .clipShape(Capsule())
+                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                 } else {
                     // Sort menu (icon only) - only shown when not in select mode
                     Menu {
@@ -2865,50 +2881,52 @@ struct SongLibraryPopover: View {
                     }
                 }
 
-                // Select/Exit button (icon only)
-                Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        batchSelectMode.toggle()
-                        if !batchSelectMode {
-                            selectedSongs.removeAll()
+                // Select button (icon only) - only show when NOT in batch mode
+                if !batchSelectMode {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            batchSelectMode = true
                         }
+                    }) {
+                        Image(systemName: "checklist")
+                            .font(.system(size: 18))
+                            .foregroundColor(defaultCueColor)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Capsule()
+                                    .fill(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+                                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                            )
                     }
-                }) {
-                    Image(systemName: batchSelectMode ? "xmark" : "checklist")
-                        .font(.system(size: 18))
-                        .foregroundColor(defaultCueColor)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            Capsule()
-                                .fill(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
-                                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
-                        )
                 }
             }
             .padding(.horizontal, 16)
 
-            // Search bar (moved below buttons)
-            HStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(textColor.opacity(0.5))
+            // Search bar (moved below buttons) - Apple-like capsule style
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16))
+                    .foregroundColor(defaultCueColor)
 
-                    TextField("Search songs...", text: $searchQuery)
-                        .foregroundColor(textColor)
+                TextField("Search songs...", text: $searchQuery)
+                    .font(.system(size: 15))
+                    .foregroundColor(textColor)
 
-                    if !searchQuery.isEmpty {
-                        Button(action: { searchQuery = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(textColor.opacity(0.5))
-                        }
+                if !searchQuery.isEmpty {
+                    Button(action: { searchQuery = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(defaultCueColor.opacity(0.6))
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.regularMaterial)
-                .background(titleBarColor.opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .frame(maxWidth: .infinity)
+            .background(.regularMaterial)
+            .clipShape(Capsule())
+            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
             .padding(.horizontal, 16)
         }
         .padding(.vertical, 12)
@@ -3257,48 +3275,66 @@ struct CueListChooserPopover: View {
                 Spacer()
 
                 if batchSelectMode {
-                    // Batch mode action buttons
-                    Button(action: {
-                        selectedCueLists = Set(filteredCueLists.map { $0.id })
-                    }) {
-                        Text("Select All")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(defaultCueColor)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-
-                    Button(action: {
-                        selectedCueLists.removeAll()
-                    }) {
-                        Text("Clear")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(defaultCueColor)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-
-                    Button(action: {
-                        if !selectedCueLists.isEmpty {
-                            showBatchDeleteConfirmation = true
+                    // Batch mode action buttons in shared capsule
+                    HStack(spacing: 0) {
+                        Button(action: {
+                            selectedCueLists = Set(filteredCueLists.map { $0.id })
+                        }) {
+                            Text("Select All")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
                         }
-                    }) {
-                        Text("Delete")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(selectedCueLists.isEmpty ? textColor.opacity(0.3) : .red)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.regularMaterial)
-                            .background(titleBarColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            selectedCueLists.removeAll()
+                        }) {
+                            Text("Clear")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            if !selectedCueLists.isEmpty {
+                                showBatchDeleteConfirmation = true
+                            }
+                        }) {
+                            Text("Delete")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(selectedCueLists.isEmpty ? textColor.opacity(0.3) : .red)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(selectedCueLists.isEmpty)
+
+                        Rectangle()
+                            .fill(defaultCueColor.opacity(0.2))
+                            .frame(width: 1, height: 24)
+                            .padding(.horizontal, 4)
+
+                        // X button to exit select mode
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                batchSelectMode = false
+                                selectedCueLists.removeAll()
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .disabled(selectedCueLists.isEmpty)
+                    .background(.regularMaterial)
+                    .clipShape(Capsule())
+                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                 } else {
                     // Sort menu (icon only) - only show when NOT in batch mode
                     Menu {
@@ -3325,24 +3361,23 @@ struct CueListChooserPopover: View {
                     }
                 }
 
-                // Select/Exit button
-                Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        batchSelectMode.toggle()
-                        if !batchSelectMode {
-                            selectedCueLists.removeAll()
+                // Select button - only show when NOT in batch mode
+                if !batchSelectMode {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            batchSelectMode = true
                         }
+                    }) {
+                        Image(systemName: "checklist")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(defaultCueColor)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Capsule()
+                                    .fill(theme.lightButtonBackgroundColor(for: colorScheme))
+                                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                            )
                     }
-                }) {
-                    Image(systemName: batchSelectMode ? "xmark" : "checklist")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(defaultCueColor)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            Capsule()
-                                .fill(theme.lightButtonBackgroundColor(for: colorScheme))
-                                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
-                        )
                 }
             }
             .padding(.horizontal, 16)
@@ -3355,28 +3390,31 @@ struct CueListChooserPopover: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
 
-            // Search bar
-            HStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(textColor.opacity(0.5))
+            // Search bar - Apple-like capsule style
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16))
+                    .foregroundColor(defaultCueColor)
 
-                    TextField("Search cue lists...", text: $searchQuery)
-                        .foregroundColor(textColor)
+                TextField("Search cue lists...", text: $searchQuery)
+                    .font(.system(size: 15))
+                    .foregroundColor(textColor)
 
-                    if !searchQuery.isEmpty {
-                        Button(action: { searchQuery = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(textColor.opacity(0.5))
-                        }
+                if !searchQuery.isEmpty {
+                    Button(action: { searchQuery = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(defaultCueColor.opacity(0.6))
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.regularMaterial)
-                .background(titleBarColor.opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .frame(maxWidth: .infinity)
+            .background(.regularMaterial)
+            .clipShape(Capsule())
+            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
             .padding(.horizontal, 16)
         }
         .padding(.vertical, 12)

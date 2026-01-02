@@ -77,7 +77,7 @@ struct SwipeableCapsuleConfig {
 
     static let cueCapsule = SwipeableCapsuleConfig(
         expandedWidth: 140,
-        expandedHeight: 275,
+        expandedHeight: 210,
         collapsedWidth: 40,
         collapsedHeight: 100,
         tutorialText: "Swipe right to collapse",
@@ -175,7 +175,7 @@ struct UpwardTutorial: View {
             // Arrow offset from bubble center to point at target
             let arrowOffset = targetX - clampedBubbleX
 
-            let tooltipY = targetFrame.maxY + 30  // Position below target (closer)
+            let tooltipY = targetFrame.maxY + 8  // Position just below target (touching)
 
             VStack(spacing: 0) {
                 // Arrow pointing up - offset horizontally to point at target
@@ -3728,34 +3728,38 @@ internal struct ContentView: View {
     }
 
     private var collapsedControlCapsule: some View {
-        // Always show "Controls" with faders icon (matching top capsules style)
-        HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
-            Button(action: {
-                withAnimation(.easeOut(duration: 0.1)) {
-                    controlAreaCollapsed = false
-                    // If empty, also enter edit mode
-                    if controlButtons.isEmpty {
-                        controlEditMode = true
-                    }
-                }
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 20, weight: .medium))
-                    Text("Controls")
-                }
-                .frame(minHeight: 32)
+        // Icon-only capsule (matching top capsules style)
+        Button(action: {
+            // Dismiss tutorial 3 when user clicks the controls capsule
+            if showTutorial3 {
+                showTutorial3 = false
+                hasSeenTutorial3 = true
             }
-            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: currentTheme.defaultCueColor(for: colorScheme)))
-            .controlSize(.mini)
-            .contentShape(Rectangle())
+            withAnimation(.easeOut(duration: 0.1)) {
+                controlAreaCollapsed = false
+                // If empty, also enter edit mode
+                if controlButtons.isEmpty {
+                    controlEditMode = true
+                }
+            }
+        }) {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 2)
+        .buttonStyle(.plain)
+        .frame(width: 44, height: 44)
         .background(.regularMaterial)
-        .background(currentTheme.titleBarColor(for: colorScheme).opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .clipShape(Capsule())
         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: TutorialButtonFramePreferenceKey.self,
+                    value: ["controlsCapsule": geo.frame(in: .global)]
+                )
+            }
+        )
         .padding(.trailing, 16)
         .padding(.bottom, 0)  // No internal bottom padding - applied externally at frame level
         .background(
@@ -3763,14 +3767,6 @@ internal struct ContentView: View {
                 Color.clear.preference(
                     key: CapsuleBoundsPreferenceKey.self,
                     value: ["controlArea.main": geo.frame(in: .global)]
-                )
-            }
-        )
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(
-                    key: TutorialButtonFramePreferenceKey.self,
-                    value: ["controlsCapsule": geo.frame(in: .global)]
                 )
             }
         )
@@ -4476,6 +4472,12 @@ internal struct ContentView: View {
                                 onDismiss: {
                                     showTutorial1 = false
                                     hasSeenTutorial1 = true
+                                    // When dismissed by tapping (not by clicking edit), show tutorial 3
+                                    if !hasSeenTutorial3 {
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            showTutorial3 = true
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -4560,6 +4562,20 @@ internal struct ContentView: View {
                     .onChange(of: showTutorial3) { _, newValue in
                         debugPrint("📖 [Tutorial] showTutorial3 changed to \(newValue), controlsCapsuleFrame=\(controlsCapsuleFrame)")
                     }
+                    .onChange(of: showCueListChooser) { _, isShowing in
+                        // Dismiss tutorial 2c when user opens cue list chooser
+                        if isShowing && showTutorial2c {
+                            showTutorial2c = false
+                            hasSeenTutorial2c = true
+                        }
+                    }
+                    .onChange(of: showLibraryPopover) { _, isShowing in
+                        // Dismiss tutorial 2b when user opens song library
+                        if isShowing && showTutorial2b {
+                            showTutorial2b = false
+                            hasSeenTutorial2b = true
+                        }
+                    }
                 }
         }
     }
@@ -4622,9 +4638,19 @@ internal struct ContentView: View {
                                 }
                                 modeBeforeEditing = nil
 
+                                // Dismiss tutorial 2 or 2b if still showing, mark as seen, then show 2c
+                                let shouldShowTutorial2c = (showTutorial2 || showTutorial2b || hasSeenTutorial2b) && !hasSeenTutorial2c
+                                if showTutorial2 {
+                                    showTutorial2 = false
+                                    hasSeenTutorial2 = true
+                                }
+                                if showTutorial2b {
+                                    showTutorial2b = false
+                                    hasSeenTutorial2b = true
+                                }
+
                                 // Tutorial 2c: Show cue list name tutorial after exiting edit mode
-                                // Only if Tutorial 2b has been seen
-                                if hasSeenTutorial2b && !hasSeenTutorial2c {
+                                if shouldShowTutorial2c {
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                         showTutorial2c = true
                                     }
@@ -6873,13 +6899,54 @@ private struct CBTopBar: View {
 
             Spacer()
 
-            // RIGHT CAPSULE: Unified controls that morph between states
-            rightCapsuleControls
-            .padding(.horizontal, 14)
-            .frame(height: 44)
-            .background(.regularMaterial)
-            .clipShape(Capsule())
-            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+            // RIGHT CAPSULES: Separate capsules for connections and edit
+            HStack(spacing: 8) {
+                // Connections capsule (hide when editing)
+                if !isEditing {
+                    Button(action: onConnections) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "antenna.radiowaves.left.and.right")
+                                .font(.system(size: 18))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(connectionTint)
+
+                            // Show connection type chip when connected
+                            if connectionCoordinator.activeConnection == .usb {
+                                Text("USB")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.green)
+                                    .clipShape(Capsule())
+                            } else if connectionCoordinator.activeConnection == .wifi {
+                                Text("WiFi")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.blue)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .background(.regularMaterial)
+                    .clipShape(Capsule())
+                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                    .transition(.opacity.combined(with: .scale))
+                }
+
+                // Edit controls capsule
+                rightCapsuleControls
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(.regularMaterial)
+                .clipShape(Capsule())
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+            }
             .padding(.trailing, 16)
             .padding(.leading, isPhone && isEditing ? 16 : 0)  // iPhone edit mode: expand to left edge
             .offset(x: showSideMenu ? 300 : 0)
@@ -6962,46 +7029,6 @@ private struct CBTopBar: View {
     // Unified right capsule that morphs between performance and edit modes
     private var rightCapsuleControls: some View {
         HStack(spacing: 12) {
-            // Connections button (hide when editing)
-            if !isEditing {
-                Button(action: onConnections) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "antenna.radiowaves.left.and.right")
-                            .imageScale(.large)
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(connectionTint)
-                            .scaleEffect(connectionCoordinator.activeConnection == .none ? 1.0 : 1.0)
-                            .animation(
-                                connectionCoordinator.activeConnection == .none
-                                    ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
-                                    : .default,
-                                value: connectionCoordinator.activeConnection
-                            )
-
-                        // Show connection type chip when connected
-                        if connectionCoordinator.activeConnection == .usb {
-                            Text("USB")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.green)
-                                .clipShape(Capsule())
-                        } else if connectionCoordinator.activeConnection == .wifi {
-                            Text("WiFi")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.blue)
-                                .clipShape(Capsule())
-                        }
-                    }
-                }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: connectionTint))
-                .transition(.opacity.combined(with: .scale))
-            }
-
             // Edit mode controls (show when editing)
             if isEditing {
                 // Library button - opens song library popover
@@ -7568,12 +7595,12 @@ private struct CBControlSection: View {
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundStyle(standardButtonColor)
                         }
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(controlAreaColor.opacity(0.9))
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 3)
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 14)
+                        .frame(height: 44)
+                        .background(.regularMaterial)
+                        .clipShape(Capsule())
+                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         .padding(.trailing, 16)
                         .padding(.bottom, 8)
                     }
@@ -7583,7 +7610,7 @@ private struct CBControlSection: View {
                 Color.clear
                     .frame(height: 0)
                     .overlay(alignment: .bottomTrailing) {
-                        HStack(spacing: UIDevice.current.userInterfaceIdiom == .phone ? 6 : 10) {
+                        HStack(spacing: 0) {
                             Button(action: {
                                 withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
                                     if isEditing {
@@ -7597,9 +7624,12 @@ private struct CBControlSection: View {
                                 }
                             }) {
                                 Text(isEditing ? "Done" : "Edit")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(defaultCueColor)
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 44)
                             }
-                            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                            .controlSize(.mini)
+                            .buttonStyle(.plain)
 
                             if !buttons.isEmpty {
                                 Button(action: {
@@ -7608,17 +7638,15 @@ private struct CBControlSection: View {
                                     }
                                 }) {
                                     Image(systemName: "chevron.up")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .frame(minWidth: 32, minHeight: 32)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(defaultCueColor)
+                                        .frame(width: 44, height: 44)
                                 }
-                                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: standardButtonColor))
-                                .controlSize(.mini)
+                                .buttonStyle(.plain)
                             }
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 2)
-                        .background(controlAreaColor.opacity(0.9))
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .background(.regularMaterial)
+                        .clipShape(Capsule())
                         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         .padding(.trailing, 16)
                         .padding(.bottom, 8)
@@ -7665,11 +7693,14 @@ private struct CBControlSection: View {
     }
     
     private var mainHeader: some View {
-        HStack(spacing: 12) {
-            // Left side - edit mode buttons in shared capsule
-            if isEditing && !isCollapsed {
-                HStack(spacing: 0) {
-                    // Undo
+        HStack(spacing: 8) {
+            Spacer()
+
+            // Main edit capsule - animates width between Edit text and full toolbar
+            HStack(spacing: 0) {
+                // Edit mode buttons (animate in from left)
+                if isEditing && !isCollapsed {
+                    // Undo (leftmost)
                     Button(action: onUndo) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 18, weight: .medium))
@@ -7677,6 +7708,7 @@ private struct CBControlSection: View {
                             .frame(width: 44, height: 44)
                     }
                     .disabled(!canUndo)
+                    .transition(.scale.combined(with: .opacity))
 
                     // Redo
                     Button(action: onRedo) {
@@ -7686,88 +7718,89 @@ private struct CBControlSection: View {
                             .frame(width: 44, height: 44)
                     }
                     .disabled(!canRedo)
+                    .transition(.scale.combined(with: .opacity))
 
-                    // Divider
-                    Rectangle()
-                        .fill(defaultCueColor.opacity(0.2))
-                        .frame(width: 1, height: 24)
+                    // + Add menu
+                    Menu {
+                        Button(action: onAddButton) {
+                            Label("Button", systemImage: "button.horizontal")
+                        }
+                        .disabled(!canAddMoreControls)
 
-                    // + Button (text)
-                    Button(action: onAddButton) {
-                        Text("+ Button")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(canAddMoreControls ? defaultCueColor : defaultCueColor.opacity(0.3))
-                            .padding(.horizontal, 12)
-                            .frame(height: 44)
+                        Button(action: onAddFader) {
+                            Label("Fader", systemImage: "slider.vertical.3")
+                        }
+                        .disabled(!canAddFader)
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor((canAddMoreControls || canAddFader) ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .frame(width: 44, height: 44)
                     }
-                    .disabled(!canAddMoreControls)
-
-                    // + Fader (text)
-                    Button(action: onAddFader) {
-                        Text("+ Fader")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(canAddFader ? defaultCueColor : defaultCueColor.opacity(0.3))
-                            .padding(.horizontal, 12)
-                            .frame(height: 44)
-                    }
-                    .disabled(!canAddFader)
+                    .disabled(!canAddMoreControls && !canAddFader)
+                    .transition(.scale.combined(with: .opacity))
                 }
-                .background(
-                    Capsule()
-                        .fill(lightButtonBackgroundColor)
-                        .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
-                )
-            }
 
-            Spacer()
-
-            // Right side - Edit/Done + chevron in shared capsule
-            HStack(spacing: 0) {
-                // Edit/Done button (text)
+                // Edit/Done button - always present, changes between text, checkmark, or chevron
                 Button(action: {
-                    withAnimation(.easeInOut) {
-                        isEditing.toggle()
-                        if !isEditing {
-                            clearDragState(reason: "main edit button - exiting edit mode")
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        if isEditing && buttons.isEmpty {
+                            // No buttons - collapse instead of exiting edit mode
+                            isCollapsed = true
+                            isEditing = false
+                            clearDragState(reason: "main edit button - collapsing empty control area")
                         } else {
-                            // Entering edit mode - always unfold the control area and clear selection
-                            isCollapsed = false
-                            selectedCue = nil  // Clear chosen cue when entering edit mode
-                            editSessionNonce &+= 1
-                            clearDragState(reason: "main edit button - entering edit mode")
+                            isEditing.toggle()
+                            if !isEditing {
+                                clearDragState(reason: "main edit button - exiting edit mode")
+                            } else {
+                                // Entering edit mode - always unfold the control area and clear selection
+                                isCollapsed = false
+                                selectedCue = nil  // Clear chosen cue when entering edit mode
+                                editSessionNonce &+= 1
+                                clearDragState(reason: "main edit button - entering edit mode")
+                            }
                         }
                     }
                 }) {
-                    Text(isEditing ? "Done" : "Edit")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(defaultCueColor)
-                        .padding(.horizontal, 12)
-                        .frame(height: 44)
-                }
-
-                // Chevron collapse button
-                if !buttons.isEmpty {
-                    Button(action: {
-                        withAnimation(.easeOut(duration: 0.1)) {
-                            if isEditing {
-                                isEditing = false  // Exit edit mode when folding
-                            }
-                            isCollapsed.toggle()
-                        }
-                    }) {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 16, weight: .semibold))
+                    if isEditing && !isCollapsed {
+                        // In edit mode: show chevron if empty, checkmark if has buttons
+                        Image(systemName: buttons.isEmpty ? "chevron.down" : "checkmark")
+                            .font(.system(size: 18, weight: .medium))
                             .foregroundColor(defaultCueColor)
                             .frame(width: 44, height: 44)
+                    } else {
+                        Text("Edit")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(defaultCueColor)
+                            .padding(.horizontal, 14)
+                            .frame(height: 44)
                     }
                 }
             }
-            .background(
-                Capsule()
-                    .fill(lightButtonBackgroundColor)
-                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
-            )
+            .background(.regularMaterial)
+            .clipShape(Capsule())
+            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+
+            // Chevron collapse button capsule - only in non-edit mode with buttons
+            if !isEditing && !buttons.isEmpty {
+                Button(action: {
+                    withAnimation(.easeOut(duration: 0.1)) {
+                        isCollapsed.toggle()
+                    }
+                }) {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(defaultCueColor)
+                        .frame(width: 44, height: 44)
+                }
+                .background(.regularMaterial)
+                .clipShape(Capsule())
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .transition(.scale.combined(with: .opacity))
+            }
         }
+        .animation(.easeInOut(duration: 0.25), value: isEditing)
         .padding(.horizontal, 12)
         .padding(.top, 8)  // Match sheet toolbar top spacing
         .padding(.bottom, 12)  // Space between header capsules and button grid (prevents X button clipping)
@@ -7991,13 +8024,9 @@ private struct CBControlSection: View {
             }
             .background(
                 // Background layers with rounded corners - doesn't clip content
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(.regularMaterial)
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(controlAreaColor.opacity(0.5))
-                }
-                .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.regularMaterial)
+                    .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
             )
             // Content is NOT clipped - X buttons can extend beyond bounds
         }
@@ -8106,14 +8135,15 @@ private struct CBControlSection: View {
         // Add extra padding in landscape to prevent cutoff and provide breathing room
         // iPhone landscape: no extra padding since we want buttons flush to bottom
         let extraPadding: CGFloat = isLandscape && UIDevice.current.userInterfaceIdiom != .phone ? 30 : 0
-        // iPhone uses different vertical padding: top=18, bottom=columnSpacing (portrait) or 0 (landscape)
-        // iPad uses gridPadding for both top and bottom
+        // Vertical padding must match the actual grid padding applied in buildControlGrid
         let actualVerticalPadding: CGFloat
         if UIDevice.current.userInterfaceIdiom == .phone {
+            // iPhone: keep original values for now
             let bottomPadding = isLandscape ? 0 : columnSpacing
             actualVerticalPadding = 18 + bottomPadding  // top + bottom
         } else {
-            actualVerticalPadding = (gridPadding + 4) + (gridPadding + (isLandscape ? 10 : 0))  // top + bottom
+            // iPad: top=8, bottom=gridPadding (same as sides)
+            actualVerticalPadding = 8 + gridPadding
         }
         let finalHeight = gridHeight + actualVerticalPadding + extraPadding
 
@@ -9290,7 +9320,7 @@ private struct CBControlSection: View {
         .padding(EdgeInsets(
             top: 8,
             leading: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding,
-            bottom: UIDevice.current.userInterfaceIdiom == .phone ? (verticalSizeClass == .compact ? 0 : columnSpacing) : (gridPadding + (verticalSizeClass == .compact ? 10 : 0)),
+            bottom: UIDevice.current.userInterfaceIdiom == .phone ? (verticalSizeClass == .compact ? 0 : columnSpacing) : gridPadding,
             trailing: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
         ))
         .frame(maxWidth: .infinity, alignment: .topLeading)
