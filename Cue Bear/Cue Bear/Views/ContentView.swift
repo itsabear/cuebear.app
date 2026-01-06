@@ -76,8 +76,8 @@ struct SwipeableCapsuleConfig {
     )
 
     static let cueCapsule = SwipeableCapsuleConfig(
-        expandedWidth: 140,
-        expandedHeight: 210,
+        expandedWidth: 140,  // Same as navPill
+        expandedHeight: 275,  // Same as navPill for visual consistency
         collapsedWidth: 40,
         collapsedHeight: 100,
         tutorialText: "Swipe right to collapse",
@@ -315,6 +315,156 @@ struct DownwardTutorial: View {
             }
         }
         .allowsHitTesting(true)
+    }
+}
+
+/// Tutorial bubble that points rightward to a target element (positioned on left side, arrow pointing right)
+/// Used for iPhone control area two-finger scroll tutorial
+struct RightwardTutorial: View {
+    let message: String
+    let targetFrame: CGRect
+    let onDismiss: () -> Void
+
+    @State private var floatOffset: CGFloat = 4  // Start at bottom of float range (horizontal float)
+    @State private var hasStartedAnimation = false
+    @State private var bubbleSize: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geo in
+            let screenHeight = geo.size.height
+            let padding: CGFloat = 16
+            let estimatedBubbleHeight = bubbleSize.height > 0 ? bubbleSize.height : 50
+
+            // Target Y where the arrow should point (center of control area)
+            let targetY = targetFrame.midY
+
+            // Clamp bubble center Y so bubble stays within screen bounds
+            let minBubbleY = padding + estimatedBubbleHeight / 2
+            let maxBubbleY = screenHeight - padding - estimatedBubbleHeight / 2
+            let clampedBubbleY = min(max(targetY, minBubbleY), maxBubbleY)
+
+            // Arrow offset from bubble center to point at target
+            let arrowOffset = targetY - clampedBubbleY
+
+            // Position to the left of the target, leaving space for arrow
+            let tooltipX = targetFrame.minX - 20
+
+            HStack(spacing: 0) {
+                // Main tutorial bubble
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.draw")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white)
+
+                    Text(message)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [Color.purple, Color.blue],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 4)
+                .background(
+                    GeometryReader { bubbleGeo in
+                        Color.clear.onAppear {
+                            bubbleSize = bubbleGeo.size
+                        }
+                    }
+                )
+
+                // Arrow pointing right - offset vertically to point at target
+                Image(systemName: "arrowtriangle.right.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.blue)
+                    .offset(x: -2, y: arrowOffset)
+            }
+            .fixedSize()
+            .offset(x: floatOffset)
+            .position(x: tooltipX - (bubbleSize.width > 0 ? bubbleSize.width / 2 : 100), y: clampedBubbleY)
+            .onTapGesture {
+                onDismiss()
+            }
+            .onAppear {
+                guard !hasStartedAnimation else { return }
+                hasStartedAnimation = true
+                // Animate from +4 to -4 (bobs left and right)
+                withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                    floatOffset = -4
+                }
+            }
+        }
+        .allowsHitTesting(true)
+    }
+}
+
+// MARK: - Two-Finger Horizontal ScrollView
+// Custom ScrollView that only scrolls with two fingers (for iPhone control area)
+// Single-finger gestures pass through to faders/buttons
+
+struct TwoFingerScrollView<Content: View>: UIViewRepresentable {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.bounces = true
+        scrollView.alwaysBounceHorizontal = true
+        scrollView.delaysContentTouches = false
+        scrollView.canCancelContentTouches = true
+        scrollView.clipsToBounds = false  // Don't clip content (allows X buttons to extend beyond)
+        scrollView.contentInsetAdjustmentBehavior = .never  // Don't adjust for safe area
+
+        // Create hosting controller for SwiftUI content
+        let hostingController = UIHostingController(rootView: content)
+        hostingController.view.backgroundColor = .clear
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        hostingController.view.clipsToBounds = false  // Don't clip SwiftUI content
+
+        scrollView.addSubview(hostingController.view)
+
+        // Pin content to scroll view's content layout guide
+        // Height matches the frame (scroll view's visible area)
+        NSLayoutConstraint.activate([
+            hostingController.view.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            hostingController.view.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            // Match height to scroll view's frame so content fills vertically
+            hostingController.view.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
+        ])
+
+        context.coordinator.hostingController = hostingController
+
+        // Configure pan gesture to require two fingers
+        scrollView.panGestureRecognizer.minimumNumberOfTouches = 2
+        scrollView.panGestureRecognizer.maximumNumberOfTouches = 2
+
+        return scrollView
+    }
+
+    func updateUIView(_ scrollView: UIScrollView, context: Context) {
+        context.coordinator.hostingController?.rootView = content
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject {
+        var hostingController: UIHostingController<Content>?
     }
 }
 
@@ -646,9 +796,11 @@ internal struct ControlButton: Identifiable, Codable, Equatable {
     var faderDirection: String? = nil
     // Custom color (hex string, e.g. "#FF5733")
     var colorHex: String? = nil
+    // Page index (0-3) for multi-page control area
+    var page: Int = 0
 
     // Memberwise initializer
-    init(title: String, symbol: String, kind: MIDIKind, number: Int, channel: Int, velocity: Int = 127, isToggle: Bool? = nil, toggleState: Bool = false, isFader: Bool? = nil, isSmall: Bool? = nil, gridCol: Int? = nil, gridRow: Int? = nil, faderValue: Double? = nil, faderOrientation: String? = nil, faderDirection: String? = nil, colorHex: String? = nil) {
+    init(title: String, symbol: String, kind: MIDIKind, number: Int, channel: Int, velocity: Int = 127, isToggle: Bool? = nil, toggleState: Bool = false, isFader: Bool? = nil, isSmall: Bool? = nil, gridCol: Int? = nil, gridRow: Int? = nil, faderValue: Double? = nil, faderOrientation: String? = nil, faderDirection: String? = nil, colorHex: String? = nil, page: Int = 0) {
         self.title = title
         self.symbol = symbol
         self.kind = kind
@@ -665,6 +817,7 @@ internal struct ControlButton: Identifiable, Codable, Equatable {
         self.faderOrientation = faderOrientation
         self.faderDirection = faderDirection
         self.colorHex = colorHex
+        self.page = page
     }
 
     // Custom decoder to handle missing toggleState in older project files
@@ -689,6 +842,8 @@ internal struct ControlButton: Identifiable, Codable, Equatable {
         faderOrientation = try container.decodeIfPresent(String.self, forKey: .faderOrientation)
         faderDirection = try container.decodeIfPresent(String.self, forKey: .faderDirection)
         colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex)
+        // Page property - defaults to 0 for backward compatibility
+        page = try container.decodeIfPresent(Int.self, forKey: .page) ?? 0
     }
 
     // Computed properties for grid dimensions
@@ -3106,11 +3261,13 @@ internal struct ContentView: View {
     @AppStorage("hasSeenTutorial2b") private var hasSeenTutorial2b = false  // Tutorial 2b: Library button
     @AppStorage("hasSeenTutorial2c") private var hasSeenTutorial2c = false  // Tutorial 2c: Cue list name
     @AppStorage("hasSeenTutorial3") private var hasSeenTutorial3 = false  // Tutorial 3: Controls capsule
+    @AppStorage("hasSeenTutorial4") private var hasSeenTutorial4 = false  // Tutorial 4: Two-finger scroll (iPhone only)
     @State private var showTutorial1 = false  // Tutorial 1: Edit button (after onboarding)
     @State private var showTutorial2 = false  // Tutorial 2: + button (after clicking Edit)
     @State private var showTutorial2b = false  // Tutorial 2b: Library button
     @State private var showTutorial2c = false  // Tutorial 2c: Cue list name button (after exiting edit)
     @State private var showTutorial3 = false  // Tutorial 3: Controls capsule
+    @State private var showTutorial4 = false  // Tutorial 4: Two-finger scroll for control area (iPhone only)
     @State private var interruptedTutorial: Int? = nil  // Track which tutorial was interrupted by nav/cue capsule tutorial (1, 2, 2 for 2b, 3 for 2c, 4 for 3)
 
     // Tutorial frame tracking (for positioning tutorials)
@@ -3119,6 +3276,7 @@ internal struct ContentView: View {
     @State private var libraryButtonFrame: CGRect = .zero  // Library button (book icon)
     @State private var cueListNameButtonFrame: CGRect = .zero  // Cue list name button (top left)
     @State private var controlsCapsuleFrame: CGRect = .zero  // Controls capsule (bottom right)
+    @State private var controlAreaFrame: CGRect = .zero  // iPhone expanded control area (for tutorial 4)
 
     // Projects
     @State private var showProjects = false
@@ -3167,6 +3325,7 @@ internal struct ContentView: View {
     @State private var controlButtons: [ControlButton] = []
     @State private var controlEditMode = false
     @State private var controlAreaCollapsed: Bool = false  // Track if control area is collapsed
+    @State private var currentControlPage: Int = 0  // Current page (0-3) for multi-page control area
     @State private var controlsPerRow: Int = 4
     @State private var controlAreaHeight: CGFloat = 0
     @State private var showCollapsedCapsule: Bool = false  // Control visibility for sequential animation
@@ -3526,7 +3685,7 @@ internal struct ContentView: View {
                             isEditing: isEditing,
                             titleBarBottom: titleBarBottom,
                             editCapsuleBottom: editCapsuleBottom,
-                            sizeMultiplier: cueCapsuleSize,
+                            sizeMultiplier: navigationPillSize,  // Use same size as nav pill
                             isControlAreaCollapsed: effectivelyCollapsedForOverlay,
                             capsuleBounds: capsuleBounds,
                             hasControlButtons: !controlButtons.isEmpty,
@@ -3782,6 +3941,7 @@ internal struct ContentView: View {
                 canAddMoreControls: $canAddMoreControlsToGrid,
                 isCollapsed: $controlAreaCollapsed,
                 selectedCue: $selectedCue,
+                currentPage: $currentControlPage,
                 conflictFor: conflictLookup(),
                 midiFilter: midiFilter,
                 showMIDIData: showMIDIData,
@@ -3817,9 +3977,23 @@ internal struct ContentView: View {
                 if newValue {
                     // Entering edit mode - start timer
                     startControlEditModeTimer()
+
+                    // Dismiss tutorial 4 if user re-enters edit mode
+                    if showTutorial4 {
+                        showTutorial4 = false
+                        hasSeenTutorial4 = true
+                    }
                 } else {
                     // Exiting edit mode - cancel timer
                     cancelControlEditModeTimer()
+
+                    // Tutorial 4: Show two-finger scroll tutorial on iPhone after first button/fader added
+                    let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+                    if isPhone && !hasSeenTutorial4 && !controlButtons.isEmpty {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            showTutorial4 = true
+                        }
+                    }
                 }
             }
             .onChange(of: showControlEditor) { _, isShowing in
@@ -4282,8 +4456,9 @@ internal struct ContentView: View {
                             } else {
                                 // Calculate expanded height estimate based on device/orientation
                                 let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-                                let screenHeight = UIScreen.main.bounds.height
-                                let maxHeight = isPhone ? screenHeight * 0.6 : screenHeight * 0.7
+                                let screenBounds = UIScreen.main.bounds
+                                let landscapeHeight = min(screenBounds.width, screenBounds.height)
+                                let maxHeight = isPhone ? landscapeHeight * 0.8 : screenBounds.height * 0.7
                                 controlAreaHeight = maxHeight
                             }
                         }
@@ -4404,17 +4579,17 @@ internal struct ContentView: View {
         // FIX: Start from 1 instead of 0 to avoid assigning CC# 0 by default
         let freeCC = (1...127).first { conflicts[MIDIKey(kind: .cc, channel: 1, number: $0)] == nil } ?? 1
         debugPrint("🎹 beginAddControlOfType: Found free CC = \(freeCC), total conflicts = \(conflicts.count)")
-        var draft = ControlButton(title: "", symbol: "square.grid.2x2.fill", kind: .cc, number: freeCC, channel: 1, velocity: 127, isToggle: nil)
+        var draft = ControlButton(title: "", symbol: "square.grid.2x2.fill", kind: .cc, number: freeCC, channel: 1, velocity: 127, isToggle: nil, page: currentControlPage)
         switch kind {
         case .button:
             draft.isFader = false
             draft.isSmall = false
-            debugPrint("🎹 [ADD CONTROL] Creating button draft")
+            debugPrint("🎹 [ADD CONTROL] Creating button draft on page \(currentControlPage)")
         case .fader:
             draft.isFader = true
             draft.isSmall = false
             draft.symbol = "" // no icon for fader
-            debugPrint("🎹 [ADD CONTROL] Creating fader draft")
+            debugPrint("🎹 [ADD CONTROL] Creating fader draft on page \(currentControlPage)")
         }
         editingControl = draft
         // Hint the editor about fader mode
@@ -4541,12 +4716,25 @@ internal struct ContentView: View {
                                 }
                             )
                         }
+
+                        // Tutorial 4: Two-finger scroll (iPhone only, after adding first button/fader)
+                        if showTutorial4 && controlAreaFrame != .zero {
+                            RightwardTutorial(
+                                message: "Use two fingers to scroll",
+                                targetFrame: controlAreaFrame,
+                                onDismiss: {
+                                    showTutorial4 = false
+                                    hasSeenTutorial4 = true
+                                }
+                            )
+                        }
                     }
                     .animation(.easeInOut(duration: 0.3), value: showTutorial1)
                     .animation(.easeInOut(duration: 0.3), value: showTutorial2)
                     .animation(.easeInOut(duration: 0.3), value: showTutorial2b)
                     .animation(.easeInOut(duration: 0.3), value: showTutorial2c)
                     .animation(.easeInOut(duration: 0.3), value: showTutorial3)
+                    .animation(.easeInOut(duration: 0.3), value: showTutorial4)
                     .onChange(of: showTutorial1) { _, newValue in
                         debugPrint("📖 [Tutorial] showTutorial1 changed to \(newValue), editButtonFrame=\(editButtonFrame), frame != .zero: \(editButtonFrame != .zero)")
                     }
@@ -4561,6 +4749,16 @@ internal struct ContentView: View {
                     }
                     .onChange(of: showTutorial3) { _, newValue in
                         debugPrint("📖 [Tutorial] showTutorial3 changed to \(newValue), controlsCapsuleFrame=\(controlsCapsuleFrame)")
+                    }
+                    .onChange(of: showTutorial4) { _, newValue in
+                        debugPrint("📖 [Tutorial] showTutorial4 changed to \(newValue), controlAreaFrame=\(controlAreaFrame)")
+                    }
+                    .onChange(of: controlAreaCollapsed) { _, isCollapsed in
+                        // Dismiss tutorial 4 when user interacts with control area
+                        if isCollapsed && showTutorial4 {
+                            showTutorial4 = false
+                            hasSeenTutorial4 = true
+                        }
                     }
                     .onChange(of: showCueListChooser) { _, isShowing in
                         // Dismiss tutorial 2c when user opens cue list chooser
@@ -4590,6 +4788,10 @@ internal struct ContentView: View {
                         }
                         .onPreferenceChange(CapsuleBoundsPreferenceKey.self) { value in
                             capsuleBounds = value  // Update all capsule bounds for collision detection
+                            // Track control area frame for Tutorial 4 (two-finger scroll on iPhone)
+                            if let frame = value["controlArea.main"] {
+                                controlAreaFrame = frame
+                            }
                         }
                         .onPreferenceChange(TutorialButtonFramePreferenceKey.self) { value in
                             // Update tutorial button frames
@@ -4906,13 +5108,16 @@ internal struct ContentView: View {
                             let buttonWidth = newControl.gridWidth
                             let buttonHeight = newControl.gridHeight
 
+                            // Only check buttons on the same page for overlap
+                            let pageButtons = controlButtons.filter { $0.page == newControl.page }
+
                             // Simple position finder - scan grid for first available spot
                             var foundPosition = false
                             for row in 0..<4 { // Scan up to 4 rows (matching display limit)
                                 for col in 0..<(8 - buttonWidth + 1) { // 8 columns max, account for width
                                     var canPlace = true
                                     // Check if this position is free
-                                    for existingButton in controlButtons {
+                                    for existingButton in pageButtons {
                                         if let existingCol = existingButton.gridCol, let existingRow = existingButton.gridRow {
                                             let existingWidth = existingButton.gridWidth
                                             let existingHeight = existingButton.gridHeight
@@ -4931,7 +5136,7 @@ internal struct ContentView: View {
                                         newControl.gridCol = col
                                         newControl.gridRow = row
                                         foundPosition = true
-                                        debugPrint("🔧 Assigned new control to position (\(col), \(row))")
+                                        debugPrint("🔧 Assigned new control to position (\(col), \(row)) on page \(newControl.page)")
                                         break
                                     }
                                 }
@@ -4942,7 +5147,7 @@ internal struct ContentView: View {
                                 // Fallback to 0,0 if no space found
                                 newControl.gridCol = 0
                                 newControl.gridRow = 0
-                                debugPrint("🔧 No space found, placing new control at (0, 0)")
+                                debugPrint("🔧 No space found, placing new control at (0, 0) on page \(newControl.page)")
                             }
                         }
                         controlButtons.append(newControl)
@@ -6763,6 +6968,56 @@ internal struct ContentView: View {
     // App starts with completely blank data - no placeholder content
 }
 
+// MARK: - Conditional Drawing Group
+// Applies drawingGroup only when enabled (skip on iPhone to avoid rendering issues)
+private struct ConditionalDrawingGroup: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.drawingGroup(opaque: false, colorMode: .nonLinear)
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: - Press Gesture Modifier
+// On iPad: applies press feedback gesture for visual touch feedback
+// On iPhone: skips the gesture to allow ScrollView horizontal scrolling
+private struct PressGestureModifier: ViewModifier {
+    let isPhone: Bool
+    @Binding var isTouching: Bool
+    @Binding var isPressed: Bool
+
+    func body(content: Content) -> some View {
+        if isPhone {
+            // On iPhone, skip the drag gesture entirely to allow ScrollView scrolling
+            content
+        } else {
+            // On iPad, use the press feedback gesture
+            content
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            if !isTouching {
+                                isTouching = true
+                                withAnimation(.easeInOut(duration: 0.08)) {
+                                    isPressed = true
+                                }
+                            }
+                        }
+                        .onEnded { _ in
+                            isTouching = false
+                            withAnimation(.easeInOut(duration: 0.1)) {
+                                isPressed = false
+                            }
+                        }
+                )
+        }
+    }
+}
+
 // MARK: - Splash Screen
 private struct SplashScreen: View {
     var body: some View {
@@ -7399,6 +7654,7 @@ private struct CBControlSection: View {
     @Binding var canAddMoreControls: Bool
     @Binding var isCollapsed: Bool  // Changed from @State to @Binding so ContentView can access it
     @Binding var selectedCue: UUID?  // Chosen cue to clear when entering edit mode
+    @Binding var currentPage: Int  // Current page (0-3) for multi-page control area
     let conflictFor: [MIDIKey: String]
     let midiFilter: Set<Int>
     let showMIDIData: Bool  // Toggle for showing MIDI data
@@ -7430,7 +7686,7 @@ private struct CBControlSection: View {
     @State private var dragging: ControlButton? = nil
     @State private var previewLocation: GridPosition? = nil
     @State private var dropSurfaceElevated: Bool = false
-    @State private var editSessionNonce: Int = 0
+    @State private   var editSessionNonce: Int = 0
     @State private var isDragOperation: Bool = false
     @State private var lastDropTime: Date = Date.distantPast
     @State private var isAutoAssigning: Bool = false
@@ -7461,6 +7717,12 @@ private struct CBControlSection: View {
 
     // Track calculated height to avoid infinite render loops
     @State private var cachedHeight: CGFloat = 0
+
+    // Cross-page drag state
+    @State private var edgeDragTimer: Timer? = nil
+    @State private var edgeDragDirection: Int = 0  // -1 = left edge, +1 = right edge, 0 = not at edge
+    private let edgeDragDelay: TimeInterval = 0.5  // Delay before switching pages
+    private let edgeThreshold: CGFloat = 40  // Pixels from edge to trigger
 
     // PERFORMANCE FIX: Cache displacement calculations to prevent O(n²) recomputation during drag
     @State private var displacementCache: [UUID: (col: Int, row: Int)] = [:]
@@ -7496,6 +7758,8 @@ private struct CBControlSection: View {
         dragTranslation = .zero
         dragStartLocation = .zero
         shadowOffset = .zero
+        // Cancel any pending cross-page drag timer
+        cancelEdgeDragTimer()
     }
 
     // Update displacement cache (called from onChange to avoid state modification during view update)
@@ -7570,7 +7834,123 @@ private struct CBControlSection: View {
         return findFirstAvailablePosition(for: horizontalFader) != nil ||
                findFirstAvailablePosition(for: verticalFader) != nil
     }
-    
+
+    // MARK: - Page Navigation
+
+    private let totalPages = 10  // Fixed number of pages (0-9)
+
+    /// Returns buttons on the current page only
+    private var currentPageButtons: [ControlButton] {
+        buttons.filter { $0.page == currentPage }
+    }
+
+    /// Returns pages that have at least one control (for non-edit mode navigation)
+    private var pagesWithControls: [Int] {
+        let usedPages = Set(buttons.map { $0.page })
+        return (0..<totalPages).filter { usedPages.contains($0) }.sorted()
+    }
+
+    /// In edit mode: show all pages. Otherwise: only pages with controls
+    private var availablePages: [Int] {
+        if isEditing {
+            return Array(0..<totalPages)
+        } else {
+            let pages = pagesWithControls
+            // If no controls at all, still show page 0
+            return pages.isEmpty ? [0] : pages
+        }
+    }
+
+    /// Previous available page (skipping empty pages in non-edit mode)
+    private var previousPage: Int? {
+        let pages = availablePages
+        guard let currentIndex = pages.firstIndex(of: currentPage), currentIndex > 0 else {
+            return nil
+        }
+        return pages[currentIndex - 1]
+    }
+
+    /// Next available page (skipping empty pages in non-edit mode)
+    private var nextPage: Int? {
+        let pages = availablePages
+        guard let currentIndex = pages.firstIndex(of: currentPage), currentIndex < pages.count - 1 else {
+            return nil
+        }
+        return pages[currentIndex + 1]
+    }
+
+    /// Display string for page indicator (e.g., "1/4" in edit mode, "1/2" if only 2 pages have controls)
+    private var pageIndicatorText: String {
+        let pages = availablePages
+        let displayPage = (pages.firstIndex(of: currentPage) ?? 0) + 1
+        return "\(displayPage)/\(pages.count)"
+    }
+
+    // MARK: - Cross-Page Drag Handling
+
+    /// Check if drag position is at the edge and start/stop timer accordingly
+    private func checkEdgeDrag(dragX: CGFloat, gridWidth: CGFloat) {
+        let leftEdge = dragX < edgeThreshold
+        let rightEdge = dragX > gridWidth - edgeThreshold
+
+        if leftEdge && currentPage > 0 {
+            // At left edge - can go to previous page
+            if edgeDragDirection != -1 {
+                startEdgeDragTimer(direction: -1)
+            }
+        } else if rightEdge && currentPage < totalPages - 1 {
+            // At right edge - can go to next page
+            if edgeDragDirection != 1 {
+                startEdgeDragTimer(direction: 1)
+            }
+        } else {
+            // Not at edge - cancel timer
+            cancelEdgeDragTimer()
+        }
+    }
+
+    private func startEdgeDragTimer(direction: Int) {
+        cancelEdgeDragTimer()
+        edgeDragDirection = direction
+        edgeDragTimer = Timer.scheduledTimer(withTimeInterval: edgeDragDelay, repeats: false) { [self] _ in
+            // Move control to adjacent page
+            if let draggedButton = dragging {
+                moveControlToPage(draggedButton, newPage: currentPage + direction)
+            }
+        }
+    }
+
+    private func cancelEdgeDragTimer() {
+        edgeDragTimer?.invalidate()
+        edgeDragTimer = nil
+        edgeDragDirection = 0
+    }
+
+    /// Move a control to a different page and switch to that page
+    private func moveControlToPage(_ control: ControlButton, newPage: Int) {
+        guard newPage >= 0 && newPage < totalPages else { return }
+
+        // Update the control's page
+        if let index = buttons.firstIndex(where: { $0.id == control.id }) {
+            buttons[index].page = newPage
+            // Reset grid position to find a new spot on the new page
+            buttons[index].gridCol = nil
+            buttons[index].gridRow = nil
+        }
+
+        // Switch to the new page
+        withAnimation(.easeInOut(duration: 0.2)) {
+            currentPage = newPage
+        }
+
+        // Reset drag state
+        clearDragState(reason: "moved control to page \(newPage)")
+        cancelEdgeDragTimer()
+
+        // Trigger re-layout
+        editSessionNonce &+= 1
+    }
+
     private func controlRowCount() -> Int {
         let slotsPerRow = max(3, perRow * 3)
         let totalSlots = buttons.reduce(0) { acc, b in acc + (b.isFader == true ? 2 : 3) }
@@ -7694,6 +8074,68 @@ private struct CBControlSection: View {
     
     private var mainHeader: some View {
         HStack(spacing: 8) {
+            // Page navigation capsule (left side) - only show if more than 1 page available
+            if availablePages.count > 1 {
+                HStack(spacing: 0) {
+                    // Previous page button
+                    Button(action: {
+                        if let prev = previousPage {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                currentPage = prev
+                            }
+                        }
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(previousPage != nil ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .frame(width: 36, height: 44)
+                    }
+                    .disabled(previousPage == nil)
+
+                    // Page indicator
+                    Text(pageIndicatorText)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(defaultCueColor)
+                        .frame(minWidth: 32)
+
+                    // Next page button
+                    Button(action: {
+                        if let next = nextPage {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                currentPage = next
+                            }
+                        }
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(nextPage != nil ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .frame(width: 36, height: 44)
+                    }
+                    .disabled(nextPage == nil)
+                }
+                .background(.regularMaterial)
+                .clipShape(Capsule())
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .contentShape(Capsule())
+                .gesture(
+                    DragGesture(minimumDistance: 20)
+                        .onEnded { value in
+                            let horizontalAmount = value.translation.width
+                            // Swipe left = next page, swipe right = previous page
+                            if horizontalAmount < -30, let next = nextPage {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    currentPage = next
+                                }
+                            } else if horizontalAmount > 30, let prev = previousPage {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    currentPage = prev
+                                }
+                            }
+                        }
+                )
+                .transition(.scale.combined(with: .opacity))
+            }
+
             Spacer()
 
             // Main edit capsule - animates width between Edit text and full toolbar
@@ -7793,7 +8235,9 @@ private struct CBControlSection: View {
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(defaultCueColor)
                         .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .background(.regularMaterial)
                 .clipShape(Capsule())
                 .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
@@ -7834,7 +8278,8 @@ private struct CBControlSection: View {
                 .background(Color.clear)  // Ensure no white background
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: cachedHeight)
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
-                .drawingGroup(opaque: false, colorMode: .nonLinear)
+                // Skip drawingGroup on iPhone - can cause rendering issues with GeometryReader
+                .modifier(ConditionalDrawingGroup(enabled: UIDevice.current.userInterfaceIdiom != .phone))
                 .onChange(of: actualWidth) { _, _ in
                     // Recalculate height when width changes (orientation change)
                     let height = calculateDynamicHeight()
@@ -7971,8 +8416,9 @@ private struct CBControlSection: View {
                 var cellSize = floor(availableWidth / CGFloat(columns))
 
                 // Apply same height constraint logic
-                let screenHeight = UIScreen.main.bounds.height
-                let maxHeight = isPhone ? screenHeight * 0.6 : screenHeight * 0.7
+                let screenBounds = UIScreen.main.bounds
+                let landscapeHeight = min(screenBounds.width, screenBounds.height)
+                let maxHeight = isPhone ? landscapeHeight * 0.8 : screenBounds.height * 0.7
                 let actualVerticalPadding: CGFloat = 18 + (isPhone ? 0 : 8)  // top + bottom
                 let extraPadding: CGFloat = 0
                 let availableGridHeight = maxHeight - actualVerticalPadding - extraPadding
@@ -7997,9 +8443,10 @@ private struct CBControlSection: View {
             let availableWidth = portraitWidth - (2 * actualHorizontalPadding) - totalSpacing
             var cellSize = floor(availableWidth / CGFloat(columns))
 
-            // Apply height constraint
-            let screenHeight = UIScreen.main.bounds.height
-            let maxHeight = screenHeight * 0.6
+            // Apply height constraint - use 80% of landscape height
+            let screenBounds = UIScreen.main.bounds
+            let landscapeHeight = min(screenBounds.width, screenBounds.height)
+            let maxHeight = landscapeHeight * 0.8
             let actualVerticalPadding: CGFloat = 18
             let availableGridHeight = maxHeight - actualVerticalPadding
             let displayRows = 4
@@ -8078,109 +8525,122 @@ private struct CBControlSection: View {
     private func calculateDynamicHeight() -> CGFloat {
         // Use tracked actual width instead of screen bounds for proper orientation handling
         let height = calculateControlAreaHeight(proxy: nil, screenWidth: actualWidth)
-        // Removed verbose height calculation logs for cleaner testing
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        if isPhone {
+            debugPrint("📱 [calculateDynamicHeight] height=\(height), actualWidth=\(actualWidth)")
+        }
         return height
     }
     
     // Calculate the height needed for the control area
     private func calculateControlAreaHeight(proxy: GeometryProxy?, screenWidth: CGFloat? = nil) -> CGFloat {
-        // Calculate grid dimensions following the specification
-        // iPad: Use tracked portrait width for consistent grid size in both orientations
-        // iPhone: Use actual width
         let isLandscape = verticalSizeClass == .compact
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
 
-        // iPad uses tracked portrait width (dynamically set from GeometryReader)
-        // iPhone uses actual width for responsive behavior
-        let fixedWidthForGrid: CGFloat = isPhone ? 0 : portraitWidth
+        // iPhone: Dynamic height based on content, with larger cells
+        // Always use 80% of landscape height (the shorter dimension) for consistency
+        // NOTE: This returns GRID HEIGHT ONLY - header is added separately in VStack
+        if isPhone {
+            let screenBounds = UIScreen.main.bounds
+            let landscapeHeight = min(screenBounds.width, screenBounds.height)  // Always use shorter dimension
+            let maxAvailableHeight = landscapeHeight * 0.8
 
-        let defaultWidth: CGFloat = isPhone ? (isLandscape ? 1200 : 800) : fixedWidthForGrid
-        let width: CGFloat = isPhone ? (proxy?.size.width ?? screenWidth ?? defaultWidth) : fixedWidthForGrid
+            // Reserve space for header (68pt is added separately) and grid padding
+            let headerHeight: CGFloat = 68
+            let gridVerticalPadding: CGFloat = 16  // 4pt top + 12pt bottom
+            let maxGridAreaHeight = maxAvailableHeight - headerHeight - gridVerticalPadding
+
+            // Calculate cell size based on 4 rows max - NO MINIMUM, let it shrink to fit
+            let maxRows = 4
+            let verticalGapsMax = max(0, maxRows - 1)
+            let cellSize = floor((maxGridAreaHeight - CGFloat(verticalGapsMax) * rowSpacing) / CGFloat(maxRows))
+
+            // Determine actual rows needed
+            let rows: Int
+            if isEditing {
+                rows = 4  // Full grid in edit mode
+            } else {
+                let visualRows = calculateVisualRows()
+                let pageButtons = buttons.filter { $0.page == currentPage }
+                if visualRows == 0 && pageButtons.isEmpty {
+                    return 44  // Header-only height when no buttons (this is total height)
+                }
+                rows = min(4, max(1, visualRows))
+            }
+
+            // Calculate GRID height only (header is in separate view in VStack)
+            let verticalGaps = max(0, rows - 1)
+            let gridHeight = CGFloat(rows) * cellSize + CGFloat(verticalGaps) * rowSpacing + gridVerticalPadding
+
+            debugPrint("📱 [iPhone height] landscapeH=\(landscapeHeight), maxAvail=\(maxAvailableHeight), cellSize=\(cellSize), rows=\(rows), gridHeight=\(gridHeight)")
+
+            return gridHeight
+        }
+
+        // iPad: Calculate based on grid dimensions
+        let fixedWidthForGrid: CGFloat = portraitWidth
+
+        let width: CGFloat = fixedWidthForGrid
         let totalSpacing = CGFloat(columns - 1) * columnSpacing
-        // iPhone uses columnSpacing for horizontal padding, iPad uses gridPadding
-        let actualHorizontalPadding = isPhone ? columnSpacing : gridPadding
+        let actualHorizontalPadding = gridPadding
         let availableWidth = width - (2 * actualHorizontalPadding) - totalSpacing
         let cellSize = floor(availableWidth / CGFloat(columns))
 
-        // Ensure minimum cell size in landscape to prevent cutoff (iPad only)
+        // Ensure minimum cell size in landscape to prevent cutoff
         let minCellSize: CGFloat = isLandscape ? 80 : 60
-        let shouldApplyMinSize = UIDevice.current.userInterfaceIdiom != .phone  // Only apply on iPad
-        let adjustedCellSize = shouldApplyMinSize ? max(cellSize, minCellSize) : cellSize
-        
+        let adjustedCellSize = max(cellSize, minCellSize)
+
         // Determine rows based on mode and orientation
         let rows: Int
-        
-        // Unified approach: Both orientations use dynamic height with 4-row maximum
+
         if isEditing {
             // Edit mode: Always show full 4-row editing canvas
             rows = 4
-            // Removed verbose height calculation logs for cleaner testing
         } else {
-            // Non-edit mode: Dynamic based on occupied buttons, capped at 4 rows
+            // Non-edit mode: Dynamic based on occupied buttons on current page, capped at 4 rows
             let visualRows = calculateVisualRows()
-            if visualRows == 0 && buttons.isEmpty {
-                // Special case: no buttons = header-only height (same as collapsed)
-                let headerOnlyHeight: CGFloat = 44  // Same as collapsed state
-                // Removed verbose height calculation logs for cleaner testing
-                return headerOnlyHeight
+            let pageButtons = buttons.filter { $0.page == currentPage }
+            if visualRows == 0 && pageButtons.isEmpty {
+                // Special case: no buttons on current page = header-only height (same as collapsed)
+                return 44
             }
             rows = min(4, max(0, visualRows))
-            // Removed verbose height calculation logs for cleaner testing
         }
-        
+
         // Convert rows to pixels
         let verticalGaps = max(0, rows - 1)
         let gridHeight = CGFloat(rows) * adjustedCellSize + CGFloat(verticalGaps) * rowSpacing
 
         // Add extra padding in landscape to prevent cutoff and provide breathing room
-        // iPhone landscape: no extra padding since we want buttons flush to bottom
-        let extraPadding: CGFloat = isLandscape && UIDevice.current.userInterfaceIdiom != .phone ? 30 : 0
-        // Vertical padding must match the actual grid padding applied in buildControlGrid
-        let actualVerticalPadding: CGFloat
-        if UIDevice.current.userInterfaceIdiom == .phone {
-            // iPhone: keep original values for now
-            let bottomPadding = isLandscape ? 0 : columnSpacing
-            actualVerticalPadding = 18 + bottomPadding  // top + bottom
-        } else {
-            // iPad: top=8, bottom=gridPadding (same as sides)
-            actualVerticalPadding = 8 + gridPadding
-        }
+        let extraPadding: CGFloat = isLandscape ? 30 : 0
+        // iPad: top=8, bottom=gridPadding (same as sides)
+        let actualVerticalPadding: CGFloat = 8 + gridPadding
         let finalHeight = gridHeight + actualVerticalPadding + extraPadding
 
-        // iPhone landscape: Limit control area to 60% of screen height
-        if UIDevice.current.userInterfaceIdiom == .phone && isLandscape {
-            let screenHeight = UIScreen.main.bounds.height
-            let maxHeight = screenHeight * 0.6
-            return min(finalHeight, maxHeight)
-        }
-
-        // Removed verbose height calculation logs for cleaner testing
         return finalHeight
     }
     
-    // Calculate visual rows based on actual control positions and sizes
+    // Calculate visual rows based on actual control positions and sizes (for current page only)
     private func calculateVisualRows() -> Int {
-        guard !buttons.isEmpty else { 
-            // Removed verbose height calculation logs for cleaner testing
+        // Only count buttons on the current page
+        let pageButtons = buttons.filter { $0.page == currentPage }
+        guard !pageButtons.isEmpty else {
             return 0  // Will be handled specially in height calculation
         }
-        
+
         // Don't call autoAssignGridPositions during view updates to avoid state modification warnings
         // Instead, just calculate based on current positions, defaulting to row 0 if not set
-        
+
         var maxEndRow = 0
-        // Removed verbose height calculation logs for cleaner testing
-        for button in buttons {
+        for button in pageButtons {
             let row = button.gridRow ?? 0  // Default to row 0 if not assigned yet
             // Use button.gridHeight to get the correct height based on orientation
             let height = button.gridHeight
             let endRow = row + height
             maxEndRow = max(maxEndRow, endRow)
-            // Removed verbose height calculation logs for cleaner testing
         }
-        
+
         let result = maxEndRow  // Allow 0 rows for minimal height when no buttons
-        // Removed verbose height calculation logs for cleaner testing
         return result
     }
     
@@ -8754,7 +9214,9 @@ private struct CBControlSection: View {
     }
 
     private func hasOverlapExcluding(_ rect: GridRect, excluding excludeIds: [UUID]) -> Bool {
-        for item in buttons {
+        // Only check buttons on the current page
+        let pageButtons = buttons.filter { $0.page == currentPage }
+        for item in pageButtons {
             guard let col = item.gridCol, let row = item.gridRow, !excludeIds.contains(item.id) else { continue }
             let itemRect = GridRect(
                 col: col, row: row,
@@ -8840,12 +9302,14 @@ private struct CBControlSection: View {
 
     // Check if a specific grid cell is occupied by any button (excluding currently dragged button)
     private func isCellOccupied(col: Int, row: Int) -> Bool {
-        for button in buttons {
+        // Only check buttons on the current page
+        let pageButtons = buttons.filter { $0.page == currentPage }
+        for button in pageButtons {
             // Skip the button that's currently being dragged
             if let draggedButton = dragging, draggedButton.id == button.id {
                 continue
             }
-            
+
             guard let buttonCol = button.gridCol, let buttonRow = button.gridRow else { continue }
 
             // Get button dimensions
@@ -8863,28 +9327,30 @@ private struct CBControlSection: View {
 
     // Count rows using a dynamic packing heuristic matching layout
     private func occupiedRows(columns: Int) -> Int {
-        guard !buttons.isEmpty else { return 1 }
-        
+        // Only count rows for buttons on the current page
+        let pageButtons = buttons.filter { $0.page == currentPage }
+        guard !pageButtons.isEmpty else { return 1 }
+
         var occupancy: [[Bool]] = []
         func ensureRows(_ r: Int) {
             while occupancy.count <= r { occupancy.append(Array(repeating: false, count: columns)) }
         }
-        
+
         func fits(_ r: Int, _ c: Int, _ w: Int, _ h: Int) -> Bool {
             ensureRows(r + h)
             if c + w > columns { return false }
             for rr in r..<(r+h) { for cc in c..<(c+w) { if occupancy[rr][cc] { return false } } }
             return true
         }
-        
+
         func mark(_ r: Int, _ c: Int, _ w: Int, _ h: Int) {
             ensureRows(r + h)
             for rr in r..<(r+h) { for cc in c..<(c+w) { occupancy[rr][cc] = true } }
         }
-        
+
         // First: place controls with explicit positions
         var explicitlyPlaced = Set<UUID>()
-        for b in buttons {
+        for b in pageButtons {
             let w = b.gridWidth
             let h = b.gridHeight
             if let gridCol = b.gridCol, let gridRow = b.gridRow,
@@ -8895,7 +9361,7 @@ private struct CBControlSection: View {
         }
         
         // Then: place remaining controls with auto-packing
-        for b in buttons where !explicitlyPlaced.contains(b.id) {
+        for b in pageButtons where !explicitlyPlaced.contains(b.id) {
             let w = b.gridWidth
             let h = b.gridHeight
             var placed = false
@@ -8949,7 +9415,11 @@ private struct CBControlSection: View {
                 let yBase = CGFloat(pos.row) * (cellSize + rowSpacing)
                 let x = xBase
                 let y = yBase
-                let key = MIDIKey(kind: button.kind, channel: button.channel, number: button.number)
+
+        // DEBUG: Log tile positioning for iPhone
+        let _ = isPhone ? debugPrint("📱 [Tile] '\(button.title)' cellSize=\(cellSize), pos=(\(pos.col),\(pos.row)), offset=(\(x),\(y)), size=(\(width)x\(height))") : ()
+
+        let key = MIDIKey(kind: button.kind, channel: button.channel, number: button.number)
                 let owner = conflictFor[key]
 
                 // Filter out the current button from conflict list
@@ -9088,11 +9558,19 @@ private struct CBControlSection: View {
                                 
                                 // Store shadow offset separately - this is for visual shadow positioning only
                                 shadowOffset = CGSize(width: dx, height: dy)
+
+                                // Check for edge drag to switch pages
+                                let dragX = value.location.x
+                                let gridWidth = actualWidth
+                                checkEdgeDrag(dragX: dragX, gridWidth: gridWidth)
                             }
                         }
                         .onEnded { value in
                             guard dragging?.id == button.id else { return }
-                            
+
+                            // Cancel any pending edge drag timer
+                            cancelEdgeDragTimer()
+
                             // Snap to grid position like iOS home screen
                             if let preview = previewLocation {
                                 // Commit the dragged button's position
@@ -9158,38 +9636,48 @@ private struct CBControlSection: View {
     
     // Helper to calculate grid parameters
     private func calculateGridParameters(proxy: GeometryProxy) -> (cellSize: CGFloat, displayRows: Int, gridHeight: CGFloat, gridWidth: CGFloat) {
-        // Calculate grid dimensions using same logic as height calculation
-        let totalSpacing = CGFloat(columns - 1) * columnSpacing
-        // Use actual horizontal padding: columnSpacing on iPhone, gridPadding on iPad
-        let actualHorizontalPadding = UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
-        let availableWidth = proxy.size.width - (2 * actualHorizontalPadding) - totalSpacing
-        var cellSize = floor(availableWidth / CGFloat(columns))
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
 
-        // Determine rows based on mode and orientation (same as height calculation)
+        var cellSize: CGFloat
         let displayRows: Int
 
-        // Unified approach: Both orientations use dynamic height with 4-row maximum
-            if isEditing {
-            // Edit mode: Show editing canvas (4 rows for both iPhone and iPad)
-            displayRows = 4
-        } else {
-            // Non-edit mode: Dynamic based on occupied buttons
-            let visualRows = calculateVisualRows()
-            // 4 rows max for both iPhone and iPad
-            displayRows = min(4, max(0, visualRows))
-        }
+        if isPhone {
+            // iPhone: Use fixed cell size based on available height
+            // This creates larger, easier-to-use controls that scroll horizontally
+            // Always use 80% of landscape height (the shorter dimension) for consistency
+            let screenBounds = UIScreen.main.bounds
+            let landscapeHeight = min(screenBounds.width, screenBounds.height)  // Always use shorter dimension
+            let availableHeight = landscapeHeight * 0.8
+            // Reserve space for header and grid padding
+            let headerHeight: CGFloat = 68
+            let gridVerticalPadding: CGFloat = 16  // 4pt top + 12pt bottom
+            let gridAreaHeight = availableHeight - headerHeight - gridVerticalPadding
 
-        // iPhone landscape: Adjust cell size to fit within 60% screen height
-        let isLandscape = verticalSizeClass == .compact
-        if UIDevice.current.userInterfaceIdiom == .phone && isLandscape && displayRows > 0 {
-            let screenHeight = UIScreen.main.bounds.height
-            let maxHeight = screenHeight * 0.6
-            let actualVerticalPadding: CGFloat = 16 + 16  // top + bottom
-            let extraPadding: CGFloat = 30
-            let availableGridHeight = maxHeight - actualVerticalPadding - extraPadding
-            let verticalGaps = max(0, displayRows - 1)
-            let maxCellSize = (availableGridHeight - CGFloat(verticalGaps) * rowSpacing) / CGFloat(displayRows)
-            cellSize = min(cellSize, floor(maxCellSize))
+            // Calculate cell size based on 4 rows (max) - NO MINIMUM, let it shrink to fit 80% height
+            let maxRows = 4
+            let verticalGaps = max(0, maxRows - 1)
+            cellSize = floor((gridAreaHeight - CGFloat(verticalGaps) * rowSpacing) / CGFloat(maxRows))
+
+            // iPhone: Dynamic rows like iPad - shrink to fit content, expand in edit mode
+            if isEditing {
+                displayRows = 4  // Full grid in edit mode
+            } else {
+                let visualRows = calculateVisualRows()
+                displayRows = min(4, max(1, visualRows))  // At least 1 row, max 4
+            }
+        } else {
+            // iPad: Calculate based on available width (original behavior)
+            let totalSpacing = CGFloat(columns - 1) * columnSpacing
+            let actualHorizontalPadding = gridPadding
+            let availableWidth = proxy.size.width - (2 * actualHorizontalPadding) - totalSpacing
+            cellSize = floor(availableWidth / CGFloat(columns))
+
+            if isEditing {
+                displayRows = 4
+            } else {
+                let visualRows = calculateVisualRows()
+                displayRows = min(4, max(0, visualRows))
+            }
         }
 
         let verticalGaps = max(0, displayRows - 1)
@@ -9203,10 +9691,13 @@ private struct CBControlSection: View {
         let params = calculateGridParameters(proxy: proxy)
         let cellSize = params.cellSize
         let displayRows = params.displayRows
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone // Moved up for debug
         // let dropTypes: [UTType] = isCtrlEditing ? [UTType.text] : [] // Unused in new iOS-style drag system
 
         let maxRows = displayRows // Capture for use in gesture closures
-        let tilesCore = ForEach(buttons) { button in
+        let pageButtons = buttons.filter { $0.page == currentPage }
+
+        let tilesCore = ForEach(pageButtons) { button in
             buildControlTileView(
                 button: button,
                 cellSize: cellSize,
@@ -9305,7 +9796,7 @@ private struct CBControlSection: View {
             clearDragState: clearDragState
         )
 
-        let content = ZStack(alignment: .topLeading) {
+        let gridContent = ZStack(alignment: .topLeading) {
             // Controls positioned with simple offset (Mac editor approach)
             tiles
                 .allowsHitTesting(true)
@@ -9316,23 +9807,50 @@ private struct CBControlSection: View {
             // Blue drag shadow preview
             dragPreview
         }
-        .id("ctrl-container-\(isCtrlEditing)-sess-\(sessionNonce)-\(buttons.map { "\($0.gridCol ?? -1)-\($0.gridRow ?? -1)-\($0.colorHex ?? "nil")" }.joined(separator: ","))")
-        .padding(EdgeInsets(
-            top: 8,
-            leading: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding,
-            bottom: UIDevice.current.userInterfaceIdiom == .phone ? (verticalSizeClass == .compact ? 0 : columnSpacing) : gridPadding,
-            trailing: UIDevice.current.userInterfaceIdiom == .phone ? columnSpacing : gridPadding
-        ))
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .animation(.easeInOut(duration: 0.3), value: displayRows)
-        // .onDrop(of: [], delegate: dropDelegate) // Disabled old drop system in favor of smooth drag
-        .allowsHitTesting(true)
-        .onChange(of: sessionNonce) { _, _ in
-            // Force complete state reset when session changes
-            clearDragState(reason: "gesture cancelled")
-    }
-        
-        return AnyView(content)
+        .frame(
+            width: params.gridWidth,
+            height: params.gridHeight,
+            alignment: .topLeading
+        )
+
+        // iPhone: Wrap in horizontal ScrollView for larger cells
+        // iPad: No scroll needed, grid fits within screen
+        let content: AnyView
+        if isPhone {
+            content = AnyView(
+                TwoFingerScrollView {
+                    gridContent
+                        .padding(.horizontal, columnSpacing)
+                        .padding(.top, 4)
+                        .padding(.bottom, 12)  // More bottom padding for better visual balance
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+                .id("ctrl-container-\(isCtrlEditing)-sess-\(sessionNonce)-page-\(currentPage)-\(pageButtons.count)")
+                .allowsHitTesting(true)
+                .onChange(of: sessionNonce) { _, _ in
+                    clearDragState(reason: "gesture cancelled")
+                }
+            )
+        } else {
+            content = AnyView(
+                gridContent
+                    .id("ctrl-container-\(isCtrlEditing)-sess-\(sessionNonce)-page-\(currentPage)-\(pageButtons.count)")
+                    .padding(EdgeInsets(
+                        top: 8,
+                        leading: gridPadding,
+                        bottom: gridPadding,
+                        trailing: gridPadding
+                    ))
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .animation(.easeInOut(duration: 0.3), value: displayRows)
+                    .allowsHitTesting(true)
+                    .onChange(of: sessionNonce) { _, _ in
+                        clearDragState(reason: "gesture cancelled")
+                    }
+            )
+        }
+
+        return content
 }
 
 private struct ControlButtonTile: View {
@@ -10320,13 +10838,19 @@ private struct SeededRandom {
 }
 
 // MARK: - Press effect gesture only when not editing (prevents conflicts with system drag)
+// Also skips on iPhone to allow ScrollView horizontal scrolling
 private struct PressEffectWhenNotEditing: ViewModifier {
     let isEditing: Bool
     let onChange: () -> Void
     let onEnd: () -> Void
 
+    private var isPhone: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone
+    }
+
     func body(content: Content) -> some View {
-        if isEditing {
+        // Skip on iPhone to allow ScrollView scrolling, skip when editing for system drag
+        if isEditing || isPhone {
             content
         } else {
             content.simultaneousGesture(
@@ -10436,19 +10960,8 @@ private struct iPadControlTile: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { _ in
-                                if !isTouching {
-                                    isTouching = true
-                                    isPressed = true
-                                }
-                            }
-                            .onEnded { _ in
-                                isTouching = false
-                                isPressed = false
-                            }
-                    )
+                    // Only add press feedback gesture on iPad - on iPhone it blocks ScrollView scrolling
+                    .modifier(PressGestureModifier(isPhone: isPhone, isTouching: $isTouching, isPressed: $isPressed))
                 }
             }
             
@@ -10690,28 +11203,20 @@ private struct iPadControlTile: View {
                 }
             }
         }
-        .foregroundColor(isPhone ? phoneButtonTextColor : buttonTextColor)
+        .foregroundColor(buttonTextColor)  // Same text color for iPhone and iPad
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            Group {
-                if isPhone {
-                    // iPhone: Solid keyboard-style buttons, no stroke
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(phoneButtonBackgroundColor)
-                } else {
-                    // iPad: Original stroked design
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(customButtonColor, lineWidth: 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(buttonBackgroundColor)
-                        )
-                }
-            }
+            // Same stroked design for both iPhone and iPad
+            RoundedRectangle(cornerRadius: isPhone ? 10 : 14)
+                .stroke(customButtonColor, lineWidth: 2)
+                .background(
+                    RoundedRectangle(cornerRadius: isPhone ? 10 : 14)
+                        .fill(buttonBackgroundColor)
+                )
         )
-            .scaleEffect(isPhone ? 1.0 : (isTouching ? 1.02 : 1.0))  // iPhone: no scale effects
-            .animation(isPhone ? nil : .spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
-            .animation(isPhone ? nil : .spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
+            .scaleEffect(isTouching ? 1.02 : 1.0)  // Same scale effect for iPhone and iPad
+            .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
+            .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
     }
     
     @ViewBuilder
@@ -10731,24 +11236,17 @@ private struct iPadControlTile: View {
                 let fillAlignment: Alignment = (direction == "right") ? .leading : .trailing
 
                 ZStack(alignment: fillAlignment) {
-                    // Main fader track background
-                    if isPhone {
-                        // iPhone: Solid background, no stroke
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(phoneButtonBackgroundColor)
-                    } else {
-                        // iPad: Original stroked design
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(selectedTheme.titleBarColor(for: colorScheme))
-                            .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(customButtonColor, lineWidth: 2)
-                            )
-                    }
+                    // Main fader track background - same stroked design for iPhone and iPad
+                    RoundedRectangle(cornerRadius: isPhone ? 8 : 10)
+                        .fill(selectedTheme.titleBarColor(for: colorScheme))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: isPhone ? 8 : 10)
+                                .stroke(customButtonColor, lineWidth: 2)
+                        )
 
                     // Fader fill (dynamic based on faderValue) - alignment handles the direction
-                    RoundedRectangle(cornerRadius: isPhone ? 3 : 8)
-                        .fill(customButtonColor.opacity(isPhone ? 0.5 : 0.2))
+                    RoundedRectangle(cornerRadius: isPhone ? 6 : 8)
+                        .fill(customButtonColor.opacity(0.2))
                         .frame(width: w * faderVisualValue)
                         .padding(3)
 
@@ -10840,25 +11338,18 @@ private struct iPadControlTile: View {
                 let fillAlignment: Alignment = (direction == "up") ? .bottom : .top
 
                 ZStack(alignment: fillAlignment) {
-                    // Main fader track background
-                    if isPhone {
-                        // iPhone: Solid background, no stroke
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(phoneButtonBackgroundColor)
-                    } else {
-                        // iPad: Original stroked design
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(selectedTheme.titleBarColor(for: colorScheme))
-                            .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(customButtonColor, lineWidth: 2)
-                            )
-                    }
+                    // Main fader track background - same stroked design for iPhone and iPad
+                    RoundedRectangle(cornerRadius: isPhone ? 8 : 10)
+                        .fill(selectedTheme.titleBarColor(for: colorScheme))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: isPhone ? 8 : 10)
+                                .stroke(customButtonColor, lineWidth: 2)
+                        )
 
                     // Fader fill (dynamic based on faderValue) - alignment handles the direction
-                    RoundedRectangle(cornerRadius: isPhone ? 3 : 8)
-                        .fill(customButtonColor.opacity(isPhone ? 0.5 : 0.2))
-                            .frame(height: h * faderVisualValue)
+                    RoundedRectangle(cornerRadius: isPhone ? 6 : 8)
+                        .fill(customButtonColor.opacity(0.2))
+                        .frame(height: h * faderVisualValue)
                         .padding(3)
 
                     // Fader head (dynamic position) - conditional offset for direction
@@ -10953,9 +11444,9 @@ private struct iPadControlTile: View {
                 }
             }
         )
-        .scaleEffect(isPhone ? 1.0 : (isTouching ? 1.02 : 1.0))
-        .animation(isPhone ? nil : .spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
-        .animation(isPhone ? nil : .spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
+        .scaleEffect(isTouching ? 1.02 : 1.0)  // Same scale effect for iPhone and iPad
+        .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
+        .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
     }
 
     private func midiLabel() -> String {
@@ -12377,11 +12868,11 @@ struct DraggableNavigationCapsule: View {
 
     private let config = SwipeableCapsuleConfig.navPill
 
-    // Vertical pill size - changes based on expanded state
+    // Vertical pill size - changes based on expanded state (uses config for consistency with cue capsule)
     private var pillSize: CGSize {
         isExpanded
-            ? CGSize(width: 140 * sizeMultiplier, height: 275 * sizeMultiplier)
-            : CGSize(width: 40 * sizeMultiplier, height: 100 * sizeMultiplier)  // Collapsed tongue size
+            ? CGSize(width: config.expandedWidth * sizeMultiplier, height: config.expandedHeight * sizeMultiplier)
+            : CGSize(width: config.collapsedWidth * sizeMultiplier, height: config.collapsedHeight * sizeMultiplier)
     }
 
     // Computed tutorial position that includes floating animation
@@ -12638,61 +13129,25 @@ struct DraggableNavigationCapsule: View {
                     }
             )
             .position(position)
-            .task(id: "\(width)-\(height)-\(editCapsuleBottom)-\(titleBarBottom)-\(verticalSizeClass == .compact ? "landscape" : "portrait")") {
+            .task(id: "\(width)-\(height)-\(isControlAreaCollapsed ? 1 : 0)-\(controlAreaHeight)") {
                 guard width > 0 && height > 0 else { return }
 
                 // Fixed to right edge - use current width based on expanded state
-                let currentHalfWidth = isExpanded ? (140 * sizeMultiplier) / 2 : (40 * sizeMultiplier) / 2
+                let currentHalfWidth = isExpanded ? (config.expandedWidth * sizeMultiplier) / 2 : (config.collapsedWidth * sizeMultiplier) / 2
                 let rightEdgeX = width - currentHalfWidth - 16  // 16pt padding from edge (matches other capsules)
 
-                // Calculate Y position: in portrait, avoid control area; in landscape, center on screen
-                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : titleBarBottom
-                let centerY: CGFloat
-                if verticalSizeClass == .compact {
-                    // Landscape: center between top boundary and bottom of screen
-                    centerY = (topBoundary + height) / 2
-                } else {
-                    // Portrait: center between top boundary and control area
-                    // Capture current control area values
-                    let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
-                    let controlAreaTop = height - currentControlHeight
-                    centerY = (topBoundary + controlAreaTop) / 2
-                }
+                // Center vertically in available space (above control area)
+                let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
+                let availableHeight = height - currentControlHeight
+                let centerY = availableHeight / 2
 
                 position = CGPoint(x: rightEdgeX, y: centerY)
             }
-            // Nav pill is fixed, no collision detection needed
-            .onChange(of: editCapsuleBottom) { _, _ in
-                // Recalculate Y position when edit capsule moves
-                // Keep X position stable - don't recalculate it
-                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : titleBarBottom
-                let centerY: CGFloat
-                if verticalSizeClass == .compact {
-                    // Landscape: center between top boundary and bottom of screen
-                    centerY = (topBoundary + height) / 2
-                } else {
-                    // Portrait: center between top boundary and control area
-                    // Capture current control area values directly
-                    let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
-                    let controlAreaTop = height - currentControlHeight
-                    centerY = (topBoundary + controlAreaTop) / 2
-                }
-
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                    position = CGPoint(x: position.x, y: centerY)
-                }
-            }
             .onChange(of: isControlAreaCollapsed) { _, _ in
-                // Only adjust Y position for control area in portrait mode
-                // In landscape, control area doesn't affect capsule position
-                guard verticalSizeClass != .compact else { return }
-
-                // Recalculate Y position when control area collapses/expands (portrait only)
-                // Keep X position stable - don't recalculate it
-                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : titleBarBottom
-                let effectiveHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
-                let controlAreaTop = height - effectiveHeight
-                let centerY = (topBoundary + controlAreaTop) / 2
+                // Recalculate Y position when control area collapses/expands
+                let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
+                let availableHeight = height - currentControlHeight
+                let centerY = availableHeight / 2
 
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                     position = CGPoint(x: position.x, y: centerY)
@@ -12704,10 +13159,10 @@ struct DraggableNavigationCapsule: View {
                 let targetX: CGFloat
                 if newValue {
                     // Expanding - position based on expanded width
-                    targetX = width - (140 * sizeMultiplier / 2) - 16
+                    targetX = width - (config.expandedWidth * sizeMultiplier / 2) - 16
                 } else {
                     // Collapsing - position based on collapsed width (flush to edge)
-                    targetX = width - (40 * sizeMultiplier / 2) - 16
+                    targetX = width - (config.collapsedWidth * sizeMultiplier / 2) - 16
                 }
 
                 // Use fast animation for smooth horizontal movement
@@ -12901,7 +13356,7 @@ struct SimpleDraggableTransportDock: View {
                     }
             )
             .position(position)
-            .task(id: "\(width)-\(height)-\(editCapsuleBottom)-\(titleBarBottom)-\(verticalSizeClass == .compact ? "landscape" : "portrait")") {
+            .task(id: "\(width)-\(height)-\(isControlAreaCollapsed ? 1 : 0)-\(controlAreaHeight)") {
                 guard width > 0 && height > 0 else { return }
 
                 // Fixed to right edge - use current width based on expanded state
@@ -12910,53 +13365,18 @@ struct SimpleDraggableTransportDock: View {
                     : (config.collapsedWidth * sizeMultiplier) / 2
                 let rightEdgeX = width - currentHalfWidth - 16  // 16pt padding from edge (matches other capsules)
 
-                // Calculate Y position: in portrait, avoid control area; in landscape, center on screen
-                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : titleBarBottom
-                let centerY: CGFloat
-                if verticalSizeClass == .compact {
-                    // Landscape: center between top boundary and bottom of screen
-                    centerY = (topBoundary + height) / 2
-                } else {
-                    // Portrait: center between top boundary and control area
-                    // Capture current control area values
-                    let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
-                    let controlAreaTop = height - currentControlHeight
-                    centerY = (topBoundary + controlAreaTop) / 2
-                }
+                // Center vertically in available space (above control area)
+                let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
+                let availableHeight = height - currentControlHeight
+                let centerY = availableHeight / 2
 
                 position = CGPoint(x: rightEdgeX, y: centerY)
             }
-            .onChange(of: editCapsuleBottom) { _, _ in
-                // Recalculate Y position when edit capsule moves
-                // Keep X position stable - don't recalculate it
-                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : titleBarBottom
-                let centerY: CGFloat
-                if verticalSizeClass == .compact {
-                    // Landscape: center between top boundary and bottom of screen
-                    centerY = (topBoundary + height) / 2
-                } else {
-                    // Portrait: center between top boundary and control area
-                    // Capture current control area values directly
-                    let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
-                    let controlAreaTop = height - currentControlHeight
-                    centerY = (topBoundary + controlAreaTop) / 2
-                }
-
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                    position = CGPoint(x: position.x, y: centerY)
-                }
-            }
             .onChange(of: isControlAreaCollapsed) { _, _ in
-                // Only adjust Y position for control area in portrait mode
-                // In landscape, control area doesn't affect capsule position
-                guard verticalSizeClass != .compact else { return }
-
-                // Recalculate Y position when control area collapses/expands (portrait only)
-                // Keep X position stable - don't recalculate it
-                let topBoundary = editCapsuleBottom > 0 ? editCapsuleBottom : titleBarBottom
-                let effectiveHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
-                let controlAreaTop = height - effectiveHeight
-                let centerY = (topBoundary + controlAreaTop) / 2
+                // Recalculate Y position when control area collapses/expands
+                let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
+                let availableHeight = height - currentControlHeight
+                let centerY = availableHeight / 2
 
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                     position = CGPoint(x: position.x, y: centerY)
