@@ -144,6 +144,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9E6AAA082E50EE4B00F22798 /* Build configuration list for PBXNativeTarget "Cue Bear" */;
 			buildPhases = (
+				9EGITHASH2E50EE4A00F22799 /* Update Git Hash */,
 				9E6AA9E02E50EE4A00F22798 /* Sources */,
 				9E6AA9E12E50EE4A00F22798 /* Frameworks */,
 				9E6AA9E22E50EE4A00F22798 /* Resources */,
@@ -298,6 +299,27 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		9EGITHASH2E50EE4A00F22799 /* Update Git Hash */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Update Git Hash";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/../scripts/update_git_info.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXTargetDependency section */
 		9E6AA9F62E50EE4B00F22798 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -350,7 +372,7 @@
 				DEVELOPMENT_TEAM = 2U78NYVLQN;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -415,7 +437,7 @@
 				DEVELOPMENT_TEAM = 2U78NYVLQN;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;

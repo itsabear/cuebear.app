@@ -1721,12 +1721,11 @@ class ConnectionManager: ObservableObject {
             let hasConnectedBefore = self.connectedComputerName != nil
             let shouldBeAvailable = hasConnectedBefore
 
+            // Only update if value actually changed to prevent unnecessary SwiftUI redraws
+            guard self.usbBridgeAvailable != shouldBeAvailable else { return }
+
             let wasAvailable = self.usbBridgeAvailable
             self.usbBridgeAvailable = shouldBeAvailable
-
-            // Enhanced debug logging to diagnose visibility issues
-            debugPrint("🔗 ConnectionManager: 🔍 checkUSBBridgeAvailability() - connectedComputerName: \(self.connectedComputerName ?? "nil"), isListening: \(self.isListening), isWiFiConnected: \(self.isWiFiConnected)")
-            debugPrint("🔗 ConnectionManager: 🔍 hasConnectedBefore: \(hasConnectedBefore), shouldBeAvailable: \(shouldBeAvailable)")
 
             if shouldBeAvailable && !wasAvailable {
                 debugPrint("🔗 ConnectionManager: 🎯 USB Bridge available - showing USB chip (Bridge has connected before)")

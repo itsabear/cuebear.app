@@ -3331,6 +3331,7 @@ internal struct ContentView: View {
     @State private var showCollapsedCapsule: Bool = false  // Control visibility for sequential animation
     @State private var showExpandedArea: Bool = false  // Control visibility for sequential animation
     @State private var isAnimatingControlArea: Bool = false  // Track if control area is animating
+    @State private var controlSectionReady: Bool = false  // PERFORMANCE: Delay CBControlSection creation until after initial layout
     @State private var titleBarBottom: CGFloat = 88  // Bottom edge of title bar (default: safe area + title height)
     @State private var editCapsuleBottom: CGFloat = 0  // Bottom edge of edit/search capsules when visible
     @State private var capsuleBounds: [String: CGRect] = [:]  // Track all UI capsule bounds for collision detection
@@ -3932,47 +3933,47 @@ internal struct ContentView: View {
     }
 
     private var controlSectionView: some View {
-            CBControlSection(
-                buttons: $controlButtons,
-                isEditing: $controlEditMode,
-                perRow: $controlsPerRow,
+        CBControlSection(
+            buttons: $controlButtons,
+            isEditing: $controlEditMode,
+            perRow: $controlsPerRow,
             pendingAddIsFader: $pendingAddIsFader,
-                reportedHeight: $controlAreaHeight,
-                canAddMoreControls: $canAddMoreControlsToGrid,
-                isCollapsed: $controlAreaCollapsed,
-                selectedCue: $selectedCue,
-                currentPage: $currentControlPage,
-                conflictFor: conflictLookup(),
-                midiFilter: midiFilter,
-                showMIDIData: showMIDIData,
-                onTap: { btn in triggerControl(btn) },
-                onEditButton: { btn in
-                    editingControlForEdit = btn
-                    showEditControlSheet = true
-                    resetControlEditModeTimer()
-                },
+            reportedHeight: $controlAreaHeight,
+            canAddMoreControls: $canAddMoreControlsToGrid,
+            isCollapsed: $controlAreaCollapsed,
+            selectedCue: $selectedCue,
+            currentPage: $currentControlPage,
+            conflictFor: conflictLookup(),
+            midiFilter: midiFilter,
+            showMIDIData: showMIDIData,
+            onTap: { btn in triggerControl(btn) },
+            onEditButton: { btn in
+                editingControlForEdit = btn
+                showEditControlSheet = true
+                resetControlEditModeTimer()
+            },
             onAddButton: { if canAddMoreControlsToGrid { beginAddControlOfType(.button) }; resetControlEditModeTimer() },
             onAddFader: { if canAddMoreControlsToGrid { beginAddControlOfType(.fader) }; resetControlEditModeTimer() },
-                onUndo: { undoControls(); resetControlEditModeTimer() },
-                onRedo: { redoControls(); resetControlEditModeTimer() },
-                canUndo: !controlUndoStack.isEmpty,
-                canRedo: !controlRedoStack.isEmpty,
-                onDelete: { btn in deleteControl(btn); resetControlEditModeTimer() },
-                onMove: { from, to in pushControlUndo(); controlButtons.move(fromOffsets: from, toOffset: to); markDirty(); resetControlEditModeTimer() },
-                onCancelTimer: cancelControlEditModeTimer,
-                onResetTimer: resetControlEditModeTimer,
-                usbServer: usbServer,
-                wifiClient: wifiClient,
-                connectionCoordinator: connectionCoordinator,
-                controlAreaColor: currentTheme.titleBarColor(for: colorScheme),
-                buttonBackgroundColor: currentTheme.buttonBackgroundColor(for: colorScheme, customAccentHex: customDefaultCueColorStorage),
-                lightButtonBackgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme),
-                defaultCueColor: Color(hex: effectiveDefaultCueColorHex),
-                standardButtonColor: currentTheme.defaultCueColor(for: colorScheme),
-                textColor: currentTheme.primaryTextColor(for: colorScheme),
-                markDirty: markDirty,
-                cueListEditMode: isEditing
-            )
+            onUndo: { undoControls(); resetControlEditModeTimer() },
+            onRedo: { redoControls(); resetControlEditModeTimer() },
+            canUndo: !controlUndoStack.isEmpty,
+            canRedo: !controlRedoStack.isEmpty,
+            onDelete: { btn in deleteControl(btn); resetControlEditModeTimer() },
+            onMove: { from, to in pushControlUndo(); controlButtons.move(fromOffsets: from, toOffset: to); markDirty(); resetControlEditModeTimer() },
+            onCancelTimer: cancelControlEditModeTimer,
+            onResetTimer: resetControlEditModeTimer,
+            usbServer: usbServer,
+            wifiClient: wifiClient,
+            connectionCoordinator: connectionCoordinator,
+            controlAreaColor: currentTheme.titleBarColor(for: colorScheme),
+            buttonBackgroundColor: currentTheme.buttonBackgroundColor(for: colorScheme, customAccentHex: customDefaultCueColorStorage),
+            lightButtonBackgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme),
+            defaultCueColor: Color(hex: effectiveDefaultCueColorHex),
+            standardButtonColor: currentTheme.defaultCueColor(for: colorScheme),
+            textColor: currentTheme.primaryTextColor(for: colorScheme),
+            markDirty: markDirty,
+            cueListEditMode: isEditing
+        )
             .onChange(of: controlEditMode) { _, newValue in
                 if newValue {
                     // Entering edit mode - start timer
@@ -4373,38 +4374,22 @@ internal struct ContentView: View {
                                 .transition(.move(edge: .bottom))
                         }
 
-                        if !isEditing && !effectivelyCollapsedForOverlay && showExpandedArea {
-                            // Show full expanded control area with sequential animation
+                        // PERFORMANCE: Only create CBControlSection when controlSectionReady is true
+                        // This delays heavy view initialization until after initial app layout
+                        // NOTE: Removed GeometryReader background - it caused UI freeze due to layout loop
+                        if !isEditing && !effectivelyCollapsedForOverlay && showExpandedArea && controlSectionReady {
                             let isLandscape = verticalSizeClass == .compact
                             // Bottom padding: X + 2Y where X = home indicator height (~5pt), Y = its distance from bottom (8pt)
-                            // Result: 5 + 2(8) = 21pt
                             let bottomPadding: CGFloat = 21
 
-                            // Portrait: center, Landscape: align to bottom-right (matching collapsed capsule)
                             AnyView(controlSectionView)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isLandscape ? .bottomTrailing : .bottom)
-                                .padding(.trailing, isLandscape ? 16 : 0)  // Match collapsed capsule trailing padding in landscape
-                                .padding(.bottom, bottomPadding)  // Position above home indicator with proper spacing
+                                .padding(.trailing, isLandscape ? 16 : 0)
+                                .padding(.bottom, bottomPadding)
                                 .ignoresSafeArea(edges: .bottom)
-                            .background(
-                                GeometryReader { geo in
-                                    Color.clear.onAppear {
-                                        // Report actual height only when not animating
-                                        if showExpandedArea && !isAnimatingControlArea {
-                                            controlAreaHeight = geo.size.height
-                                        }
-                                    }
-                                    .onChange(of: geo.size.height) { _, newHeight in
-                                        // Only update height when not animating
-                                        if showExpandedArea && !isAnimatingControlArea {
-                                            controlAreaHeight = newHeight
-                                        }
-                                    }
-                                }
-                            )
-                            .transition(.move(edge: .bottom))
-                            .zIndex(1)
-                            .id("expandedNonEdit")
+                                .transition(.move(edge: .bottom))
+                                .zIndex(1)
+                                .id("expandedNonEdit")
                         }
                     }
                     .animation(.linear(duration: 0.1), value: showCollapsedCapsule)
@@ -4461,6 +4446,12 @@ internal struct ContentView: View {
                                 let maxHeight = isPhone ? landscapeHeight * 0.8 : screenBounds.height * 0.7
                                 controlAreaHeight = maxHeight
                             }
+                        }
+
+                        // PERFORMANCE: Delay CBControlSection creation until after initial layout
+                        // This prevents the heavy view from blocking app startup
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            controlSectionReady = true
                         }
                     }
                 }
@@ -7644,6 +7635,13 @@ private struct CBTopBar: View {
             }
         }
     }
+// Global cached portrait width to prevent repeated UIScreen access during SwiftUI layout
+// This MUST be outside the struct to avoid recreation on each view instantiation
+private let globalCachedPortraitWidth: CGFloat = {
+    let screenBounds = UIScreen.main.bounds
+    return min(screenBounds.width, screenBounds.height)
+}()
+
 private struct CBControlSection: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Binding var buttons: [ControlButton]
@@ -7697,22 +7695,14 @@ private struct CBControlSection: View {
     @State private var shadowOffset: CGSize = .zero // For smooth shadow tracking
 
     // Track actual width for proper orientation handling
-    @State private var actualWidth: CGFloat = UIScreen.main.bounds.width
+    // IMPORTANT: Initialize to 0, will be set by GeometryReader on first layout
+    // Using UIScreen.main.bounds.width here causes freeze issues
+    @State private var actualWidth: CGFloat = 0
 
     // Track portrait width for consistent grid sizing in both orientations
-    // Use screen bounds to ensure consistent width regardless of edit mode
+    // Uses global cached value to prevent infinite layout loops
     private var portraitWidth: CGFloat {
-        let screenBounds = UIScreen.main.bounds
-        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-        let minDimension = min(screenBounds.width, screenBounds.height)
-
-        if isPhone {
-            // iPhone: use minimum dimension (portrait width)
-            return minDimension
-        } else {
-            // iPad: use full width - padding is internal to the capsule (matches title bar capsules)
-            return minDimension
-        }
+        return globalCachedPortraitWidth
     }
 
     // Track calculated height to avoid infinite render loops
@@ -8274,17 +8264,28 @@ private struct CBControlSection: View {
                 }
                 .id("ctrl-geo-\(isEditing)-sess-\(editSessionNonce)")
                 // No maxWidth constraint - let the capsule width calculation determine the size
-                .frame(height: calculateDynamicHeight(), alignment: .top)  // Align content to top
+                // Use cachedHeight instead of calculateDynamicHeight() to prevent infinite layout loop
+                .frame(height: cachedHeight > 0 ? cachedHeight : 200, alignment: .top)  // Align content to top
                 .background(Color.clear)  // Ensure no white background
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: cachedHeight)
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
                 // Skip drawingGroup on iPhone - can cause rendering issues with GeometryReader
                 .modifier(ConditionalDrawingGroup(enabled: UIDevice.current.userInterfaceIdiom != .phone))
+                .onAppear {
+                    // Calculate initial height on appear
+                    let height = calculateDynamicHeight()
+                    if cachedHeight != height {
+                        cachedHeight = height
+                        reportedHeight = height
+                    }
+                }
                 .onChange(of: actualWidth) { _, _ in
                     // Recalculate height when width changes (orientation change)
                     let height = calculateDynamicHeight()
-                    cachedHeight = height
-                    reportedHeight = height
+                    if cachedHeight != height {
+                        cachedHeight = height
+                        reportedHeight = height
+                    }
                 }
             }
         }
