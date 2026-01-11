@@ -4,6 +4,382 @@ This changelog is automatically generated from git commits.
 
 ---
 
+## ed2d70b - iPhone improvements: portrait-only, two-finger scroll, UI fixes
+
+**Date:** 2026-01-06
+**Author:** Omri Behr
+
+- Lock iPhone to portrait orientation only
+- Add TwoFingerScrollView for control area (requires 2 fingers to scroll)
+- Add Tutorial 4 for two-finger scroll hint on iPhone
+- Fix chevron collapse button with proper buttonStyle and contentShape
+- Match cue capsule width to nav pill (use same sizeMultiplier)
+- Simplify nav pill/cue capsule vertical positioning
+- Update control area height calculations
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## dadf1a4 - Improve control area UI and tutorial interactions
+
+**Date:** 2026-01-02
+**Author:** Omri Behr
+
+- Control area edit mode: single expanding capsule with undo/redo/+/done
+- Show chevron instead of checkmark when no controls exist in edit mode
+- Separate Edit and chevron into two capsules in normal mode
+- Animate capsule expansion when entering/exiting edit mode
+- Tutorial dismissals: 2b on library open, 2c on cue list open, 3 on controls tap
+- Tutorial 1 tap dismissal now shows tutorial 3
+- Remove "Controls" text from collapsed capsule (icon only)
+- Fix tutorial 3 arrow to point at center of controls button
+- iPad: equalize bottom padding with side padding in control grid
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## dcbd38e - Update UI capsules to Apple-like design with consistent styling
+
+**Date:** 2025-12-31
+**Author:** Omri Behr
+
+- Top bar capsules: Use Capsule() shape with .regularMaterial, 44pt height
+- Control area header: Add bottom padding to prevent X button clipping
+- Cue list edit mode: Apple-like search bar and select/sort capsules
+- Popover toolbars: Update icon buttons to capsule style with shadows
+- Cue capsule: Match nav pill height (275pt)
+- Adjust cue list slide-down distance to match capsule positioning
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## 108745a - Redesign control area title bar with text buttons
+
+**Date:** 2025-12-30
+**Author:** Omri Behr
+
+- Left side (edit mode): Undo/Redo icons + "| + Button" + "+ Fader" text
+- Right side: "Edit"/"Done" text + chevron icon
+- All in shared capsules with shadows
+- 15pt font for text buttons, 18pt for icons
+- Added 8pt top padding to match sheet toolbar spacing
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## a6fdec1 - Fix X delete buttons being clipped by control area title bar
+
+**Date:** 2025-12-29
+**Author:** Omri Behr
+
+Use background-only rounded rectangles for control area capsule
+so X delete buttons can extend beyond bounds without being clipped.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## 6227643 - Fix X delete buttons being clipped by control area title bar
+
+**Date:** 2025-12-29
+**Author:** Omri Behr
+
+Position X delete buttons inside cell bounds instead of extending
+outside with negative offset. This prevents clipping without
+changing the control area height.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## db69b3e - Fix tutorials to show only once in all builds
+
+**Date:** 2025-12-29
+**Author:** Omri Behr
+
+Remove #if DEBUG blocks that were forcing tutorials to always show
+in debug builds. Now both nav pill and cue capsule tutorials properly
+check UserDefaults and only show once, regardless of build type.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## 5af28b1 - Redesign add/edit sheets with toolbar buttons
+
+**Date:** 2025-12-29
+**Author:** Omri Behr
+
+Replace bottom action buttons with toolbar design across all sheets:
+- Add cue sheet: 3-dot menu + checkmark in toolbar
+- Edit cue sheet: 3-dot menu (duplicate/delete) + checkmark
+- Add button/fader sheet: 3-dot menu + checkmark
+- Edit button/fader sheet: 3-dot menu (delete) + checkmark
+
+Also fix cue list scrolling and tap detection by removing
+blocking DragGesture that was consuming all touch events.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## 883ef0c - Add tutorial system with interruption/resume logic
+
+**Date:** 2025-12-29
+**Author:** Omri Behr
+
+- Add onboarding tutorial flow (tutorials 1-3, 2b, 2c) with frame tracking
+- Tutorial bubbles clamp to screen edges with offset arrows
+- Float animation bobs up and down symmetrically
+- Side menu buttons now clickable across entire row
+- Add Reset Tutorials button to side menu (resets all tutorials + onboarding)
+- Nav pill and cue capsule tutorials pause other tutorials, resume on dismiss
+- Tutorials appear above control area with proper z-index
+- Update empty cue list text
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## 467b1bf - Restore nav pill and cue capsule with fixed-to-right-edge design and tutorials
+
+**Date:** 2025-12-29
+**Author:** Omri Behr
+
+- Nav pill fixed to right edge with swipe to expand/collapse
+- Cue capsule fixed to right edge with slide-to-collapse animation
+- SwipeableCapsuleTutorial for both nav pill and cue capsule
+- RoundedRectangle(cornerRadius: 20) for capsule shapes
+- Theme color support for capsules
+
+Restored from Time Machine backup after accidental revert.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+----
+
+## f110a13 - Add press state animation to cue rows in regular mode
+
+**Date:** 2025-12-22
+**Author:** Omri Behr
+
+- Add DragGesture with @GestureState to detect press state
+- Scale down to 0.97 when pressed
+- Reduce shadow radius from 8 to 4 and y-offset when pressed
+- Press animation works alongside tap gesture and scrolling
+- Only applies in regular mode (not edit mode)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## 703cf7b - Fix navigation pill collapse swipe gesture
+
+**Date:** 2025-12-22
+**Author:** Omri Behr
+
+- Move swipe gesture after all overlays (contentShape level)
+- Use simultaneousGesture instead of gesture to work alongside button presses
+- Increase swipe threshold from 20/30pt to 30/40pt for more deliberate swipes
+- Swipe now works correctly when expanded (swipe right to collapse)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## 2ed8574 - Add border and chevron to expanded navigation pill
+
+**Date:** 2025-12-22
+**Author:** Omri Behr
+
+- Add 2pt stroke border around expanded nav pill
+- Add right-facing chevron on left side when expanded (indicates collapse action)
+- Chevron positioned 45pt to the left of pill
+- Border and chevron only visible when expanded
+- Remove unused movement boundary variables (upperLimit, lowerLimit, horizontalPadding)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## b5f1419 - Add collapsible nav pill and restore GO button to cue capsule
+
+**Date:** 2025-12-22
+**Author:** Omri Behr
+
+Navigation Pill Changes:
+- Add expand/collapse functionality with swipe gestures
+- Fix position to right edge (no longer draggable)
+- Auto-center between control area top and edit capsule bottom
+- Show chevron icon when collapsed, full +/- buttons when expanded
+- Swipe left to expand, swipe right to collapse
+- Remove drag gesture and collision detection (now fixed position)
+
+Cue Capsule Changes:
+- Add GO button back to center of vertical layout
+- Layout: Prev (top) → GO (center) → Next (bottom)
+- GO button: Circular with accent color, 120pt size
+- Dividers between sections
+- Increased total height to 260pt to accommodate GO button
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## c62a810 - Change capsule shapes to rounded rectangles and simplify cue capsule
+
+**Date:** 2025-12-22
+**Author:** Omri Behr
+
+- Change nav pill and cue capsule from Capsule() to RoundedRectangle(cornerRadius: 20)
+- Redesign cue capsule as vertical pill with +/- buttons (matches nav pill design)
+- Remove horizontal GO button layout, simplify to vertical prev/next buttons
+- Remove visual drag feedback scale effects, use opacity + enhanced shadow instead
+- Update cornerRadius from 32 to 20 to match design system
+- Consistent 20pt corner radius across all capsules per DESIGN_SYSTEM.md
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## 0a984d0 - Optimize capsule dragging and collision detection
+
+**Date:** 2025-12-22
+**Author:** Omri Behr
+
+- Fix cue list scrolling: Remove unused pressAnimation gesture
+- Remove toggle button flash on iPad control area
+- Improve capsule edge sliding with direction-aware collision detection
+- Optimize rounded shape spacing (0.5-2pt) for natural nestling
+- Fix cue capsule position persistence (save/load from UserDefaults)
+- Reduce collision spacing for flush edge contact between rounded surfaces
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## cc04ee3 - Fix nav pill and cue capsule dragging behavior
+
+**Date:** 2025-12-19
+**Author:** Omri Behr
+
+- Fix jittering when dragging capsules near control area by preventing collision detection from searching for alternative positions during active drag
+- Allow capsules to be dragged to empty space beside control area in landscape mode by reducing horizontal padding constraints
+- Fix capsules jumping up after drag ends in landscape by adding horizontal overlap check to onChange handlers
+- Capsules now only avoid control area when actually overlapping it horizontally, not just vertically
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## cd3850e - v1.2.1: Refactor layout with orientation-aware containers
+
+**Date:** 2025-12-12
+**Author:** Omri Behr
+
+Architecture changes:
+- Wrap cue list ScrollView in GeometryReader container that constrains width
+  - Portrait iPad: screen width - 72pt (36pt padding each side)
+  - Landscape iPad: screen width - 240pt (120pt padding each side)
+- Constrain control area width in landscape to 60% of screen (max 600pt)
+  - Enables proper trailing alignment in landscape mode
+
+Layout fixes:
+- Cue list: Narrower in landscape, proper padding in both orientations
+- Control area: Aligned to right in landscape with 16pt trailing padding
+- Remove per-row padding in favor of ScrollView width constraint
+
+Technical improvements:
+- Clear separation: container handles sizing, content handles rendering
+- No more conflicting .frame(maxWidth: .infinity) modifiers
+- Easier to customize orientation-specific behavior
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## ee95f47 - v1.2.0: Fix toggle button animation and adjust landscape cue width
+
+**Date:** 2025-12-12
+**Author:** Omri Behr
+
+- Remove flash animation from toggle buttons in control area
+- Add orientation-specific horizontal padding for cue list
+  - Portrait iPad: 36pt padding
+  - Landscape iPad: 120pt padding (narrower cues)
+  - iPhone: 16pt in both orientations
+- Remove .frame(maxWidth: .infinity) from row components to respect padding
+- Fix control area height management during expand/collapse animations
+- Prevent nav pill and cue capsule from being pushed out of bounds
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
+## 789ecfe - Reduce spacing in expanded control area while preserving collapsed capsule height
+
+**Date:** 2025-12-10
+**Author:** Omri Behr
+
+Changed grid top padding to 8pt (from 18pt iPhone / 24pt iPad) for the
+expanded control area (edit mode or with buttons visible).
+
+This makes the expanded control area more compact by reducing the gap between
+the title bar and buttons grid, while the collapsed capsules maintain their
+original comfortable height through separate padding values.
+
+Result:
+- Expanded control area: Minimal title bar height with 8pt spacing
+- Collapsed capsules: Regular capsule height matching main title bar capsules
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+----
+
 ## 9e48d07 - Revert control area grid spacing to original values
 
 **Date:** 2025-12-10
