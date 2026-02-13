@@ -77,7 +77,7 @@ struct SwipeableCapsuleConfig {
 
     static let cueCapsule = SwipeableCapsuleConfig(
         expandedWidth: 140,  // Same as navPill
-        expandedHeight: 275,  // Same as navPill for visual consistency
+        expandedHeight: 310,  // Taller than navPill so +/- buttons are almost square
         collapsedWidth: 40,
         collapsedHeight: 100,
         tutorialText: "Swipe right to collapse",
@@ -587,6 +587,8 @@ struct PrimaryWideButtonStyle: ButtonStyle {
                             : (configuration.isPressed ? Color(hex: "0A84FF").opacity(0.7) : Color(hex: "0A84FF"))
                     )
             )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
@@ -634,6 +636,8 @@ struct SecondaryWideButtonStyle: ButtonStyle {
                         lineWidth: 1
                     )
             )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
@@ -660,6 +664,8 @@ struct DestructiveWideButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(configuration.isPressed ? Color.red.opacity(0.7) : Color.red)
             )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
@@ -688,12 +694,10 @@ class WobbleAnimator: ObservableObject {
             scaleDelta: scaleDelta,
             phaseOffset: phaseOffset
         )
-        debugPrint("🔄 WobbleAnimator: Started wobbling for ID \(id.uuidString.prefix(8))... (total wobbles: \(wobbles.count))")
     }
 
     func stopWobbling(for id: UUID) {
         wobbles.removeValue(forKey: id)
-        debugPrint("🔄 WobbleAnimator: Stopped wobbling for ID \(id.uuidString.prefix(8))... (remaining wobbles: \(wobbles.count))")
     }
 
     func resetWobble(for id: UUID) {
@@ -3269,6 +3273,52 @@ internal struct ContentView: View {
     @State private var showTutorial3 = false  // Tutorial 3: Controls capsule
     @State private var showTutorial4 = false  // Tutorial 4: Two-finger scroll for control area (iPhone only)
     @State private var interruptedTutorial: Int? = nil  // Track which tutorial was interrupted by nav/cue capsule tutorial (1, 2, 2 for 2b, 3 for 2c, 4 for 3)
+    @State private var pendingTutorial: Int? = nil  // Tutorial waiting to be shown (queued because another is active)
+
+    /// Check if any tutorial is currently showing
+    private var isAnyTutorialShowing: Bool {
+        showTutorial1 || showTutorial2 || showTutorial2b || showTutorial2c || showTutorial3 || showTutorial4
+    }
+
+    /// Request to show a tutorial - will queue if another is active
+    /// Tutorial IDs: 1=Edit, 2=AddCue, 2b=Library, 2c=CueListName, 3=Controls, 4=TwoFingerScroll
+    private func requestTutorial(_ tutorialId: Int) {
+        if isAnyTutorialShowing {
+            // Queue this tutorial to show after current one is dismissed
+            pendingTutorial = tutorialId
+            debugPrint("📖 [Tutorial] Tutorial \(tutorialId) queued - another tutorial is active")
+        } else {
+            // Show immediately
+            showTutorialById(tutorialId)
+        }
+    }
+
+    /// Show a tutorial by its ID
+    private func showTutorialById(_ tutorialId: Int) {
+        switch tutorialId {
+        case 1: showTutorial1 = true
+        case 2: showTutorial2 = true
+        case 21: showTutorial2b = true  // Using 21 for 2b
+        case 22: showTutorial2c = true  // Using 22 for 2c
+        case 3: showTutorial3 = true
+        case 4: showTutorial4 = true
+        default: break
+        }
+        debugPrint("📖 [Tutorial] Showing tutorial \(tutorialId)")
+    }
+
+    /// Called when a tutorial is dismissed - shows pending tutorial if any
+    private func onTutorialDismissed() {
+        if let pending = pendingTutorial {
+            pendingTutorial = nil
+            // Small delay before showing next tutorial for smooth transition
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                if !self.isAnyTutorialShowing {
+                    self.showTutorialById(pending)
+                }
+            }
+        }
+    }
 
     // Tutorial frame tracking (for positioning tutorials)
     @State private var editButtonFrame: CGRect = .zero  // Edit button in top right capsule
@@ -3480,10 +3530,11 @@ internal struct ContentView: View {
                     editingSong = nil
                     showAddEdit = true
 
-                    // Tutorial 2b: Show Library tutorial after clicking + button
+                    // Tutorial 2: Dismiss when clicking + button
                     if showTutorial2 {
                         showTutorial2 = false
                         hasSeenTutorial2 = true
+                        onTutorialDismissed()
                     }
                     // Will trigger tutorial 2b after the add sheet closes
                 },
@@ -3832,7 +3883,7 @@ internal struct ContentView: View {
                                             .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                             .frame(width: 44, height: 44)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(IOSPressButtonStyle())
                                 } else {
                                     // Normal mode: select and reorder buttons (select on left, reorder on right)
                                     Button(action: {
@@ -3846,7 +3897,7 @@ internal struct ContentView: View {
                                             .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                             .frame(width: 44, height: 44)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(IOSPressButtonStyle())
                                     .transition(.scale.combined(with: .opacity))
 
                                     Button(action: {
@@ -3859,7 +3910,7 @@ internal struct ContentView: View {
                                             .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
                                             .frame(width: 44, height: 44)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(IOSPressButtonStyle())
                                 }
                             }
                             .frame(height: 44)
@@ -3887,49 +3938,62 @@ internal struct ContentView: View {
         return controlAreaCollapsed || (controlButtons.isEmpty && !controlEditMode)
     }
 
+    // State for controls capsule press animation (can't use ButtonStyle due to GeometryReader conflicts)
+    @State private var controlsCapsulePressed: Bool = false
+
     private var collapsedControlCapsule: some View {
-        // Icon-only capsule (matching top capsules style)
-        Button(action: {
-            // Dismiss tutorial 3 when user clicks the controls capsule
-            if showTutorial3 {
-                showTutorial3 = false
-                hasSeenTutorial3 = true
-            }
-            withAnimation(.easeOut(duration: 0.1)) {
-                controlAreaCollapsed = false
-                // If empty, also enter edit mode
-                if controlButtons.isEmpty {
-                    controlEditMode = true
+        // Larger floating action button (Gmail-style)
+        Image(systemName: "slider.horizontal.3")
+            .font(.system(size: 24, weight: .medium))
+            .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
+            .frame(width: 56, height: 56)
+            .background(.regularMaterial)
+            .clipShape(Circle())
+            .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 4)
+            .opacity(controlsCapsulePressed ? 0.5 : 1.0)
+            .contentShape(Circle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        if !controlsCapsulePressed {
+                            controlsCapsulePressed = true
+                        }
+                    }
+                    .onEnded { _ in
+                        controlsCapsulePressed = false
+                        // Dismiss tutorial 3 when user clicks the controls capsule
+                        if showTutorial3 {
+                            showTutorial3 = false
+                            hasSeenTutorial3 = true
+                            onTutorialDismissed()
+                        }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            controlAreaCollapsed = false
+                            // If empty, also enter edit mode
+                            if controlButtons.isEmpty {
+                                controlEditMode = true
+                            }
+                        }
+                    }
+            )
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: TutorialButtonFramePreferenceKey.self,
+                        value: ["controlsCapsule": geo.frame(in: .global)]
+                    )
                 }
-            }
-        }) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
-        }
-        .buttonStyle(.plain)
-        .frame(width: 44, height: 44)
-        .background(.regularMaterial)
-        .clipShape(Capsule())
-        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(
-                    key: TutorialButtonFramePreferenceKey.self,
-                    value: ["controlsCapsule": geo.frame(in: .global)]
-                )
-            }
-        )
-        .padding(.trailing, 16)
-        .padding(.bottom, 0)  // No internal bottom padding - applied externally at frame level
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(
-                    key: CapsuleBoundsPreferenceKey.self,
-                    value: ["controlArea.main": geo.frame(in: .global)]
-                )
-            }
-        )
+            )
+            .padding(.trailing, 16)
+            .padding(.bottom, 0)  // No internal bottom padding - applied externally at frame level
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: CapsuleBoundsPreferenceKey.self,
+                        value: ["controlArea.main": geo.frame(in: .global)]
+                    )
+                }
+            )
     }
 
     private var controlSectionView: some View {
@@ -3983,6 +4047,7 @@ internal struct ContentView: View {
                     if showTutorial4 {
                         showTutorial4 = false
                         hasSeenTutorial4 = true
+                        onTutorialDismissed()
                     }
                 } else {
                     // Exiting edit mode - cancel timer
@@ -3992,7 +4057,7 @@ internal struct ContentView: View {
                     let isPhone = UIDevice.current.userInterfaceIdiom == .phone
                     if isPhone && !hasSeenTutorial4 && !controlButtons.isEmpty {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            showTutorial4 = true
+                            self.requestTutorial(4)
                         }
                     }
                 }
@@ -4117,7 +4182,7 @@ internal struct ContentView: View {
                             .padding(.vertical, 12)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
 
                         // Regular + Remote (navigation capsule)
                         Button(action: {
@@ -4144,7 +4209,7 @@ internal struct ContentView: View {
                             .padding(.vertical, 12)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
 
                         // Cue Mode (GO capsule)
                         Button(action: {
@@ -4171,7 +4236,7 @@ internal struct ContentView: View {
                             .padding(.vertical, 12)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
                     }
 
                     Divider()
@@ -4333,7 +4398,7 @@ internal struct ContentView: View {
             .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(IOSPressButtonStyle())
     }
 
     private func closeMenu() {
@@ -4392,8 +4457,9 @@ internal struct ContentView: View {
                                 .id("expandedNonEdit")
                         }
                     }
-                    .animation(.linear(duration: 0.1), value: showCollapsedCapsule)
-                    .animation(.linear(duration: 0.1), value: showExpandedArea)
+                    // Smooth slide animation for control area transitions
+                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showCollapsedCapsule)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showExpandedArea)
                     .onChange(of: effectivelyCollapsedForOverlay) { _, isCollapsed in
                         // Mark as animating - prevents GeometryReader from updating height during animation
                         isAnimatingControlArea = true
@@ -4402,28 +4468,25 @@ internal struct ContentView: View {
                             // Collapsing: hide expanded area and show collapsed capsule simultaneously
                             showExpandedArea = false
                             showCollapsedCapsule = true
+                            // Set collapsed height immediately
+                            controlAreaHeight = 56
                         } else {
                             // Expanding: hide collapsed capsule and show expanded area simultaneously
                             showCollapsedCapsule = false
                             showExpandedArea = true
+                            // Set expanded height immediately from bounds or use fixed estimate
+                            // IMPORTANT: Do NOT access UIScreen.main.bounds here - causes freeze
+                            if let actualHeight = capsuleBounds["controlArea.main"]?.height, actualHeight > 56 {
+                                controlAreaHeight = actualHeight
+                            } else {
+                                // Use fixed estimate - actual height will be set by CBControlSection
+                                controlAreaHeight = 200
+                            }
                         }
 
-                        // Update height only AFTER both animations complete (0.1s delay + 0.1s animation + margin)
+                        // Clear animating flag after animation completes
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                             isAnimatingControlArea = false
-
-                            // Now update to correct height based on final state
-                            if isCollapsed {
-                                controlAreaHeight = 56  // Collapsed capsule height
-                            } else if showExpandedArea {
-                                // Get actual height from bounds if available
-                                if let actualHeight = capsuleBounds["controlArea.main"]?.height {
-                                    controlAreaHeight = actualHeight
-                                } else {
-                                    // Fallback: conservative estimate
-                                    controlAreaHeight = 200
-                                }
-                            }
                         }
                     }
                     .onAppear {
@@ -4439,11 +4502,9 @@ internal struct ContentView: View {
                             if let actualHeight = capsuleBounds["controlArea.main"]?.height {
                                 controlAreaHeight = actualHeight
                             } else {
-                                // Calculate expanded height estimate based on device/orientation
+                                // Use fixed estimate - UIScreen.main.bounds access during layout causes freeze
                                 let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-                                let screenBounds = UIScreen.main.bounds
-                                let landscapeHeight = min(screenBounds.width, screenBounds.height)
-                                let maxHeight = isPhone ? landscapeHeight * 0.8 : screenBounds.height * 0.7
+                                let maxHeight = isPhone ? globalCachedPortraitWidth * 0.8 : 200
                                 controlAreaHeight = maxHeight
                             }
                         }
@@ -4638,12 +4699,11 @@ internal struct ContentView: View {
                                 onDismiss: {
                                     showTutorial1 = false
                                     hasSeenTutorial1 = true
-                                    // When dismissed by tapping (not by clicking edit), show tutorial 3
+                                    // When dismissed by tapping (not by clicking edit), queue tutorial 3
                                     if !hasSeenTutorial3 {
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                            showTutorial3 = true
-                                        }
+                                        pendingTutorial = 3
                                     }
+                                    onTutorialDismissed()
                                 }
                             )
                         }
@@ -4656,12 +4716,11 @@ internal struct ContentView: View {
                                 onDismiss: {
                                     showTutorial2 = false
                                     hasSeenTutorial2 = true
-                                    // Show Tutorial 2b after dismissing
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        if !hasSeenTutorial2b {
-                                            showTutorial2b = true
-                                        }
+                                    // Queue Tutorial 2b after dismissing
+                                    if !hasSeenTutorial2b {
+                                        pendingTutorial = 21  // 21 = tutorial 2b
                                     }
+                                    onTutorialDismissed()
                                 }
                             )
                         }
@@ -4674,6 +4733,7 @@ internal struct ContentView: View {
                                 onDismiss: {
                                     showTutorial2b = false
                                     hasSeenTutorial2b = true
+                                    onTutorialDismissed()
                                 }
                             )
                         }
@@ -4686,12 +4746,11 @@ internal struct ContentView: View {
                                 onDismiss: {
                                     showTutorial2c = false
                                     hasSeenTutorial2c = true
-                                    // Show Tutorial 3 after dismissing
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        if !hasSeenTutorial3 {
-                                            showTutorial3 = true
-                                        }
+                                    // Queue Tutorial 3 after dismissing
+                                    if !hasSeenTutorial3 {
+                                        pendingTutorial = 3
                                     }
+                                    onTutorialDismissed()
                                 }
                             )
                         }
@@ -4704,18 +4763,38 @@ internal struct ContentView: View {
                                 onDismiss: {
                                     showTutorial3 = false
                                     hasSeenTutorial3 = true
+                                    onTutorialDismissed()
                                 }
                             )
                         }
 
                         // Tutorial 4: Two-finger scroll (iPhone only, after adding first button/fader)
-                        if showTutorial4 && controlAreaFrame != .zero {
+                        if showTutorial4 {
+                            // Use actual frame if available, otherwise estimate based on screen size
+                            // The expanded control area is roughly 80% of landscape height, positioned at bottom
+                            let estimatedFrame: CGRect = {
+                                if controlAreaFrame != .zero {
+                                    return controlAreaFrame
+                                }
+                                // Estimate: control area is near bottom of screen
+                                let screenWidth = globalCachedPortraitWidth
+                                let estimatedHeight = screenWidth * 0.6  // Rough estimate
+                                let screenHeight = UIScreen.main.bounds.height
+                                return CGRect(
+                                    x: 16,
+                                    y: screenHeight - estimatedHeight - 40,
+                                    width: screenWidth - 32,
+                                    height: estimatedHeight
+                                )
+                            }()
+
                             RightwardTutorial(
                                 message: "Use two fingers to scroll",
-                                targetFrame: controlAreaFrame,
+                                targetFrame: estimatedFrame,
                                 onDismiss: {
                                     showTutorial4 = false
                                     hasSeenTutorial4 = true
+                                    onTutorialDismissed()
                                 }
                             )
                         }
@@ -4749,6 +4828,7 @@ internal struct ContentView: View {
                         if isCollapsed && showTutorial4 {
                             showTutorial4 = false
                             hasSeenTutorial4 = true
+                            onTutorialDismissed()
                         }
                     }
                     .onChange(of: showCueListChooser) { _, isShowing in
@@ -4756,6 +4836,7 @@ internal struct ContentView: View {
                         if isShowing && showTutorial2c {
                             showTutorial2c = false
                             hasSeenTutorial2c = true
+                            onTutorialDismissed()
                         }
                     }
                     .onChange(of: showLibraryPopover) { _, isShowing in
@@ -4763,6 +4844,7 @@ internal struct ContentView: View {
                         if isShowing && showTutorial2b {
                             showTutorial2b = false
                             hasSeenTutorial2b = true
+                            onTutorialDismissed()
                         }
                     }
                 }
@@ -4778,33 +4860,61 @@ internal struct ContentView: View {
                             editCapsuleBottom = isEditing ? value : 0  // Only track when visible
                         }
                         .onPreferenceChange(CapsuleBoundsPreferenceKey.self) { value in
-                            capsuleBounds = value  // Update all capsule bounds for collision detection
-                            // Track control area frame for Tutorial 4 (two-finger scroll on iPhone)
+                            // PERFORMANCE: Guard against redundant updates to prevent layout loops
+                            // Use a larger threshold (5 points) to filter out animation micro-updates
+                            let hasSignificantChange = value.contains { key, newRect in
+                                guard let oldRect = capsuleBounds[key] else { return true }
+                                return abs(newRect.origin.x - oldRect.origin.x) > 5 ||
+                                       abs(newRect.origin.y - oldRect.origin.y) > 5 ||
+                                       abs(newRect.width - oldRect.width) > 5 ||
+                                       abs(newRect.height - oldRect.height) > 5
+                            }
+
+                            guard hasSignificantChange || value.count != capsuleBounds.count else { return }
+
+                            capsuleBounds = value
+                            // Track control area frame for Tutorial 4
                             if let frame = value["controlArea.main"] {
-                                controlAreaFrame = frame
+                                let differs = abs(frame.origin.x - controlAreaFrame.origin.x) > 5 ||
+                                             abs(frame.origin.y - controlAreaFrame.origin.y) > 5 ||
+                                             abs(frame.width - controlAreaFrame.width) > 5 ||
+                                             abs(frame.height - controlAreaFrame.height) > 5
+                                if differs {
+                                    controlAreaFrame = frame
+                                }
                             }
                         }
                         .onPreferenceChange(TutorialButtonFramePreferenceKey.self) { value in
-                            // Update tutorial button frames
-                            if let frame = value["editButton"] {
+                            // PERFORMANCE: Only process tutorial frames when tutorials might be shown
+                            // This prevents expensive frame comparisons on every layout pass
+                            let anyTutorialVisible = showTutorial1 || showTutorial2 || showTutorial2b || showTutorial2c || showTutorial3 || showTutorial4
+                            let anyTutorialPending = !hasSeenTutorial1 || !hasSeenTutorial2 || !hasSeenTutorial2b || !hasSeenTutorial2c || !hasSeenTutorial3 || !hasSeenTutorial4
+
+                            guard anyTutorialVisible || anyTutorialPending else { return }
+
+                            // Helper to check if frames differ significantly (more than 5 points to filter animation frames)
+                            func framesDiffer(_ a: CGRect, _ b: CGRect) -> Bool {
+                                return abs(a.origin.x - b.origin.x) > 5 ||
+                                       abs(a.origin.y - b.origin.y) > 5 ||
+                                       abs(a.width - b.width) > 5 ||
+                                       abs(a.height - b.height) > 5
+                            }
+
+                            // Silently update frames without logging - logging caused major performance issues
+                            if let frame = value["editButton"], framesDiffer(frame, editButtonFrame) {
                                 editButtonFrame = frame
-                                debugPrint("📍 [Tutorial] editButton frame: \(frame)")
                             }
-                            if let frame = value["addCueButton"] {
+                            if let frame = value["addCueButton"], framesDiffer(frame, addCueButtonFrame) {
                                 addCueButtonFrame = frame
-                                debugPrint("📍 [Tutorial] addCueButton frame: \(frame)")
                             }
-                            if let frame = value["libraryButton"] {
+                            if let frame = value["libraryButton"], framesDiffer(frame, libraryButtonFrame) {
                                 libraryButtonFrame = frame
-                                debugPrint("📍 [Tutorial] libraryButton frame: \(frame)")
                             }
-                            if let frame = value["cueListNameButton"] {
+                            if let frame = value["cueListNameButton"], framesDiffer(frame, cueListNameButtonFrame) {
                                 cueListNameButtonFrame = frame
-                                debugPrint("📍 [Tutorial] cueListNameButton frame: \(frame)")
                             }
-                            if let frame = value["controlsCapsule"] {
+                            if let frame = value["controlsCapsule"], framesDiffer(frame, controlsCapsuleFrame) {
                                 controlsCapsuleFrame = frame
-                                debugPrint("📍 [Tutorial] controlsCapsule frame: \(frame)")
                             }
                         }
                         .onChange(of: isEditing) { oldValue, newValue in
@@ -4817,10 +4927,11 @@ internal struct ContentView: View {
                                     // Dismiss Tutorial 1 first
                                     showTutorial1 = false
                                     hasSeenTutorial1 = true
+                                    onTutorialDismissed()
                                 }
                                 if !hasSeenTutorial2 {
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        showTutorial2 = true
+                                        self.requestTutorial(2)
                                     }
                                 }
                             } else {
@@ -4836,16 +4947,18 @@ internal struct ContentView: View {
                                 if showTutorial2 {
                                     showTutorial2 = false
                                     hasSeenTutorial2 = true
+                                    onTutorialDismissed()
                                 }
                                 if showTutorial2b {
                                     showTutorial2b = false
                                     hasSeenTutorial2b = true
+                                    onTutorialDismissed()
                                 }
 
                                 // Tutorial 2c: Show cue list name tutorial after exiting edit mode
                                 if shouldShowTutorial2c {
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        showTutorial2c = true
+                                        self.requestTutorial(22)  // 22 = tutorial 2c
                                     }
                                 }
                             }
@@ -4987,7 +5100,7 @@ internal struct ContentView: View {
             // Tutorial 2b: Show Library tutorial after adding a cue
             if hasSeenTutorial2 && !hasSeenTutorial2b && isEditing {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    showTutorial2b = true
+                    self.requestTutorial(21)  // 21 = tutorial 2b
                 }
             }
         }) {
@@ -5018,14 +5131,18 @@ internal struct ContentView: View {
                     showAddEdit = false
                 },
                 onDelete: { song in
-                    // Determine context based on whether we're in edit mode
-                    // If in edit mode (from cue list), just remove from cue list
-                    // Otherwise (from library or add button), delete from library
+                    // Remove from cue list only (when in cue list context)
+                    // Or delete from library (when in library context)
                     if isEditing {
                         removeFromSetlist(song)
                     } else {
                         deleteFromLibrary(song)
                     }
+                    showAddEdit = false
+                },
+                onDeleteFromLibrary: { song in
+                    // Delete from library (and all cue lists)
+                    deleteFromLibrary(song)
                     showAddEdit = false
                 },
                 onDuplicate: { song in
@@ -5256,8 +5373,7 @@ internal struct ContentView: View {
             if !hasSeenTutorial1 {
                 debugPrint("📖 [Tutorial] Scheduling Tutorial 1 (Edit button)")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    debugPrint("📖 [Tutorial] Setting showTutorial1 = true")
-                    showTutorial1 = true
+                    self.requestTutorial(1)
                 }
             }
         }) {
@@ -5690,19 +5806,20 @@ internal struct ContentView: View {
         }
 
         // Convert to single string per key, joining multiple owners (deduplicate names)
+        // NOTE: Duplicate cues (same name) intentionally share MIDI - don't count as conflict
         var map: [MIDIKey: String] = [:]
         for (key, owners) in multiMap {
-            // Deduplicate owner names
+            // Deduplicate owner names - this means cues with the same name
+            // (duplicates/copies) won't be counted as separate conflicts
             let uniqueOwners = Array(Set(owners)).sorted()
 
-            // Store ALL owners (even single ones) so we can detect conflicts
-            // The filtering happens at display time to exclude the current item
+            // Only store if there are 2+ UNIQUE owners (actual conflicts)
+            // Single owner or multiple cues with same name = no conflict
             if uniqueOwners.count >= 2 {
                 // Format list with separator
                 map[key] = uniqueOwners.joined(separator: "|||")
-            } else if uniqueOwners.count == 1 {
-                map[key] = uniqueOwners[0]
             }
+            // Don't store single owners - no conflict to display
         }
 
         return map
@@ -5756,7 +5873,42 @@ internal struct ContentView: View {
         scheduleConflictCacheUpdate()
     }
     
-    private func ownerName(for key: MIDIKey) -> String? { conflictLookup()[key] }
+    /// Returns the owner name for a MIDI key (for auto-assign conflict detection)
+    /// This checks ALL owners, not just conflicts (unlike conflictLookup which only stores 2+ owners)
+    private func ownerName(for key: MIDIKey) -> String? {
+        // Check songs in setlist
+        for s in store.activeSongs {
+            let songKey = (s.kind == .note)
+                ? MIDIKey(kind: .note, channel: s.channel, number: s.note ?? 0)
+                : MIDIKey(kind: .cc, channel: s.channel, number: s.cc)
+            if songKey == key {
+                return s.name
+            }
+        }
+
+        // Check songs in library (not in setlist)
+        for s in songLibrary {
+            // Skip if already in setlist (avoid double-counting)
+            if store.activeSongs.contains(where: { $0.id == s.id }) { continue }
+            let songKey = (s.kind == .note)
+                ? MIDIKey(kind: .note, channel: s.channel, number: s.note ?? 0)
+                : MIDIKey(kind: .cc, channel: s.channel, number: s.cc)
+            if songKey == key {
+                return s.name
+            }
+        }
+
+        // Check control buttons
+        for b in controlButtons {
+            let buttonKey = MIDIKey(kind: b.kind, channel: b.channel, number: b.number)
+            if buttonKey == key {
+                let typePrefix = b.isFader == true ? "Fader" : "Button"
+                return b.title.isEmpty ? typePrefix : "\(typePrefix): \(b.title)"
+            }
+        }
+
+        return nil
+    }
 
     // MARK: - Global Channel Management
     private func handleGlobalChannelToggle(wasEnabled: Bool, isEnabled: Bool) {
@@ -5879,11 +6031,9 @@ internal struct ContentView: View {
             // Toggle behavior: flip state and send appropriate value
             updatedButton.toggleState.toggle()
             value = updatedButton.toggleState ? (b.kind == .cc ? 127 : b.velocity) : 0
-            debugPrint("🔄 Toggle button '\(b.title)': \(updatedButton.toggleState ? "ON" : "OFF")")
         } else {
             // Momentary behavior: send fixed value
             value = b.kind == .cc ? 127 : b.velocity
-            debugPrint("⚡ Momentary button '\(b.title)': \(value)")
         }
 
         // Use global channel if enabled, otherwise use button's channel
@@ -5942,21 +6092,15 @@ internal struct ContentView: View {
         guard let interrupted = interruptedTutorial else { return }
         interruptedTutorial = nil
 
-        // Small delay to let the capsule tutorial fully dismiss
+        // Small delay to let the capsule tutorial fully dismiss, then use queue system
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             switch interrupted {
-            case 1:
-                showTutorial1 = true
-            case 2:
-                showTutorial2 = true
-            case 3:
-                showTutorial2b = true
-            case 4:
-                showTutorial2c = true
-            case 5:
-                showTutorial3 = true
-            default:
-                break
+            case 1: self.requestTutorial(1)
+            case 2: self.requestTutorial(2)
+            case 3: self.requestTutorial(21)  // 21 = tutorial 2b
+            case 4: self.requestTutorial(22)  // 22 = tutorial 2c
+            case 5: self.requestTutorial(3)
+            default: break
             }
         }
     }
@@ -7150,6 +7294,7 @@ private struct CBTopBar: View {
                 // Connections capsule (hide when editing)
                 if !isEditing {
                     Button(action: onConnections) {
+                        // All visual styling inside label so ButtonStyle animates the whole capsule
                         HStack(spacing: 6) {
                             Image(systemName: "antenna.radiowaves.left.and.right")
                                 .font(.system(size: 18))
@@ -7175,13 +7320,13 @@ private struct CBTopBar: View {
                                     .clipShape(Capsule())
                             }
                         }
+                        .padding(.horizontal, 14)
+                        .frame(height: 44)
+                        .background(.regularMaterial)
+                        .clipShape(Capsule())
+                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 14)
-                    .frame(height: 44)
-                    .background(.regularMaterial)
-                    .clipShape(Capsule())
-                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                    .buttonStyle(IOSPressButtonStyle())
                     .transition(.opacity.combined(with: .scale))
                 }
 
@@ -7224,7 +7369,7 @@ private struct CBTopBar: View {
                     .foregroundStyle(textColor.opacity(0.7))
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(IOSPressButtonStyle())
         .background(
             GeometryReader { geo in
                 Color.clear.preference(
@@ -7734,10 +7879,6 @@ private struct CBControlSection: View {
     
     // Centralized drag state management
     private func clearDragState(reason: String) {
-        debugPrint("🧹 Clearing drag state - \(reason)")
-        if let draggingButton = dragging {
-            debugPrint("🔍 Button \(draggingButton.title) final position: (\(draggingButton.gridCol ?? -1), \(draggingButton.gridRow ?? -1))")
-        }
         dragging = nil
         previewLocation = nil
         displacementCache.removeAll()
@@ -7955,7 +8096,7 @@ private struct CBControlSection: View {
                     .frame(height: 0)
                     .overlay(alignment: .bottomTrailing) {
                         Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                                 isEditing = true
                                 isCollapsed = false
                                 editSessionNonce &+= 1
@@ -7982,7 +8123,7 @@ private struct CBControlSection: View {
                     .overlay(alignment: .bottomTrailing) {
                         HStack(spacing: 0) {
                             Button(action: {
-                                withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                                     if isEditing {
                                         isEditing = false
                                         clearDragState(reason: "done button in collapsed capsule")
@@ -7999,11 +8140,11 @@ private struct CBControlSection: View {
                                     .padding(.horizontal, 12)
                                     .frame(height: 44)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(IOSPressButtonStyle())
 
                             if !buttons.isEmpty {
                                 Button(action: {
-                                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                                         isCollapsed = false
                                     }
                                 }) {
@@ -8012,7 +8153,7 @@ private struct CBControlSection: View {
                                         .foregroundColor(defaultCueColor)
                                         .frame(width: 44, height: 44)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(IOSPressButtonStyle())
                             }
                         }
                         .background(.regularMaterial)
@@ -8064,8 +8205,11 @@ private struct CBControlSection: View {
     
     private var mainHeader: some View {
         HStack(spacing: 8) {
-            // Page navigation capsule (left side) - only show if more than 1 page available
-            if availablePages.count > 1 {
+            // Page navigation capsule (left side) - show if:
+            // 1. More than 1 page has controls, OR
+            // 2. In edit mode with multiple pages available, OR
+            // 3. There are any buttons (show page indicator even if all on one page)
+            if pagesWithControls.count > 1 || (isEditing && availablePages.count > 1) || !buttons.isEmpty {
                 HStack(spacing: 0) {
                     // Previous page button
                     Button(action: {
@@ -8175,7 +8319,7 @@ private struct CBControlSection: View {
 
                 // Edit/Done button - always present, changes between text, checkmark, or chevron
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         if isEditing && buttons.isEmpty {
                             // No buttons - collapse instead of exiting edit mode
                             isCollapsed = true
@@ -8257,8 +8401,10 @@ private struct CBControlSection: View {
                         // Update actual width when view appears
                         actualWidth = outerProxy.size.width
                     }
-                    .onChange(of: outerProxy.size.width) { _, newWidth in
+                    .onChange(of: outerProxy.size.width) { oldWidth, newWidth in
                         // Update actual width when orientation changes
+                        // Guard against tiny changes that could cause layout loops
+                        guard abs(newWidth - oldWidth) > 1 else { return }
                         actualWidth = newWidth
                     }
                 }
@@ -8274,17 +8420,23 @@ private struct CBControlSection: View {
                 .onAppear {
                     // Calculate initial height on appear
                     let height = calculateDynamicHeight()
-                    if cachedHeight != height {
-                        cachedHeight = height
-                        reportedHeight = height
+                    cachedHeight = height
+                    // Debounce reportedHeight update to avoid infinite loop
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        if abs(reportedHeight - height) > 5 {
+                            reportedHeight = height
+                        }
                     }
                 }
                 .onChange(of: actualWidth) { _, _ in
                     // Recalculate height when width changes (orientation change)
                     let height = calculateDynamicHeight()
-                    if cachedHeight != height {
-                        cachedHeight = height
-                        reportedHeight = height
+                    cachedHeight = height
+                    // Debounce reportedHeight update to avoid infinite loop
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if abs(reportedHeight - height) > 5 {
+                            reportedHeight = height
+                        }
                     }
                 }
             }
@@ -8303,28 +8455,58 @@ private struct CBControlSection: View {
             }
             .onChange(of: cueListEditMode) { _, newValue in
                 // Collapse control area when cue list enters edit mode
-                withAnimation(.easeInOut) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                     if newValue {
                         isCollapsed = true
                     } else {
                         isCollapsed = false
+                        // Auto-enter edit mode when expanding empty control area
+                        if buttons.isEmpty {
+                            isEditing = true
+                        }
                     }
                 }
-            }
-            .onAppear {
-                let height = calculateDynamicHeight()
-                cachedHeight = height
-                reportedHeight = height
             }
             .onChange(of: buttons.count) { _, _ in
                 let height = calculateDynamicHeight()
                 cachedHeight = height
-                reportedHeight = height
+                // Debounce reportedHeight update to avoid infinite loop
+                // The delay breaks the synchronous layout cycle
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if abs(reportedHeight - height) > 5 {
+                        reportedHeight = height
+                    }
+                }
+            }
+            .onChange(of: buttons.map { "\($0.gridRow ?? -1)" }.joined()) { _, _ in
+                // Recalculate when button positions change (not just count)
+                let height = calculateDynamicHeight()
+                cachedHeight = height
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if abs(reportedHeight - height) > 5 {
+                        reportedHeight = height
+                    }
+                }
             }
             .onChange(of: isCollapsed) { _, _ in
                 let height = calculateDynamicHeight()
                 cachedHeight = height
-                reportedHeight = height
+                // Debounce reportedHeight update to avoid infinite loop
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if abs(reportedHeight - height) > 5 {
+                        reportedHeight = height
+                    }
+                }
+            }
+            .onChange(of: isEditing) { _, _ in
+                // Recalculate when entering/exiting edit mode (edit mode shows full 4 rows)
+                let height = calculateDynamicHeight()
+                cachedHeight = height
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if abs(reportedHeight - height) > 5 {
+                        reportedHeight = height
+                    }
+                }
             }
         
         let gridWithLifecycle = styledGridArea
@@ -8335,10 +8517,11 @@ private struct CBControlSection: View {
             .onChange(of: buttons.count) { _, newCount in
                 debugPrint("🔄 buttons.count changed to \(newCount) - dragging: \(dragging?.title ?? "none"), isDragOperation: \(isDragOperation)")
 
-                // Auto-unfold when control area becomes empty
+                // Auto-unfold and enter edit mode when control area becomes empty
                 if newCount == 0 && isCollapsed {
-                    withAnimation(.spring(response: 0.15, dampingFraction: 0.85)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         isCollapsed = false
+                        isEditing = true  // Always edit mode when empty
                     }
                 }
 
@@ -8416,10 +8599,9 @@ private struct CBControlSection: View {
                 let availableWidth = portraitWidth - (2 * actualHorizontalPadding) - totalSpacing
                 var cellSize = floor(availableWidth / CGFloat(columns))
 
-                // Apply same height constraint logic
-                let screenBounds = UIScreen.main.bounds
-                let landscapeHeight = min(screenBounds.width, screenBounds.height)
-                let maxHeight = isPhone ? landscapeHeight * 0.8 : screenBounds.height * 0.7
+                // Apply same height constraint logic - use cached value to avoid freeze
+                let landscapeHeight = globalCachedPortraitWidth
+                let maxHeight = isPhone ? landscapeHeight * 0.8 : landscapeHeight * 0.7
                 let actualVerticalPadding: CGFloat = 18 + (isPhone ? 0 : 8)  // top + bottom
                 let extraPadding: CGFloat = 0
                 let availableGridHeight = maxHeight - actualVerticalPadding - extraPadding
@@ -8434,7 +8616,6 @@ private struct CBControlSection: View {
                 // Capsule padding: 16pt left + 16pt right (added at line 7381)
                 let capsulePadding: CGFloat = 32
                 let finalWidth = gridWidth + (columnSpacing * 2) + capsulePadding
-                debugPrint("📐 Calculated control area width: \(finalWidth)")
                 return finalWidth
             }
 
@@ -8444,9 +8625,8 @@ private struct CBControlSection: View {
             let availableWidth = portraitWidth - (2 * actualHorizontalPadding) - totalSpacing
             var cellSize = floor(availableWidth / CGFloat(columns))
 
-            // Apply height constraint - use 80% of landscape height
-            let screenBounds = UIScreen.main.bounds
-            let landscapeHeight = min(screenBounds.width, screenBounds.height)
+            // Apply height constraint - use 80% of landscape height (cached to avoid freeze)
+            let landscapeHeight = globalCachedPortraitWidth
             let maxHeight = landscapeHeight * 0.8
             let actualVerticalPadding: CGFloat = 18
             let availableGridHeight = maxHeight - actualVerticalPadding
@@ -8459,7 +8639,6 @@ private struct CBControlSection: View {
             let gridWidth = CGFloat(columns) * cellSize + CGFloat(max(0, columns - 1)) * columnSpacing
             let capsulePadding: CGFloat = 32
             let finalWidth = gridWidth + (columnSpacing * 2) + capsulePadding
-            debugPrint("📐 Calculated control area width: \(finalWidth)")
             return finalWidth
         }()
 
@@ -8482,14 +8661,16 @@ private struct CBControlSection: View {
         let shapedView = baseView
         .padding(.horizontal, 16)  // Add padding to keep capsule content from edges
         .padding(.bottom, isPhone ? 0 : 8)
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(
-                    key: CapsuleBoundsPreferenceKey.self,
-                    value: ["controlArea.main": geo.frame(in: .global)]
-                )
-            }
-        )
+        // NOTE: Deliberately NOT reporting CapsuleBoundsPreferenceKey here
+        // Reporting bounds causes an infinite loop:
+        // 1. CBControlSection reports bounds via preference
+        // 2. ContentView receives preference and updates capsuleBounds state
+        // 3. ContentView re-renders
+        // 4. controlSectionView computed property creates NEW CBControlSection with NEW closures
+        // 5. SwiftUI sees new closures as "different" view and recreates CBControlSection
+        // 6. Go to step 1 -> infinite loop / freeze
+        //
+        // Tutorial 4 (which uses controlAreaFrame) will use an estimated position instead
 
         let controlCapsule = shapedView
         .compositingGroup()
@@ -8505,14 +8686,12 @@ private struct CBControlSection: View {
 
         // Apply width constraint (iPad: both orientations, iPhone: landscape only)
         if let width = gridWidthWithPadding {
-            debugPrint("✅ Applying width constraint: \(width) (landscape: \(isLandscape), phone: \(isPhone))")
             // Use fixed width in both orientations to allow outer frame alignment to work
             return AnyView(
                 controlCapsule
                     .frame(width: width)  // Fixed width allows outer frame's .bottomTrailing to align correctly
             )
         } else {
-            debugPrint("✅ Using natural width (iPhone portrait)")
             return AnyView(controlCapsule)
         }
     }
@@ -8542,8 +8721,9 @@ private struct CBControlSection: View {
         // Always use 80% of landscape height (the shorter dimension) for consistency
         // NOTE: This returns GRID HEIGHT ONLY - header is added separately in VStack
         if isPhone {
-            let screenBounds = UIScreen.main.bounds
-            let landscapeHeight = min(screenBounds.width, screenBounds.height)  // Always use shorter dimension
+            // IMPORTANT: Use globalCachedPortraitWidth instead of UIScreen.main.bounds
+            // Accessing UIScreen.main.bounds during SwiftUI layout causes freeze
+            let landscapeHeight = globalCachedPortraitWidth  // Already the shorter dimension
             let maxAvailableHeight = landscapeHeight * 0.8
 
             // Reserve space for header (68pt is added separately) and grid padding
@@ -8652,17 +8832,16 @@ private struct CBControlSection: View {
     
     // Auto-assign grid positions for controls that don't have them
     private func autoAssignGridPositions() {
-        debugPrint("🔧 autoAssignGridPositions called - checking \(buttons.count) buttons")
         var needsUpdate = false
         var updates: [(Int, Int, Int)] = [] // (index, col, row)
         var occupiedPositions: Set<String> = [] // Track occupied positions as "col,row"
-        
+
         // First, record all existing positions to avoid conflicts
         for button in buttons {
             if let col = button.gridCol, let row = button.gridRow {
                 let width = button.gridWidth
                 let height = button.gridHeight
-                
+
                 // Mark all cells occupied by this button
                 for c in col..<(col + width) {
                     for r in row..<(row + height) {
@@ -8671,12 +8850,10 @@ private struct CBControlSection: View {
                 }
             }
         }
-        
+
         for i in 0..<buttons.count {
             // Only assign if not already set - don't override user-placed positions
             let needsPosition = buttons[i].gridCol == nil || buttons[i].gridRow == nil
-            
-            debugPrint("🔍 Button \(buttons[i].title): needsPosition=\(needsPosition), current=(\(buttons[i].gridCol ?? -1), \(buttons[i].gridRow ?? -1))")
             
             if needsPosition {
                 if let position = findFirstAvailablePositionAvoidingOccupied(for: buttons[i], occupied: occupiedPositions) {
@@ -8691,19 +8868,16 @@ private struct CBControlSection: View {
                             occupiedPositions.insert("\(c),\(r)")
                         }
                     }
-                    
-                    debugPrint("📍 Will auto-assign \(buttons[i].title) to (\(position.col), \(position.row))")
                 } else {
                     // Fallback: place at bottom in first available column
                     let maxRow = buttons.compactMap { $0.gridRow }.max() ?? 0
                     let fallbackRow = maxRow + 2 // Give some space
                     updates.append((i, 0, fallbackRow))
                     needsUpdate = true
-                    debugPrint("📍 Will fallback assign \(buttons[i].title) to (0, \(fallbackRow))")
                 }
             }
         }
-        
+
         // Apply updates on next run loop to avoid "modifying state during view update"
         if needsUpdate {
             DispatchQueue.main.async {
@@ -8711,7 +8885,6 @@ private struct CBControlSection: View {
                     if index < self.buttons.count {
                         self.buttons[index].gridCol = col
                         self.buttons[index].gridRow = row
-                        debugPrint("✅ Applied position for \(self.buttons[index].title): (\(col), \(row))")
                     }
                 }
             }
@@ -8738,8 +8911,6 @@ private struct CBControlSection: View {
         let width = control.gridWidth
         let height = control.gridHeight
         let maxSearchRows = 4 // Reasonable limit
-
-        debugPrint("🔍 Finding position for \(control.title) (fader: \(control.isFader == true), size: \(width)x\(height))")
 
         // Search from top-left to bottom-right
         for row in 0..<maxSearchRows {
@@ -8776,8 +8947,6 @@ private struct CBControlSection: View {
         let height = control.gridHeight
         let maxSearchRows = 4
 
-        debugPrint("🔍 Finding position for \(control.isFader == true ? "fader" : "button"): \(control.title) (size: \(width)x\(height))")
-
         // Search from top-left to bottom-right
         for row in 0..<maxSearchRows {
             // Skip this row if the control would extend beyond the bottom edge
@@ -8788,14 +8957,11 @@ private struct CBControlSection: View {
             for col in 0...(columns - width) {
                 let testRect = GridRect(col: col, row: row, width: width, height: height)
                 let hasOverlap = hasOverlapExcluding(testRect, excluding: [control.id])
-                debugPrint("🔍 Testing position (\(col), \(row)): overlap=\(hasOverlap)")
                 if !hasOverlap {
-                    debugPrint("✅ Found position for \(control.title): (\(col), \(row))")
                     return (col, row)
                 }
             }
         }
-        debugPrint("❌ No position found for \(control.title)")
         return nil
     }
 
@@ -9646,8 +9812,8 @@ private struct CBControlSection: View {
             // iPhone: Use fixed cell size based on available height
             // This creates larger, easier-to-use controls that scroll horizontally
             // Always use 80% of landscape height (the shorter dimension) for consistency
-            let screenBounds = UIScreen.main.bounds
-            let landscapeHeight = min(screenBounds.width, screenBounds.height)  // Always use shorter dimension
+            // Use cached value to avoid freeze from UIScreen.main.bounds access during layout
+            let landscapeHeight = globalCachedPortraitWidth  // Already the shorter dimension
             let availableHeight = landscapeHeight * 0.8
             // Reserve space for header and grid padding
             let headerHeight: CGFloat = 68
@@ -11003,13 +11169,11 @@ private struct iPadControlTile: View {
             if let storedValue = button.faderValue {
                 faderValue = storedValue
                 faderVisualValue = storedValue
-                debugPrint("🎚️ iPadControlTile: Initialized fader \"\(button.title)\" with stored value: \(storedValue)")
             } else {
                 // Use default value for new faders
                 let defaultValue = 0.66
                 faderValue = defaultValue
                 faderVisualValue = defaultValue
-                debugPrint("🎚️ iPadControlTile: Initialized fader \"\(button.title)\" with default value: \(defaultValue)")
             }
             // Only start wobble on iPad (iPhone never wobbles)
             if isEditing && !isPhone { startWobble() }
@@ -11017,24 +11181,16 @@ private struct iPadControlTile: View {
             // FIX #1: Setup notification subscription using Combine to prevent memory leak
             faderUpdateCancellable = NotificationCenter.default.publisher(for: Notification.Name("cbUpdateFaderFromDAW"))
                 .sink { [self] notif in
-                    debugPrint("🎚️ iPadControlTile: Received cbUpdateFaderFromDAW notification for \"\(button.title)\"")
-                    debugPrint("🎚️ iPadControlTile: Notification data: \(notif.userInfo ?? [:])")
-                    debugPrint("🎚️ iPadControlTile: Looking for buttonID: \(button.id.uuidString)")
-
                     guard let info = notif.userInfo as? [String: Any],
                           let buttonID = info["buttonID"] as? String,
                           let value = info["value"] as? Double,
                           buttonID == button.id.uuidString else {
-                        let receivedButtonID = (notif.userInfo as? [String: Any])?["buttonID"] as? String ?? "nil"
-                        debugPrint("🎚️ iPadControlTile: ❌ Notification not for this fader (buttonID=\(receivedButtonID), expected=\(button.id.uuidString))")
                         return
                     }
 
                     // Update fader values from DAW MIDI input
                     faderValue = value
                     faderVisualValue = value
-
-                    debugPrint("🎚️ iPadControlTile: ✅ Updated fader \"\(button.title)\" to \(value) from DAW MIDI")
                 }
         }
         .onDisappear {
@@ -11048,10 +11204,8 @@ private struct iPadControlTile: View {
     // Get custom button color or default to theme's defaultCueColor
     private var customButtonColor: Color {
         if let hex = button.colorHex, !hex.isEmpty {
-            debugPrint("🎨 iPadControlTile: Button '\(button.title)' has colorHex: \(hex)")
             return Color(hex: hex)
         }
-        debugPrint("🎨 iPadControlTile: Button '\(button.title)' using theme default cue color (colorHex is \(button.colorHex ?? "nil"))")
         return defaultCueColor
     }
 
@@ -12804,7 +12958,7 @@ struct NavPillContent: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(IOSPressButtonStyle())
             .disabled(!canPrev || isDragging)
 
             Divider().frame(height: 1)
@@ -12822,7 +12976,7 @@ struct NavPillContent: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(IOSPressButtonStyle())
             .disabled(!canNext || isDragging)
         }
     }
@@ -13042,7 +13196,7 @@ struct DraggableNavigationCapsule: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(IOSPressButtonStyle())
     }
 
     var body: some View {
@@ -13148,6 +13302,19 @@ struct DraggableNavigationCapsule: View {
                 // Recalculate Y position when control area collapses/expands
                 let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
                 let availableHeight = height - currentControlHeight
+                let centerY = availableHeight / 2
+
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    position = CGPoint(x: position.x, y: centerY)
+                }
+            }
+            .onChange(of: controlAreaHeight) { oldHeight, newHeight in
+                // Animate position when control area height changes smoothly
+                // Skip if collapsed or if change is too small (debounce tiny adjustments)
+                guard !isControlAreaCollapsed else { return }
+                guard abs(newHeight - oldHeight) > 5 else { return }
+
+                let availableHeight = height - newHeight
                 let centerY = availableHeight / 2
 
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -13269,7 +13436,7 @@ struct SimpleDraggableTransportDock: View {
                 .frame(width: capsuleSize.width, height: capsuleSize.height, alignment: .center)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(IOSPressButtonStyle())
     }
 
     var body: some View {
@@ -13377,6 +13544,19 @@ struct SimpleDraggableTransportDock: View {
                 // Recalculate Y position when control area collapses/expands
                 let currentControlHeight = isControlAreaCollapsed ? 56 : controlAreaHeight
                 let availableHeight = height - currentControlHeight
+                let centerY = availableHeight / 2
+
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    position = CGPoint(x: position.x, y: centerY)
+                }
+            }
+            .onChange(of: controlAreaHeight) { oldHeight, newHeight in
+                // Animate position when control area height changes smoothly
+                // Skip if collapsed or if change is too small (debounce tiny adjustments)
+                guard !isControlAreaCollapsed else { return }
+                guard abs(newHeight - oldHeight) > 5 else { return }
+
+                let availableHeight = height - newHeight
                 let centerY = availableHeight / 2
 
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {

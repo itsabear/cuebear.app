@@ -203,6 +203,15 @@ struct CBTransportDock: View {
     }
 }
 
+// MARK: - iOS-like press button style (for plain buttons that need press feedback)
+/// Mimics Apple's native button feedback - opacity dim only, no scale
+struct IOSPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.5 : 1.0)
+    }
+}
+
 // MARK: - White capsule button style (for menu/control bars)
 struct WhiteCapsuleButtonStyle: ButtonStyle {
     var cornerRadius: CGFloat = 10
@@ -215,7 +224,7 @@ struct WhiteCapsuleButtonStyle: ButtonStyle {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(Color.gray.opacity(0.15)))
             .shadow(color: Color.primary.opacity(0.05), radius: 2, x: 0, y: 1)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.5 : 1.0)
     }
 }
 
@@ -290,9 +299,7 @@ struct ThemedCapsuleButtonStyle: ButtonStyle {
                     .frame(minHeight: 28)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-                    .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
-                    .opacity(isEnabled ? 1.0 : 0.4)
+                    .opacity(configuration.isPressed ? 0.5 : (isEnabled ? 1.0 : 0.4))
             } else {
                 // iPad: Larger tap area for better usability
                 configuration.label
@@ -301,9 +308,7 @@ struct ThemedCapsuleButtonStyle: ButtonStyle {
                     .frame(minHeight: 36)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-                    .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
-                    .opacity(isEnabled ? 1.0 : 0.4)
+                    .opacity(configuration.isPressed ? 0.5 : (isEnabled ? 1.0 : 0.4))
             }
         }
     }

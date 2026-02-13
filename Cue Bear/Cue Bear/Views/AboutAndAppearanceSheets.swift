@@ -457,7 +457,7 @@ struct AppearanceSettingsSheet: View {
                                 .overlay(Circle().stroke(selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1))
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(IOSPressButtonStyle())
 
                     if showColorPicker {
                         CBColorPickerInline(selectedColorHex: customDefaultCueColor)

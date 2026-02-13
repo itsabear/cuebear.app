@@ -234,17 +234,11 @@ class ConnectionCoordinator: ObservableObject {
     // MARK: - Public Interface
     
     func sendMIDI(type: MIDIKind, channel: Int, number: Int, value: Int, label: String, buttonID: String) {
-        debugPrint("🎵 ConnectionCoordinator: sendMIDI called - activeConnection: \(activeConnection), type: \(type), value: \(value)")
         switch activeConnection {
         case .usb:
-            debugPrint("🎵 Routing MIDI to USB")
             usbServer?.sendMIDI(type: type, channel: channel, number: number, value: value, label: label, buttonID: buttonID)
         case .wifi:
-            debugPrint("🎵 Routing MIDI to WiFi")
-            guard let wifiClient = wifiClient else {
-                debugPrint("❌ WiFi client is nil!")
-                return
-            }
+            guard let wifiClient = wifiClient else { return }
             switch type {
             case .cc:
                 wifiClient.sendCC(channel: channel, cc: number, value: value, label: label, buttonID: buttonID)

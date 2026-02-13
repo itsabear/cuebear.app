@@ -402,14 +402,12 @@ struct CBPerformanceRow: View {
     var body: some View {
         // Tap handler function
         let handleTap = {
-            debugPrint("👆 [CUE TAP] song: \(song.name), isEditing: \(isEditing), reorderMode: \(reorderMode), batchSelectMode: \(batchSelectMode)")
             // In batch select mode: toggle selection
             if batchSelectMode {
                 onToggleSelection()
             }
             // In edit mode (not batch select or reorder): open Edit Cue sheet
             else if isEditing && !reorderMode {
-                debugPrint("👆 [CUE TAP] Opening edit sheet for: \(song.name)")
                 onRename()
             } else if isEditing {
                 // Reorder mode: do nothing (handled by drag handles)
@@ -1539,6 +1537,9 @@ struct CBConnectionsSheet: View {
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
 
+    // Loading state - show spinner while checking for bridges
+    @State private var isCheckingConnections = true
+
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
@@ -1550,7 +1551,10 @@ struct CBConnectionsSheet: View {
     var body: some View {
         NavigationView {
             Group {
-                if noBridgeDetected {
+                if isCheckingConnections {
+                    // Show loading state while checking for bridges
+                    loadingView
+                } else if noBridgeDetected {
                     // Show special "Download Bridge" view when no bridges detected
                     downloadBridgeView
                 } else {
@@ -1566,6 +1570,55 @@ struct CBConnectionsSheet: View {
             }
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
+        .onAppear {
+            // If we already have connection info, skip loading
+            if usbServer.usbBridgeAvailable || !wifiClient.discovered.isEmpty || connectionCoordinator.activeConnection != .none {
+                isCheckingConnections = false
+            } else {
+                // Give the system time to discover bridges
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isCheckingConnections = false
+                    }
+                }
+            }
+        }
+        .onChange(of: usbServer.usbBridgeAvailable) { _, available in
+            // If bridge becomes available, stop loading immediately
+            if available && isCheckingConnections {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isCheckingConnections = false
+                }
+            }
+        }
+        .onChange(of: wifiClient.discovered.count) { _, count in
+            // If WiFi bridges found, stop loading immediately
+            if count > 0 && isCheckingConnections {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isCheckingConnections = false
+                }
+            }
+        }
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .tint(selectedTheme.defaultCueColor(for: colorScheme))
+
+            Text("Searching for bridges...")
+                .font(.headline)
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+
+            Text("Looking for USB and Wi-Fi connections")
+                .font(.subheadline)
+                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(selectedTheme.backgroundColor(for: colorScheme))
+        .navigationTitle("Connections")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var connectionsForm: some View {
@@ -1645,26 +1698,37 @@ struct CBConnectionsSheet: View {
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .tint(selectedTheme.defaultCueColor(for: colorScheme))
+            .navigationTitle("Connections")
+            .navigationBarTitleDisplayMode(.inline)
     }
 
     private var downloadBridgeView: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Spacer()
-                    .frame(height: 40)
+        let accentColor = selectedTheme.defaultCueColor(for: colorScheme)
 
-                // Title
+        return VStack(spacing: 0) {
+            Spacer()
+
+            VStack(spacing: 20) {
+                // Icon - matching onboarding style (72pt, light weight)
+                Image(systemName: "laptopcomputer.and.arrow.down")
+                    .font(.system(size: 72, weight: .light))
+                    .foregroundColor(accentColor)
+                    .frame(height: 72)
+
+                // Title - matching onboarding style (28pt, bold, rounded)
                 Text("Ready to Connect?")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
-
-                // Body text
-                Text("Looks like you haven't installed Cue Bear Bridge yet! Download it for your Mac to start sending MIDI to your DAW.")
-                    .font(.body)
-                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                    .padding(.horizontal, 40)
+
+                // Description - matching onboarding style (17pt, secondary)
+                Text("Download Cue Bear Bridge for your Mac to start sending MIDI to your DAW.")
+                    .font(.system(size: 17, weight: .regular))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 50)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 // QR Code
                 VStack(spacing: 12) {
@@ -1672,14 +1736,14 @@ struct CBConnectionsSheet: View {
                         Image(uiImage: qrImage)
                             .interpolation(.none)
                             .resizable()
-                            .frame(width: 180, height: 180)
+                            .frame(width: 160, height: 160)
                             .padding(12)
                             .background(selectedTheme.titleBarColor(for: colorScheme))
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     } else {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(selectedTheme.titleBarColor(for: colorScheme))
-                            .frame(width: 180, height: 180)
+                            .frame(width: 160, height: 160)
                             .overlay(
                                 Image(systemName: "qrcode")
                                     .font(.system(size: 60))
@@ -1687,13 +1751,18 @@ struct CBConnectionsSheet: View {
                             )
                     }
 
-                    Text("Scan with your phone to download")
-                        .font(.caption)
-                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                    Text("Scan to download")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
                 }
-                .padding(.vertical, 8)
+                .padding(.top, 8)
+            }
 
-                // Download button
+            Spacer()
+
+            // Bottom section with button and footer
+            VStack(spacing: 20) {
+                // Download button - matching onboarding "Get Started" style
                 Button(action: {
                     if let url = URL(string: "https://cuebear.app/bridge") {
                         UIApplication.shared.open(url)
@@ -1701,33 +1770,34 @@ struct CBConnectionsSheet: View {
                 }) {
                     HStack(spacing: 8) {
                         Text("cuebear.app/bridge")
-                            .fontWeight(.medium)
+                            .font(.system(size: 17, weight: .semibold))
                         Image(systemName: "arrow.up.forward")
-                            .font(.system(size: 14))
+                            .font(.system(size: 14, weight: .semibold))
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(selectedTheme.defaultCueColor(for: colorScheme))
-                    .cornerRadius(12)
+                    .frame(height: 50)
+                    .background(accentColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 40)
 
                 // Footer text
                 Text("Once installed, connections will appear here automatically")
-                    .font(.footnote)
-                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-                    .padding(.top, 8)
-
-                Spacer()
+                    .padding(.horizontal, 40)
             }
-            .frame(maxWidth: .infinity)
+            .padding(.bottom, 50)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(selectedTheme.backgroundColor(for: colorScheme))
+        .navigationTitle("Connections")
+        .navigationBarTitleDisplayMode(.inline)
     }
-    
-    
+
+
     private func KeyValueRow(_ key: String, _ value: String) -> some View {
         HStack {
             Text(key)
@@ -1882,7 +1952,8 @@ struct CBAddEditCueSheet: View {
     let defaultName: String
     var onSave: (Song, Bool) -> Void  // Added Bool parameter for andAddAnother
     var onCancel: () -> Void
-    var onDelete: ((Song) -> Void)? = nil
+    var onDelete: ((Song) -> Void)? = nil  // Remove from cue list only
+    var onDeleteFromLibrary: ((Song) -> Void)? = nil  // Delete from library (and all cue lists)
     var onDuplicate: ((Song) -> Void)? = nil  // Callback for duplicating cue
     var editContext: CueEditContext = .library  // Default to library context for backward compatibility
 
@@ -2016,20 +2087,37 @@ struct CBAddEditCueSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle(editingSong == nil ? "Add Cue" : "Edit Cue")
             .tint(selectedTheme.defaultCueColor(for: colorScheme))
-            .alert(editContext == .cueList ? "Remove from Cue List" : "Delete Cue", isPresented: $showDeleteAlert) {
-                Button(editContext == .cueList ? "Remove" : "Delete", role: .destructive) {
-                    if let song = editingSong {
-                        onDelete?(song)
-                        // Clear the draft tracking since we deleted/removed
-                        lastEditingSongID = nil
+            .alert(editContext == .cueList ? "Remove Cue" : "Delete Cue", isPresented: $showDeleteAlert) {
+                if editContext == .cueList {
+                    // 3 options for cue list context
+                    Button("Remove from Cue List") {
+                        if let song = editingSong {
+                            onDelete?(song)
+                            lastEditingSongID = nil
+                        }
                     }
+                    Button("Delete", role: .destructive) {
+                        if let song = editingSong {
+                            onDeleteFromLibrary?(song)
+                            lastEditingSongID = nil
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } else {
+                    // 2 options for library context
+                    Button("Delete", role: .destructive) {
+                        if let song = editingSong {
+                            onDelete?(song)
+                            lastEditingSongID = nil
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
                 }
-                Button("Cancel", role: .cancel) {}
             } message: {
                 if editContext == .cueList {
-                    Text("Remove '\(name.isEmpty ? defaultName : name)' from the cue list? It will remain in your library.")
+                    Text("What would you like to do with '\(name.isEmpty ? defaultName : name)'?")
                 } else {
-                    Text("Are you sure you want to delete '\(name.isEmpty ? defaultName : name)' from the library? This will remove it from all cue lists. This action cannot be undone.")
+                    Text("Delete '\(name.isEmpty ? defaultName : name)' from the library? This will remove it from all cue lists.")
                 }
             }
             .alert("Maximum Controls Reached", isPresented: $showGlobalModeMaxReachedAlert) {
@@ -2783,7 +2871,7 @@ struct SongLibraryPopover: View {
                                 .padding(.horizontal, 12)
                                 .frame(height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
 
                         // Clear selection button
                         Button(action: {
@@ -2795,7 +2883,7 @@ struct SongLibraryPopover: View {
                                 .padding(.horizontal, 12)
                                 .frame(height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
 
                         // Add selected button
                         Button(action: {
@@ -2815,7 +2903,7 @@ struct SongLibraryPopover: View {
                                 .padding(.horizontal, 12)
                                 .frame(height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
                         .disabled(selectedSongs.isEmpty)
 
                         // Delete selected button
@@ -2830,7 +2918,7 @@ struct SongLibraryPopover: View {
                                 .padding(.horizontal, 12)
                                 .frame(height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
                         .disabled(selectedSongs.isEmpty)
 
                         Rectangle()
@@ -2850,7 +2938,7 @@ struct SongLibraryPopover: View {
                                 .foregroundColor(defaultCueColor)
                                 .frame(width: 44, height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
                     }
                     .background(.regularMaterial)
                     .clipShape(Capsule())
@@ -3139,9 +3227,7 @@ struct CueListChooserPopover: View {
     }
 
     private var filteredCueLists: [CueList] {
-        debugPrint("🔍 CueListChooserPopover: cueLists count = \(cueLists.count), searchQuery = '\(searchQuery)'")
         let filtered = searchQuery.isEmpty ? cueLists : cueLists.filter { $0.name.localizedCaseInsensitiveContains(searchQuery) }
-        debugPrint("🔍 CueListChooserPopover: filtered count = \(filtered.count)")
 
         // Sort the filtered lists
         switch sortOption {
@@ -3157,16 +3243,17 @@ struct CueListChooserPopover: View {
     }
 
     private var contentView: some View {
-        VStack(spacing: 0) {
+        let lists = filteredCueLists  // Compute once and reuse
+        return VStack(spacing: 0) {
             headerView
 
             Divider()
                 .background(textColor.opacity(0.2))
 
-            if filteredCueLists.isEmpty {
+            if lists.isEmpty {
                 emptyStateView
             } else {
-                cueListsView
+                cueListsScrollView(lists)
             }
         }
         .frame(width: 400)
@@ -3186,10 +3273,10 @@ struct CueListChooserPopover: View {
         .background(backgroundColor)
     }
 
-    private var cueListsView: some View {
+    private func cueListsScrollView(_ lists: [CueList]) -> some View {
         ScrollView {
             VStack(spacing: 0) {
-                ForEach(filteredCueLists) { cueList in
+                ForEach(lists) { cueList in
                     SwipeableCueListRow(
                         cueList: cueList,
                         isActive: cueList.id == activeCueListID,
@@ -3214,9 +3301,7 @@ struct CueListChooserPopover: View {
     }
 
     var body: some View {
-        let _ = print("🔍 CueListChooserPopover body rendering - cueLists.count: \(cueLists.count), filteredCueLists.count: \(filteredCueLists.count)")
-
-        return contentView
+        contentView
             .alert("Delete Cue List", isPresented: $showDeleteConfirmation, presenting: cueListToDelete) { cueList in
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
@@ -3286,7 +3371,7 @@ struct CueListChooserPopover: View {
                                 .padding(.horizontal, 12)
                                 .frame(height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
 
                         Button(action: {
                             selectedCueLists.removeAll()
@@ -3297,7 +3382,7 @@ struct CueListChooserPopover: View {
                                 .padding(.horizontal, 12)
                                 .frame(height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
 
                         Button(action: {
                             if !selectedCueLists.isEmpty {
@@ -3310,7 +3395,7 @@ struct CueListChooserPopover: View {
                                 .padding(.horizontal, 12)
                                 .frame(height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
                         .disabled(selectedCueLists.isEmpty)
 
                         Rectangle()
@@ -3330,7 +3415,7 @@ struct CueListChooserPopover: View {
                                 .foregroundColor(defaultCueColor)
                                 .frame(width: 44, height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(IOSPressButtonStyle())
                     }
                     .background(.regularMaterial)
                     .clipShape(Capsule())
