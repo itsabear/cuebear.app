@@ -2133,7 +2133,7 @@ struct CBAddEditCueSheet: View {
 
                 // Right side buttons
                 ToolbarItem(placement: .confirmationAction) {
-                    let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && isFilteredMIDI())
+                    let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && midiFiltersEnabled && isFilteredMIDI())
                     HStack(spacing: 16) {
                         // More menu (3 dots)
                         Menu {

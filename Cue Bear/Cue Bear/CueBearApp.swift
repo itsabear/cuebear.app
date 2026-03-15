@@ -46,8 +46,8 @@
                         // Debug: Check if custom fonts are loaded
                         FontDebugHelper.checkCustomFonts()
 
-                        // Install demo projects on first launch
-                        installDemoProjectsIfNeeded()
+                        // Demo project installation disabled - new users start with empty project
+                        // installDemoProjectsIfNeeded()
 
                         // Prevent screen from locking during live performance
                         UIApplication.shared.isIdleTimerDisabled = true

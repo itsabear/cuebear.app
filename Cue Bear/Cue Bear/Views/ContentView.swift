@@ -63,10 +63,10 @@ struct SwipeableCapsuleConfig {
 
     // Static configurations
     static let navPill = SwipeableCapsuleConfig(
-        expandedWidth: 140,
+        expandedWidth: 120,
         expandedHeight: 275,
-        collapsedWidth: 40,
-        collapsedHeight: 100,
+        collapsedWidth: 36,
+        collapsedHeight: 90,
         tutorialText: "Swipe right to hide",
         tutorialUserDefaultsKey: "hasSeenNavPillTutorial",
         tutorialSpacing: 16,
@@ -76,10 +76,10 @@ struct SwipeableCapsuleConfig {
     )
 
     static let cueCapsule = SwipeableCapsuleConfig(
-        expandedWidth: 140,  // Same as navPill
-        expandedHeight: 310,  // Taller than navPill so +/- buttons are almost square
-        collapsedWidth: 40,
-        collapsedHeight: 100,
+        expandedWidth: 120,
+        expandedHeight: 310,
+        collapsedWidth: 36,
+        collapsedHeight: 90,
         tutorialText: "Swipe right to collapse",
         tutorialUserDefaultsKey: "hasSeenCueCapsuleTutorial",
         tutorialSpacing: 16,
@@ -97,18 +97,27 @@ struct SwipeableCapsuleTutorial: View {
     let position: CGPoint
     let floatOffset: CGFloat
     let onDismiss: () -> Void
+    var onSkip: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 0) {
             // Main tutorial bubble
-            HStack(spacing: 8) {
-                Image(systemName: "hand.draw")
-                    .font(.system(size: 20))
-                    .foregroundColor(.white)
+            VStack(spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.draw")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white)
 
-                Text(text)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
+                    Text(text)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                }
+
+                if let onSkip = onSkip {
+                    Button("Skip") { onSkip() }
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(.white.opacity(0.7))
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -140,9 +149,6 @@ struct SwipeableCapsuleTutorial: View {
         .offset(y: floatOffset)
         .position(position)
         .animation(.easeInOut(duration: 0.525).repeatForever(autoreverses: true), value: floatOffset)
-        .onTapGesture {
-            onDismiss()
-        }
     }
 }
 
@@ -153,6 +159,7 @@ struct UpwardTutorial: View {
     let message: String
     let targetFrame: CGRect
     let onDismiss: () -> Void
+    var onSkip: (() -> Void)? = nil
 
     @State private var floatOffset: CGFloat = 4  // Start at bottom of float range
     @State private var hasStartedAnimation = false
@@ -185,15 +192,23 @@ struct UpwardTutorial: View {
                     .offset(x: arrowOffset, y: 2)
 
                 // Main tutorial bubble
-                HStack(spacing: 8) {
-                    Image(systemName: "hand.tap")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white)
+                VStack(spacing: 4) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "hand.tap")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white)
 
-                    Text(message)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(message)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if let onSkip = onSkip {
+                        Button("Skip") { onSkip() }
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
@@ -217,13 +232,9 @@ struct UpwardTutorial: View {
             .fixedSize()
             .offset(y: floatOffset)
             .position(x: clampedBubbleX, y: tooltipY)
-            .onTapGesture {
-                onDismiss()
-            }
             .onAppear {
                 guard !hasStartedAnimation else { return }
                 hasStartedAnimation = true
-                // Animate from +4 to -4 (bobs up and down from center)
                 withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
                     floatOffset = -4
                 }
@@ -238,6 +249,7 @@ struct DownwardTutorial: View {
     let message: String
     let targetFrame: CGRect
     let onDismiss: () -> Void
+    var onSkip: (() -> Void)? = nil
 
     @State private var floatOffset: CGFloat = 4  // Start at bottom of float range
     @State private var hasStartedAnimation = false
@@ -264,15 +276,23 @@ struct DownwardTutorial: View {
 
             VStack(spacing: 0) {
                 // Main tutorial bubble
-                HStack(spacing: 8) {
-                    Image(systemName: "hand.tap")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white)
+                VStack(spacing: 4) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "hand.tap")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white)
 
-                    Text(message)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(message)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if let onSkip = onSkip {
+                        Button("Skip") { onSkip() }
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
@@ -302,169 +322,81 @@ struct DownwardTutorial: View {
             .fixedSize()
             .offset(y: floatOffset)
             .position(x: clampedBubbleX, y: tooltipY)
-            .onTapGesture {
-                onDismiss()
-            }
             .onAppear {
                 guard !hasStartedAnimation else { return }
                 hasStartedAnimation = true
-                // Animate from +4 to -4 (bobs up and down from center)
                 withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
                     floatOffset = -4
                 }
             }
         }
-        .allowsHitTesting(true)
     }
 }
 
-/// Tutorial bubble that points rightward to a target element (positioned on left side, arrow pointing right)
-/// Used for iPhone control area two-finger scroll tutorial
-struct RightwardTutorial: View {
-    let message: String
-    let targetFrame: CGRect
-    let onDismiss: () -> Void
+// MARK: - Control Area Scrollbar (iPhone)
 
-    @State private var floatOffset: CGFloat = 4  // Start at bottom of float range (horizontal float)
-    @State private var hasStartedAnimation = false
-    @State private var bubbleSize: CGSize = .zero
+private struct ControlAreaScrollbar: View {
+    let contentWidth: CGFloat
+    let visibleWidth: CGFloat
+    @Binding var scrollOffset: CGFloat
+
+    private let trackInset: CGFloat = 20
+    private let trackHeight: CGFloat = 6
+    private let handleSize: CGFloat = 28
+
+    var needsScrollbar: Bool {
+        contentWidth > visibleWidth && visibleWidth > 0
+    }
+
+    private var trackWidth: CGFloat {
+        visibleWidth - trackInset * 2
+    }
+
+    private var maxScrollOffset: CGFloat {
+        contentWidth - visibleWidth
+    }
+
+    private var scrollFraction: CGFloat {
+        maxScrollOffset > 0 ? min(1, max(0, scrollOffset / maxScrollOffset)) : 0
+    }
+
+    private var handleCenterX: CGFloat {
+        let halfHandle = handleSize / 2
+        let usableTrack = trackWidth - handleSize
+        return halfHandle + scrollFraction * usableTrack
+    }
 
     var body: some View {
-        GeometryReader { geo in
-            let screenHeight = geo.size.height
-            let padding: CGFloat = 16
-            let estimatedBubbleHeight = bubbleSize.height > 0 ? bubbleSize.height : 50
+        if needsScrollbar {
+            ZStack(alignment: .leading) {
+                // Track
+                Capsule()
+                    .fill(Color.primary.opacity(0.08))
+                    .frame(width: trackWidth, height: trackHeight)
 
-            // Target Y where the arrow should point (center of control area)
-            let targetY = targetFrame.midY
-
-            // Clamp bubble center Y so bubble stays within screen bounds
-            let minBubbleY = padding + estimatedBubbleHeight / 2
-            let maxBubbleY = screenHeight - padding - estimatedBubbleHeight / 2
-            let clampedBubbleY = min(max(targetY, minBubbleY), maxBubbleY)
-
-            // Arrow offset from bubble center to point at target
-            let arrowOffset = targetY - clampedBubbleY
-
-            // Position to the left of the target, leaving space for arrow
-            let tooltipX = targetFrame.minX - 20
-
-            HStack(spacing: 0) {
-                // Main tutorial bubble
-                HStack(spacing: 8) {
-                    Image(systemName: "hand.draw")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white)
-
-                    Text(message)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    LinearGradient(
-                        colors: [Color.purple, Color.blue],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 4)
-                .background(
-                    GeometryReader { bubbleGeo in
-                        Color.clear.onAppear {
-                            bubbleSize = bubbleGeo.size
-                        }
+                // Round draggable handle
+                Circle()
+                    .fill(Color.primary.opacity(0.3))
+                    .frame(width: handleSize, height: handleSize)
+                    .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
+                    .offset(x: handleCenterX - handleSize / 2)
+            }
+            .frame(height: handleSize)
+            .padding(.horizontal, trackInset)
+            .padding(.bottom, 4)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let trackUsable = trackWidth - handleSize
+                        guard trackUsable > 0 else { return }
+                        // Map drag X position to scroll fraction
+                        let localX = value.location.x - handleSize / 2
+                        let fraction = min(1, max(0, localX / trackUsable))
+                        scrollOffset = fraction * maxScrollOffset
                     }
-                )
-
-                // Arrow pointing right - offset vertically to point at target
-                Image(systemName: "arrowtriangle.right.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(.blue)
-                    .offset(x: -2, y: arrowOffset)
-            }
-            .fixedSize()
-            .offset(x: floatOffset)
-            .position(x: tooltipX - (bubbleSize.width > 0 ? bubbleSize.width / 2 : 100), y: clampedBubbleY)
-            .onTapGesture {
-                onDismiss()
-            }
-            .onAppear {
-                guard !hasStartedAnimation else { return }
-                hasStartedAnimation = true
-                // Animate from +4 to -4 (bobs left and right)
-                withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-                    floatOffset = -4
-                }
-            }
+            )
         }
-        .allowsHitTesting(true)
-    }
-}
-
-// MARK: - Two-Finger Horizontal ScrollView
-// Custom ScrollView that only scrolls with two fingers (for iPhone control area)
-// Single-finger gestures pass through to faders/buttons
-
-struct TwoFingerScrollView<Content: View>: UIViewRepresentable {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    func makeUIView(context: Context) -> UIScrollView {
-        let scrollView = UIScrollView()
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.bounces = true
-        scrollView.alwaysBounceHorizontal = true
-        scrollView.delaysContentTouches = false
-        scrollView.canCancelContentTouches = true
-        scrollView.clipsToBounds = false  // Don't clip content (allows X buttons to extend beyond)
-        scrollView.contentInsetAdjustmentBehavior = .never  // Don't adjust for safe area
-
-        // Create hosting controller for SwiftUI content
-        let hostingController = UIHostingController(rootView: content)
-        hostingController.view.backgroundColor = .clear
-        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
-        hostingController.view.clipsToBounds = false  // Don't clip SwiftUI content
-
-        scrollView.addSubview(hostingController.view)
-
-        // Pin content to scroll view's content layout guide
-        // Height matches the frame (scroll view's visible area)
-        NSLayoutConstraint.activate([
-            hostingController.view.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            hostingController.view.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            hostingController.view.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            hostingController.view.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            // Match height to scroll view's frame so content fills vertically
-            hostingController.view.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
-        ])
-
-        context.coordinator.hostingController = hostingController
-
-        // Configure pan gesture to require two fingers
-        scrollView.panGestureRecognizer.minimumNumberOfTouches = 2
-        scrollView.panGestureRecognizer.maximumNumberOfTouches = 2
-
-        return scrollView
-    }
-
-    func updateUIView(_ scrollView: UIScrollView, context: Context) {
-        context.coordinator.hostingController?.rootView = content
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    class Coordinator: NSObject {
-        var hostingController: UIHostingController<Content>?
     }
 }
 
@@ -1648,11 +1580,20 @@ struct CBControlEditorSheet: View {
         // Check if the current position still works with new dimensions
         if let col = editingButton.gridCol, let row = editingButton.gridRow {
             if col + newWidth <= columns && canFitAtPosition(col: col, row: row, width: newWidth, height: newHeight, excluding: editingButton.id) {
-                return true  // Current position still works
+                return true  // Current position still works (grow right)
+            }
+
+            // For buttons growing wider (small → regular): only allow same-row expansion
+            if editingButton.isFader != true && newWidth > editingButton.gridWidth {
+                // Try growing left: shift col-1
+                if col - 1 >= 0 && canFitAtPosition(col: col - 1, row: row, width: newWidth, height: newHeight, excluding: editingButton.id) {
+                    return true
+                }
+                return false  // Can't grow on this row — don't search elsewhere
             }
         }
 
-        // Try to find any available position with new dimensions
+        // Fader orientation changes can search the full grid
         return findAvailablePosition(width: newWidth, height: newHeight, excluding: editingButton.id) != nil
     }
 
@@ -2444,27 +2385,25 @@ struct CBControlEditorSheet: View {
             // Check if we need to reposition due to button type change (regular <-> small)
             if let originalButton = editing, originalButton.isFader != true {
                 let oldWidth = originalButton.gridWidth
-                let oldHeight = originalButton.gridHeight
                 let newWidth = b.gridWidth
                 let newHeight = b.gridHeight
 
-                // If dimensions changed, check if we need to reposition
-                if oldWidth != newWidth || oldHeight != newHeight {
+                // If growing wider (small → regular), use same-row right-first, left-second logic
+                if newWidth > oldWidth {
                     if let col = b.gridCol, let row = b.gridRow {
-                        // Check if current position still works
-                        if !canFitAtPosition(col: col, row: row, width: newWidth, height: newHeight, excluding: b.id) {
-                            // Need to find a new position
-                            if let newPos = findAvailablePosition(width: newWidth, height: newHeight, excluding: b.id) {
-                                b.gridCol = newPos.col
-                                b.gridRow = newPos.row
-                                debugPrint("🔄 Repositioned button from (\(col), \(row)) to (\(newPos.col), \(newPos.row)) due to size change")
-                            } else {
-                                // This shouldn't happen if validation is working correctly
-                                debugPrint("⚠️ No position found for button - this shouldn't happen!")
-                            }
+                        if canFitAtPosition(col: col, row: row, width: newWidth, height: newHeight, excluding: b.id) {
+                            // Grow right — position stays the same
+                            debugPrint("🔄 Button growing right at (\(col), \(row))")
+                        } else if col - 1 >= 0 && canFitAtPosition(col: col - 1, row: row, width: newWidth, height: newHeight, excluding: b.id) {
+                            // Grow left — shift col by -1
+                            b.gridCol = col - 1
+                            debugPrint("🔄 Button growing left from (\(col), \(row)) to (\(col - 1), \(row))")
+                        } else {
+                            debugPrint("⚠️ No room to grow button - validation should have prevented this")
                         }
                     }
                 }
+                // Shrinking (regular → small): keep current position, no reposition needed
             }
         }
 
@@ -3265,23 +3204,23 @@ internal struct ContentView: View {
     @AppStorage("hasSeenTutorial2b") private var hasSeenTutorial2b = false  // Tutorial 2b: Library button
     @AppStorage("hasSeenTutorial2c") private var hasSeenTutorial2c = false  // Tutorial 2c: Cue list name
     @AppStorage("hasSeenTutorial3") private var hasSeenTutorial3 = false  // Tutorial 3: Controls capsule
-    @AppStorage("hasSeenTutorial4") private var hasSeenTutorial4 = false  // Tutorial 4: Two-finger scroll (iPhone only)
+    // Tutorial 4 removed (two-finger scroll no longer exists)
     @State private var showTutorial1 = false  // Tutorial 1: Edit button (after onboarding)
     @State private var showTutorial2 = false  // Tutorial 2: + button (after clicking Edit)
     @State private var showTutorial2b = false  // Tutorial 2b: Library button
     @State private var showTutorial2c = false  // Tutorial 2c: Cue list name button (after exiting edit)
     @State private var showTutorial3 = false  // Tutorial 3: Controls capsule
-    @State private var showTutorial4 = false  // Tutorial 4: Two-finger scroll for control area (iPhone only)
+    // showTutorial4 removed (two-finger scroll no longer exists)
     @State private var interruptedTutorial: Int? = nil  // Track which tutorial was interrupted by nav/cue capsule tutorial (1, 2, 2 for 2b, 3 for 2c, 4 for 3)
     @State private var pendingTutorial: Int? = nil  // Tutorial waiting to be shown (queued because another is active)
 
     /// Check if any tutorial is currently showing
     private var isAnyTutorialShowing: Bool {
-        showTutorial1 || showTutorial2 || showTutorial2b || showTutorial2c || showTutorial3 || showTutorial4
+        showTutorial1 || showTutorial2 || showTutorial2b || showTutorial2c || showTutorial3
     }
 
     /// Request to show a tutorial - will queue if another is active
-    /// Tutorial IDs: 1=Edit, 2=AddCue, 2b=Library, 2c=CueListName, 3=Controls, 4=TwoFingerScroll
+    /// Tutorial IDs: 1=Edit, 2=AddCue, 2b=Library, 2c=CueListName, 3=Controls
     private func requestTutorial(_ tutorialId: Int) {
         if isAnyTutorialShowing {
             // Queue this tutorial to show after current one is dismissed
@@ -3301,7 +3240,6 @@ internal struct ContentView: View {
         case 21: showTutorial2b = true  // Using 21 for 2b
         case 22: showTutorial2c = true  // Using 22 for 2c
         case 3: showTutorial3 = true
-        case 4: showTutorial4 = true
         default: break
         }
         debugPrint("📖 [Tutorial] Showing tutorial \(tutorialId)")
@@ -3326,7 +3264,7 @@ internal struct ContentView: View {
     @State private var libraryButtonFrame: CGRect = .zero  // Library button (book icon)
     @State private var cueListNameButtonFrame: CGRect = .zero  // Cue list name button (top left)
     @State private var controlsCapsuleFrame: CGRect = .zero  // Controls capsule (bottom right)
-    @State private var controlAreaFrame: CGRect = .zero  // iPhone expanded control area (for tutorial 4)
+    // controlAreaFrame removed (tutorial 4 no longer exists)
 
     // Projects
     @State private var showProjects = false
@@ -3353,6 +3291,13 @@ internal struct ContentView: View {
     @State private var newCueListName: String = ""
     @State private var showDuplicateCueListAlert: Bool = false
     @State private var duplicateCueListName: String = ""
+
+    // Duplicate cue name detection
+    @State private var showDuplicateCueNameAlert: Bool = false
+    @State private var duplicateCueName: String = ""
+    @State private var duplicateCueSuggestedName: String = ""
+    @State private var pendingDuplicateCue: Song? = nil
+    @State private var pendingDuplicateCueAddAnother: Bool = false
 
     // Navigation capsule (Regular + Remote mode)
     @State private var lastTriggeredSongIndex: Int = 0
@@ -3543,7 +3488,7 @@ internal struct ContentView: View {
                 canUndo: !setlistUndoStack.isEmpty || !libraryUndoStack.isEmpty,
                 canRedo: !setlistRedoStack.isEmpty || !libraryRedoStack.isEmpty,
                 onMenuToggle: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.85)) {
                         showSideMenu.toggle()
                         // Exit edit mode when opening side menu
                         if showSideMenu {
@@ -3961,10 +3906,10 @@ internal struct ContentView: View {
                     }
                     .onEnded { _ in
                         controlsCapsulePressed = false
-                        // Dismiss tutorial 3 when user clicks the controls capsule
+                        // User found the controls on their own — skip tutorial 3
+                        hasSeenTutorial3 = true
                         if showTutorial3 {
                             showTutorial3 = false
-                            hasSeenTutorial3 = true
                             onTutorialDismissed()
                         }
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -4043,23 +3988,12 @@ internal struct ContentView: View {
                     // Entering edit mode - start timer
                     startControlEditModeTimer()
 
-                    // Dismiss tutorial 4 if user re-enters edit mode
-                    if showTutorial4 {
-                        showTutorial4 = false
-                        hasSeenTutorial4 = true
-                        onTutorialDismissed()
-                    }
+                    // Tutorial 4 dismiss removed (no longer exists)
                 } else {
                     // Exiting edit mode - cancel timer
                     cancelControlEditModeTimer()
 
-                    // Tutorial 4: Show two-finger scroll tutorial on iPhone after first button/fader added
-                    let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-                    if isPhone && !hasSeenTutorial4 && !controlButtons.isEmpty {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.requestTutorial(4)
-                        }
-                    }
+                    // Tutorial 4 (two-finger scroll) removed — no longer needed
                 }
             }
             .onChange(of: showControlEditor) { _, isShowing in
@@ -4421,7 +4355,7 @@ internal struct ContentView: View {
                     }
                     .disabled(showSideMenu)
                     .blur(radius: showSideMenu ? 3 : 0)
-                    .animation(.easeInOut(duration: 0.3), value: showSideMenu)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.85), value: showSideMenu)
                     .ignoresSafeArea(edges: .bottom) // Allow cues to extend into bottom safe area behind home indicator
 
                     // Floating control area capsules - NOT clipped so they can slide off-screen
@@ -4533,7 +4467,7 @@ internal struct ContentView: View {
                         .ignoresSafeArea()
                         .transition(.opacity)
                         .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.85)) {
                                 showSideMenu = false
                             }
                         }
@@ -4699,10 +4633,11 @@ internal struct ContentView: View {
                                 onDismiss: {
                                     showTutorial1 = false
                                     hasSeenTutorial1 = true
-                                    // When dismissed by tapping (not by clicking edit), queue tutorial 3
-                                    if !hasSeenTutorial3 {
-                                        pendingTutorial = 3
-                                    }
+                                    onTutorialDismissed()
+                                },
+                                onSkip: {
+                                    showTutorial1 = false
+                                    hasSeenTutorial1 = true
                                     onTutorialDismissed()
                                 }
                             )
@@ -4711,12 +4646,16 @@ internal struct ContentView: View {
                         // Tutorial 2: + button (after clicking Edit)
                         if showTutorial2 && addCueButtonFrame != .zero {
                             UpwardTutorial(
-                                message: "Click here your first cue",
+                                message: "Tap + to add your first cue",
                                 targetFrame: addCueButtonFrame,
                                 onDismiss: {
                                     showTutorial2 = false
                                     hasSeenTutorial2 = true
-                                    // Queue Tutorial 2b after dismissing
+                                    onTutorialDismissed()
+                                },
+                                onSkip: {
+                                    showTutorial2 = false
+                                    hasSeenTutorial2 = true
                                     if !hasSeenTutorial2b {
                                         pendingTutorial = 21  // 21 = tutorial 2b
                                     }
@@ -4734,11 +4673,16 @@ internal struct ContentView: View {
                                     showTutorial2b = false
                                     hasSeenTutorial2b = true
                                     onTutorialDismissed()
+                                },
+                                onSkip: {
+                                    showTutorial2b = false
+                                    hasSeenTutorial2b = true
+                                    onTutorialDismissed()
                                 }
                             )
                         }
 
-                        // Tutorial 2c: Cue list name button (after exiting edit mode)
+                        // Tutorial 2c: Cue list name button
                         if showTutorial2c && cueListNameButtonFrame != .zero {
                             UpwardTutorial(
                                 message: "Create as many cue lists as you want",
@@ -4746,7 +4690,14 @@ internal struct ContentView: View {
                                 onDismiss: {
                                     showTutorial2c = false
                                     hasSeenTutorial2c = true
-                                    // Queue Tutorial 3 after dismissing
+                                    if !hasSeenTutorial3 {
+                                        pendingTutorial = 3
+                                    }
+                                    onTutorialDismissed()
+                                },
+                                onSkip: {
+                                    showTutorial2c = false
+                                    hasSeenTutorial2c = true
                                     if !hasSeenTutorial3 {
                                         pendingTutorial = 3
                                     }
@@ -4755,7 +4706,7 @@ internal struct ContentView: View {
                             )
                         }
 
-                        // Tutorial 3: Controls capsule (after tutorial 2c)
+                        // Tutorial 3: Controls capsule (contextual: 3+ cues in active list)
                         if showTutorial3 && controlsCapsuleFrame != .zero {
                             DownwardTutorial(
                                 message: "Add buttons and faders for extra MIDI control",
@@ -4764,47 +4715,22 @@ internal struct ContentView: View {
                                     showTutorial3 = false
                                     hasSeenTutorial3 = true
                                     onTutorialDismissed()
-                                }
-                            )
-                        }
-
-                        // Tutorial 4: Two-finger scroll (iPhone only, after adding first button/fader)
-                        if showTutorial4 {
-                            // Use actual frame if available, otherwise estimate based on screen size
-                            // The expanded control area is roughly 80% of landscape height, positioned at bottom
-                            let estimatedFrame: CGRect = {
-                                if controlAreaFrame != .zero {
-                                    return controlAreaFrame
-                                }
-                                // Estimate: control area is near bottom of screen
-                                let screenWidth = globalCachedPortraitWidth
-                                let estimatedHeight = screenWidth * 0.6  // Rough estimate
-                                let screenHeight = UIScreen.main.bounds.height
-                                return CGRect(
-                                    x: 16,
-                                    y: screenHeight - estimatedHeight - 40,
-                                    width: screenWidth - 32,
-                                    height: estimatedHeight
-                                )
-                            }()
-
-                            RightwardTutorial(
-                                message: "Use two fingers to scroll",
-                                targetFrame: estimatedFrame,
-                                onDismiss: {
-                                    showTutorial4 = false
-                                    hasSeenTutorial4 = true
+                                },
+                                onSkip: {
+                                    showTutorial3 = false
+                                    hasSeenTutorial3 = true
                                     onTutorialDismissed()
                                 }
                             )
                         }
+
+                        // Tutorial 4 (two-finger scroll) removed
                     }
                     .animation(.easeInOut(duration: 0.3), value: showTutorial1)
                     .animation(.easeInOut(duration: 0.3), value: showTutorial2)
                     .animation(.easeInOut(duration: 0.3), value: showTutorial2b)
                     .animation(.easeInOut(duration: 0.3), value: showTutorial2c)
                     .animation(.easeInOut(duration: 0.3), value: showTutorial3)
-                    .animation(.easeInOut(duration: 0.3), value: showTutorial4)
                     .onChange(of: showTutorial1) { _, newValue in
                         debugPrint("📖 [Tutorial] showTutorial1 changed to \(newValue), editButtonFrame=\(editButtonFrame), frame != .zero: \(editButtonFrame != .zero)")
                     }
@@ -4820,23 +4746,23 @@ internal struct ContentView: View {
                     .onChange(of: showTutorial3) { _, newValue in
                         debugPrint("📖 [Tutorial] showTutorial3 changed to \(newValue), controlsCapsuleFrame=\(controlsCapsuleFrame)")
                     }
-                    .onChange(of: showTutorial4) { _, newValue in
-                        debugPrint("📖 [Tutorial] showTutorial4 changed to \(newValue), controlAreaFrame=\(controlAreaFrame)")
-                    }
-                    .onChange(of: controlAreaCollapsed) { _, isCollapsed in
-                        // Dismiss tutorial 4 when user interacts with control area
-                        if isCollapsed && showTutorial4 {
-                            showTutorial4 = false
-                            hasSeenTutorial4 = true
-                            onTutorialDismissed()
-                        }
-                    }
+                    // Tutorial 4 onChange removed
                     .onChange(of: showCueListChooser) { _, isShowing in
-                        // Dismiss tutorial 2c when user opens cue list chooser
                         if isShowing && showTutorial2c {
+                            // Dismiss tutorial 2c when user opens cue list chooser
                             showTutorial2c = false
                             hasSeenTutorial2c = true
-                            onTutorialDismissed()
+                        }
+                        if !isShowing && hasSeenTutorial2c && !hasSeenTutorial3 {
+                            // Skip tutorial 3 if control area is already open
+                            if !effectivelyCollapsedForOverlay {
+                                hasSeenTutorial3 = true
+                            } else {
+                                // Queue Tutorial 3 after cue list chooser closes
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    self.requestTutorial(3)
+                                }
+                            }
                         }
                     }
                     .onChange(of: showLibraryPopover) { _, isShowing in
@@ -4873,22 +4799,13 @@ internal struct ContentView: View {
                             guard hasSignificantChange || value.count != capsuleBounds.count else { return }
 
                             capsuleBounds = value
-                            // Track control area frame for Tutorial 4
-                            if let frame = value["controlArea.main"] {
-                                let differs = abs(frame.origin.x - controlAreaFrame.origin.x) > 5 ||
-                                             abs(frame.origin.y - controlAreaFrame.origin.y) > 5 ||
-                                             abs(frame.width - controlAreaFrame.width) > 5 ||
-                                             abs(frame.height - controlAreaFrame.height) > 5
-                                if differs {
-                                    controlAreaFrame = frame
-                                }
-                            }
+                            // Tutorial 4 controlAreaFrame tracking removed
                         }
                         .onPreferenceChange(TutorialButtonFramePreferenceKey.self) { value in
                             // PERFORMANCE: Only process tutorial frames when tutorials might be shown
                             // This prevents expensive frame comparisons on every layout pass
-                            let anyTutorialVisible = showTutorial1 || showTutorial2 || showTutorial2b || showTutorial2c || showTutorial3 || showTutorial4
-                            let anyTutorialPending = !hasSeenTutorial1 || !hasSeenTutorial2 || !hasSeenTutorial2b || !hasSeenTutorial2c || !hasSeenTutorial3 || !hasSeenTutorial4
+                            let anyTutorialVisible = showTutorial1 || showTutorial2 || showTutorial2b || showTutorial2c || showTutorial3
+                            let anyTutorialPending = !hasSeenTutorial1 || !hasSeenTutorial2 || !hasSeenTutorial2b || !hasSeenTutorial2c || !hasSeenTutorial3
 
                             guard anyTutorialVisible || anyTutorialPending else { return }
 
@@ -4942,8 +4859,7 @@ internal struct ContentView: View {
                                 }
                                 modeBeforeEditing = nil
 
-                                // Dismiss tutorial 2 or 2b if still showing, mark as seen, then show 2c
-                                let shouldShowTutorial2c = (showTutorial2 || showTutorial2b || hasSeenTutorial2b) && !hasSeenTutorial2c
+                                // Dismiss tutorial 2 or 2b if still showing when exiting edit mode
                                 if showTutorial2 {
                                     showTutorial2 = false
                                     hasSeenTutorial2 = true
@@ -4956,9 +4872,20 @@ internal struct ContentView: View {
                                 }
 
                                 // Tutorial 2c: Show cue list name tutorial after exiting edit mode
-                                if shouldShowTutorial2c {
+                                if !hasSeenTutorial2c {
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                         self.requestTutorial(22)  // 22 = tutorial 2c
+                                    }
+                                }
+                                // Tutorial 3: Show controls tutorial after exiting edit mode (if 2c already seen)
+                                else if !hasSeenTutorial3 {
+                                    // Skip if control area is already open
+                                    if !effectivelyCollapsedForOverlay {
+                                        hasSeenTutorial3 = true
+                                    } else {
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                            self.requestTutorial(3)
+                                        }
                                     }
                                 }
                             }
@@ -5110,19 +5037,19 @@ internal struct ContentView: View {
                 currentOwnerName: { key in ownerName(for: key) },
                 defaultName: nextDefaultCueName(),
                 onSave: { song, andAddAnother in
-                    saveSong(song)
-
-                    if andAddAnother {
-                        // Close with linear animation (no slowdown) and reopen
-                        withAnimation(.linear(duration: 0.15)) {
+                    saveCueWithDuplicateCheck(song, andAddAnother: andAddAnother) {
+                        if andAddAnother {
+                            // Close with linear animation (no slowdown) and reopen
+                            withAnimation(.linear(duration: 0.15)) {
+                                showAddEdit = false
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                showAddEdit = true
+                            }
+                        } else {
+                            // Normal close
                             showAddEdit = false
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            showAddEdit = true
-                        }
-                    } else {
-                        // Normal close
-                        showAddEdit = false
                     }
                 },
                 onCancel: {
@@ -5501,6 +5428,33 @@ internal struct ContentView: View {
             }
         }, message: {
             Text("A cue list named \"\(duplicateCueListName)\" already exists in your song library.")
+        })
+        .alert("Duplicate Name", isPresented: $showDuplicateCueNameAlert, actions: {
+            Button("Cancel", role: .cancel) {
+                pendingDuplicateCue = nil
+            }
+            Button("Rename to \"\(duplicateCueSuggestedName)\"") {
+                if var cue = pendingDuplicateCue {
+                    let addAnother = pendingDuplicateCueAddAnother
+                    cue.name = duplicateCueSuggestedName
+                    saveSong(cue)
+                    pendingDuplicateCue = nil
+
+                    if addAnother {
+                        // "Save & Add Another" flow — close and reopen the sheet
+                        withAnimation(.linear(duration: 0.15)) {
+                            showAddEdit = false
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            showAddEdit = true
+                        }
+                    } else {
+                        showAddEdit = false
+                    }
+                }
+            }
+        }, message: {
+            Text("A cue named \"\(duplicateCueName)\" already exists in your library.")
         })
         .alert("Save Changes", isPresented: $showSaveChangesAlert, actions: {
             Button("Save", role: .none) {
@@ -6099,7 +6053,13 @@ internal struct ContentView: View {
             case 2: self.requestTutorial(2)
             case 3: self.requestTutorial(21)  // 21 = tutorial 2b
             case 4: self.requestTutorial(22)  // 22 = tutorial 2c
-            case 5: self.requestTutorial(3)
+            case 5:
+                // Skip if control area already open (user found it themselves)
+                if !self.effectivelyCollapsedForOverlay {
+                    self.hasSeenTutorial3 = true
+                } else {
+                    self.requestTutorial(3)
+                }
             default: break
             }
         }
@@ -6175,6 +6135,35 @@ internal struct ContentView: View {
             }
         }
         return "Cue \(maxN + 1)"
+    }
+
+    private func cueNameExists(_ name: String, excluding id: UUID? = nil) -> Bool {
+        songLibrary.contains { $0.id != id && $0.name.lowercased() == name.lowercased() }
+    }
+
+    private func uniqueCueName(baseName: String, excluding id: UUID? = nil) -> String {
+        let names = Set(songLibrary.filter { $0.id != id }.map { $0.name.lowercased() })
+        if !names.contains(baseName.lowercased()) { return baseName }
+        var n = 2
+        while names.contains("\(baseName) (\(n))".lowercased()) { n += 1 }
+        return "\(baseName) (\(n))"
+    }
+
+    /// Handles saving a cue with duplicate name check. Shows alert if name exists, otherwise saves directly.
+    private func saveCueWithDuplicateCheck(_ song: Song, andAddAnother: Bool, dismissSheet: @escaping () -> Void) {
+        // For existing cues being edited, check against all OTHER cues
+        let excludeID: UUID? = songLibrary.contains(where: { $0.id == song.id }) ? song.id : nil
+
+        if cueNameExists(song.name, excluding: excludeID) {
+            pendingDuplicateCue = song
+            pendingDuplicateCueAddAnother = andAddAnother
+            duplicateCueName = song.name
+            duplicateCueSuggestedName = uniqueCueName(baseName: song.name, excluding: excludeID)
+            showDuplicateCueNameAlert = true
+        } else {
+            saveSong(song)
+            dismissSheet()
+        }
     }
 
     private func sortedLibrary() -> [Song] {
@@ -6850,20 +6839,11 @@ internal struct ContentView: View {
         debugPrint("🔍 UserDefaults lastProjectName: '\(UserDefaults.standard.string(forKey: "lastProjectName") ?? "nil")'")
         debugPrint("🔍 hasCompletedInitialLaunch: \(hasCompletedInitialLaunch)")
 
-        // On first launch, always try to load the Beethoven Live demo project
+        // First launch - new users start with an empty project
         if !hasCompletedInitialLaunch {
-            let demoName = "Beethoven Live"
-            debugPrint("🎵 First launch detected - attempting to load demo project: \(demoName)")
-
-            // Check if demo project exists
-            if ProjectIO.list().contains(demoName) {
-                loadProject(named: demoName)
-                return
-            } else {
-                debugPrint("⚠️ Demo project '\(demoName)' not found in saved projects")
-                debugPrint("⚠️ Available projects: \(ProjectIO.list())")
-                // Continue to normal flow - user will see empty project
-            }
+            debugPrint("🎵 First launch detected - starting with empty project")
+            hasCompletedInitialLaunch = true
+            return
         }
 
         // For subsequent launches, load the last opened project
@@ -7118,38 +7098,32 @@ private struct ConditionalDrawingGroup: ViewModifier {
 }
 
 // MARK: - Press Gesture Modifier
-// On iPad: applies press feedback gesture for visual touch feedback
-// On iPhone: skips the gesture to allow ScrollView horizontal scrolling
+// Applies press feedback gesture for visual touch feedback on both iPhone and iPad
+// (Previously disabled on iPhone to allow ScrollView scrolling, but ScrollView was removed)
 private struct PressGestureModifier: ViewModifier {
     let isPhone: Bool
     @Binding var isTouching: Bool
     @Binding var isPressed: Bool
+    var onTouchDown: (() -> Void)? = nil
 
     func body(content: Content) -> some View {
-        if isPhone {
-            // On iPhone, skip the drag gesture entirely to allow ScrollView scrolling
-            content
-        } else {
-            // On iPad, use the press feedback gesture
-            content
-                .simultaneousGesture(
+        content
+            .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { _ in
                             if !isTouching {
                                 isTouching = true
-                                withAnimation(.easeInOut(duration: 0.08)) {
-                                    isPressed = true
-                                }
+                                isPressed = true
+                                onTouchDown?()
                             }
                         }
                         .onEnded { _ in
                             isTouching = false
-                            withAnimation(.easeInOut(duration: 0.1)) {
+                            withAnimation(.easeInOut(duration: 0.08)) {
                                 isPressed = false
                             }
                         }
                 )
-        }
     }
 }
 
@@ -7267,14 +7241,29 @@ private struct CBTopBar: View {
             // iPhone: Hide when in edit mode
             if !(isPhone && isEditing) {
                 HStack(spacing: 8) {
+                    // Hamburger menu capsule
                     mainMenuButton
+                        .frame(width: 44, height: 44)
+                        .background(.regularMaterial)
+                        .clipShape(Capsule())
+                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+
+                    // Cue list name capsule
                     projectNameButton
+                        .padding(.horizontal, 14)
+                        .frame(height: 44)
+                        .background(.regularMaterial)
+                        .clipShape(Capsule())
+                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: TutorialButtonFramePreferenceKey.self,
+                                    value: ["cueListNameButton": geo.frame(in: .global)]
+                                )
+                            }
+                        )
                 }
-                .padding(.horizontal, 14)
-                .frame(height: 44)
-                .background(.regularMaterial)
-                .clipShape(Capsule())
-                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                 .padding(.leading, 16)
                 .background(
                     GeometryReader { geo in
@@ -7337,6 +7326,14 @@ private struct CBTopBar: View {
                 .background(.regularMaterial)
                 .clipShape(Capsule())
                 .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: TutorialButtonFramePreferenceKey.self,
+                            value: ["editButton": geo.frame(in: .global)]
+                        )
+                    }
+                )
             }
             .padding(.trailing, 16)
             .padding(.leading, isPhone && isEditing ? 16 : 0)  // iPhone edit mode: expand to left edge
@@ -7349,7 +7346,7 @@ private struct CBTopBar: View {
                     )
                 }
             )
-            .animation(.easeInOut(duration: 0.3), value: showSideMenu)
+            .animation(.spring(response: 0.2, dampingFraction: 0.85), value: showSideMenu)
         }
     }
 
@@ -7370,14 +7367,6 @@ private struct CBTopBar: View {
             }
         }
         .buttonStyle(IOSPressButtonStyle())
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(
-                    key: TutorialButtonFramePreferenceKey.self,
-                    value: ["cueListNameButton": geo.frame(in: .global)]
-                )
-            }
-        )
         .popover(isPresented: $showCueListChooser, arrowEdge: .top) {
             CueListChooserPopover(
                 cueLists: $cueLists,
@@ -7412,7 +7401,9 @@ private struct CBTopBar: View {
             Image(systemName: showSideMenu ? "xmark" : "line.3.horizontal")
                 .imageScale(.large)
                 .foregroundStyle(buttonColor)
-                .frame(width: 20, height: 20)  // Fixed frame to prevent size changes
+                .frame(width: 20, height: 20)
+                .rotationEffect(.degrees(showSideMenu ? 90 : 0))
+                .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
     }
@@ -7511,14 +7502,6 @@ private struct CBTopBar: View {
                         .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
                         .transition(.opacity.combined(with: .scale))
                         .id("editButton")
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: TutorialButtonFramePreferenceKey.self,
-                                    value: ["editButton": geo.frame(in: .global)]
-                                )
-                            }
-                        )
                 }
             }
         }
@@ -7852,6 +7835,10 @@ private struct CBControlSection: View {
 
     // Track calculated height to avoid infinite render loops
     @State private var cachedHeight: CGFloat = 0
+
+    // iPhone horizontal scroll tracking for custom scrollbar
+    @State private var controlScrollOffset: CGFloat = 0
+    @State private var controlVisibleWidth: CGFloat = 0
 
     // Cross-page drag state
     @State private var edgeDragTimer: Timer? = nil
@@ -8272,11 +8259,11 @@ private struct CBControlSection: View {
 
             Spacer()
 
-            // Main edit capsule - animates width between Edit text and full toolbar
-            HStack(spacing: 0) {
-                // Edit mode buttons (animate in from left)
-                if isEditing && !isCollapsed {
-                    // Undo (leftmost)
+            // Edit mode: 3 separate capsules (undo/redo | + | done)
+            // Non-edit mode: single "Edit" capsule
+            if isEditing && !isCollapsed {
+                // Capsule 3 (leftmost): Undo/Redo
+                HStack(spacing: 0) {
                     Button(action: onUndo) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 18, weight: .medium))
@@ -8284,9 +8271,7 @@ private struct CBControlSection: View {
                             .frame(width: 44, height: 44)
                     }
                     .disabled(!canUndo)
-                    .transition(.scale.combined(with: .opacity))
 
-                    // Redo
                     Button(action: onRedo) {
                         Image(systemName: "arrow.uturn.forward")
                             .font(.system(size: 18, weight: .medium))
@@ -8294,64 +8279,77 @@ private struct CBControlSection: View {
                             .frame(width: 44, height: 44)
                     }
                     .disabled(!canRedo)
-                    .transition(.scale.combined(with: .opacity))
-
-                    // + Add menu
-                    Menu {
-                        Button(action: onAddButton) {
-                            Label("Button", systemImage: "button.horizontal")
-                        }
-                        .disabled(!canAddMoreControls)
-
-                        Button(action: onAddFader) {
-                            Label("Fader", systemImage: "slider.vertical.3")
-                        }
-                        .disabled(!canAddFader)
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor((canAddMoreControls || canAddFader) ? defaultCueColor : defaultCueColor.opacity(0.3))
-                            .frame(width: 44, height: 44)
-                    }
-                    .disabled(!canAddMoreControls && !canAddFader)
-                    .transition(.scale.combined(with: .opacity))
                 }
+                .background(.regularMaterial)
+                .clipShape(Capsule())
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .transition(.scale.combined(with: .opacity))
 
-                // Edit/Done button - always present, changes between text, checkmark, or chevron
-                Button(action: {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        if isEditing && buttons.isEmpty {
-                            // No buttons - collapse instead of exiting edit mode
-                            isCollapsed = true
-                            isEditing = false
-                            clearDragState(reason: "main edit button - collapsing empty control area")
+                // Capsule 2 (middle): Add (+)
+                Menu {
+                    Button(action: onAddButton) {
+                        Label("Button", systemImage: "button.horizontal")
+                    }
+                    .disabled(!canAddMoreControls)
+
+                    Button(action: onAddFader) {
+                        Label("Fader", systemImage: "slider.vertical.3")
+                    }
+                    .disabled(!canAddFader)
+                } label: {
+                    Color.clear
+                        .frame(width: 44, height: 44)
+                        .overlay {
+                            Image(systemName: "plus")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor((canAddMoreControls || canAddFader) ? defaultCueColor : defaultCueColor.opacity(0.3))
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canAddMoreControls && !canAddFader)
+                .frame(width: 44, height: 44)
+                .background(.regularMaterial)
+                .clipShape(Capsule())
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .transition(.scale.combined(with: .opacity))
+            }
+
+            // Capsule 1 (rightmost): Done/Collapse or Edit
+            Button(action: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    if isEditing && buttons.isEmpty {
+                        // No buttons - collapse instead of exiting edit mode
+                        isCollapsed = true
+                        isEditing = false
+                        clearDragState(reason: "main edit button - collapsing empty control area")
+                    } else {
+                        isEditing.toggle()
+                        if !isEditing {
+                            clearDragState(reason: "main edit button - exiting edit mode")
                         } else {
-                            isEditing.toggle()
-                            if !isEditing {
-                                clearDragState(reason: "main edit button - exiting edit mode")
-                            } else {
-                                // Entering edit mode - always unfold the control area and clear selection
-                                isCollapsed = false
-                                selectedCue = nil  // Clear chosen cue when entering edit mode
-                                editSessionNonce &+= 1
-                                clearDragState(reason: "main edit button - entering edit mode")
-                            }
+                            // Entering edit mode - always unfold the control area and clear selection
+                            isCollapsed = false
+                            selectedCue = nil  // Clear chosen cue when entering edit mode
+                            editSessionNonce &+= 1
+                            clearDragState(reason: "main edit button - entering edit mode")
                         }
                     }
-                }) {
-                    if isEditing && !isCollapsed {
-                        // In edit mode: show chevron if empty, checkmark if has buttons
-                        Image(systemName: buttons.isEmpty ? "chevron.down" : "checkmark")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(defaultCueColor)
-                            .frame(width: 44, height: 44)
-                    } else {
-                        Text("Edit")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(defaultCueColor)
-                            .padding(.horizontal, 14)
-                            .frame(height: 44)
-                    }
+                }
+            }) {
+                if isEditing && !isCollapsed {
+                    // In edit mode: show chevron if empty, checkmark if has buttons
+                    Image(systemName: buttons.isEmpty ? "chevron.down" : "checkmark")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(defaultCueColor)
+                        .frame(width: 44, height: 44)
+                        .transaction { $0.animation = nil }  // Prevent icon swap animation during sheet transitions
+                } else {
+                    Text("Edit")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(defaultCueColor)
+                        .padding(.horizontal, 14)
+                        .frame(height: 44)
                 }
             }
             .background(.regularMaterial)
@@ -8378,11 +8376,12 @@ private struct CBControlSection: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: isEditing)
         .padding(.horizontal, 12)
         .padding(.top, 8)  // Match sheet toolbar top spacing
         .padding(.bottom, 12)  // Space between header capsules and button grid (prevents X button clipping)
         .frame(height: 68)  // Taller to accommodate top + bottom padding + 44pt buttons
+        .animation(nil, value: buttons.count)  // Prevent capsule animations when buttons are added/removed (e.g. Save & Add Another)
+        .animation(nil, value: buttons.isEmpty)
     }
 
 
@@ -8413,8 +8412,6 @@ private struct CBControlSection: View {
                 // Use cachedHeight instead of calculateDynamicHeight() to prevent infinite layout loop
                 .frame(height: cachedHeight > 0 ? cachedHeight : 200, alignment: .top)  // Align content to top
                 .background(Color.clear)  // Ensure no white background
-                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: cachedHeight)
-                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isEditing)
                 // Skip drawingGroup on iPhone - can cause rendering issues with GeometryReader
                 .modifier(ConditionalDrawingGroup(enabled: UIDevice.current.userInterfaceIdiom != .phone))
                 .onAppear {
@@ -8444,9 +8441,6 @@ private struct CBControlSection: View {
 
         let styledGridArea = gridArea
             .opacity(effectivelyCollapsed ? 0 : 1)  // Hide grid completely when collapsed
-            .animation(Animation.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.1), value: buttons.count)
-            .animation(Animation.spring(response: 0.4, dampingFraction: 0.8), value: isCollapsed)
-            .animation(Animation.spring(response: 0.4, dampingFraction: 0.8), value: effectivelyCollapsed)
             .onChange(of: isEditing) { _, newValue in
                 if !newValue {
                     // fully reset drag/drop when leaving edit
@@ -8650,12 +8644,10 @@ private struct CBControlSection: View {
                     .zIndex(1)  // Grid (with X buttons) renders on top
             }
             .background(
-                // Background layers with rounded corners - doesn't clip content
                 RoundedRectangle(cornerRadius: 20)
                     .fill(.regularMaterial)
                     .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
             )
-            // Content is NOT clipped - X buttons can extend beyond bounds
         }
 
         let shapedView = baseView
@@ -8670,7 +8662,7 @@ private struct CBControlSection: View {
         // 5. SwiftUI sees new closures as "different" view and recreates CBControlSection
         // 6. Go to step 1 -> infinite loop / freeze
         //
-        // Tutorial 4 (which uses controlAreaFrame) will use an estimated position instead
+        // Tutorial 4 removed (two-finger scroll no longer exists)
 
         let controlCapsule = shapedView
         .compositingGroup()
@@ -8728,7 +8720,7 @@ private struct CBControlSection: View {
 
             // Reserve space for header (68pt is added separately) and grid padding
             let headerHeight: CGFloat = 68
-            let gridVerticalPadding: CGFloat = 16  // 4pt top + 12pt bottom
+            let gridVerticalPadding: CGFloat = 40  // 4pt top + 4pt bottom + scrollbar (28pt handle + 4pt bottom padding)
             let maxGridAreaHeight = maxAvailableHeight - headerHeight - gridVerticalPadding
 
             // Calculate cell size based on 4 rows max - NO MINIMUM, let it shrink to fit
@@ -9817,7 +9809,7 @@ private struct CBControlSection: View {
             let availableHeight = landscapeHeight * 0.8
             // Reserve space for header and grid padding
             let headerHeight: CGFloat = 68
-            let gridVerticalPadding: CGFloat = 16  // 4pt top + 12pt bottom
+            let gridVerticalPadding: CGFloat = 40  // 4pt top + 4pt bottom + scrollbar (28pt handle + 4pt bottom padding)
             let gridAreaHeight = availableHeight - headerHeight - gridVerticalPadding
 
             // Calculate cell size based on 4 rows (max) - NO MINIMUM, let it shrink to fit 80% height
@@ -9980,22 +9972,45 @@ private struct CBControlSection: View {
             alignment: .topLeading
         )
 
-        // iPhone: Wrap in horizontal ScrollView for larger cells
+        // iPhone: Clipped grid with draggable scrollbar (no ScrollView to avoid gesture conflicts with faders)
         // iPad: No scroll needed, grid fits within screen
         let content: AnyView
+        let totalContentWidth = params.gridWidth + 2 * columnSpacing
         if isPhone {
             content = AnyView(
-                TwoFingerScrollView {
-                    gridContent
-                        .padding(.horizontal, columnSpacing)
-                        .padding(.top, 4)
-                        .padding(.bottom, 12)  // More bottom padding for better visual balance
+                VStack(spacing: 0) {
+                    // Clipped viewport — GeometryReader provides the clip bounds
+                    GeometryReader { viewportGeo in
+                        gridContent
+                            .padding(.horizontal, columnSpacing)
+                            .padding(.top, 4)
+                            .padding(.bottom, 4)
+                            .offset(x: -controlScrollOffset)
+                            .onAppear {
+                                controlVisibleWidth = viewportGeo.size.width
+                            }
+                            .onChange(of: viewportGeo.size.width) { _, newWidth in
+                                controlVisibleWidth = newWidth
+                            }
+                    }
+                    .clipped()
+
+                    // Draggable scrollbar
+                    ControlAreaScrollbar(
+                        contentWidth: totalContentWidth,
+                        visibleWidth: controlVisibleWidth,
+                        scrollOffset: $controlScrollOffset
+                    )
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
                 .id("ctrl-container-\(isCtrlEditing)-sess-\(sessionNonce)-page-\(currentPage)-\(pageButtons.count)")
                 .allowsHitTesting(true)
                 .onChange(of: sessionNonce) { _, _ in
                     clearDragState(reason: "gesture cancelled")
+                }
+                .onChange(of: currentPage) { _, _ in
+                    // Reset scroll when switching pages
+                    controlScrollOffset = 0
                 }
             )
         } else {
@@ -11120,15 +11135,10 @@ private struct iPadControlTile: View {
                     }
                     .onTapGesture { onEdit() }
                 } else {
-                    Button(action: {
-                        onTap()
-                    }) {
-                        ButtonTileContent()
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    // Only add press feedback gesture on iPad - on iPhone it blocks ScrollView scrolling
-                    .modifier(PressGestureModifier(isPhone: isPhone, isTouching: $isTouching, isPressed: $isPressed))
+                    // Fire MIDI on touch down (not touch up) for zero-latency feel
+                    ButtonTileContent()
+                        .contentShape(Rectangle())
+                        .modifier(PressGestureModifier(isPhone: isPhone, isTouching: $isTouching, isPressed: $isPressed, onTouchDown: onTap))
                 }
             }
             
@@ -11369,9 +11379,7 @@ private struct iPadControlTile: View {
                         .fill(buttonBackgroundColor)
                 )
         )
-            .scaleEffect(isTouching ? 1.02 : 1.0)  // Same scale effect for iPhone and iPad
-            .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
-            .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
+            .scaleEffect(isTouching ? 1.02 : 1.0)
     }
     
     @ViewBuilder
@@ -13246,26 +13254,13 @@ struct DraggableNavigationCapsule: View {
                 GeometryReader { geo in
                     RoundedRectangle(cornerRadius: 20)
                         .fill(.regularMaterial)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(themeColor.opacity(0.5))
-                        )
                         .preference(
                             key: CapsuleBoundsPreferenceKey.self,
                             value: ["navPill.bounds": geo.frame(in: .global)]
                         )
                 }
             )
-            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 6)
-            .overlay(
-                // Border when expanded
-                Group {
-                    if isExpanded {
-                        RoundedRectangle(cornerRadius: 20)
-                            .strokeBorder(Color.primary.opacity(0.2), lineWidth: 2)
-                    }
-                }
-            )
+            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
             .contentShape(Rectangle())
             .highPriorityGesture(
                 DragGesture(minimumDistance: 30, coordinateSpace: .global)
@@ -13486,26 +13481,13 @@ struct SimpleDraggableTransportDock: View {
                 GeometryReader { geo in
                     RoundedRectangle(cornerRadius: 20)
                         .fill(.regularMaterial)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(themeColor.opacity(0.5))
-                        )
                         .preference(
                             key: CapsuleBoundsPreferenceKey.self,
                             value: ["cueCapsule.bounds": geo.frame(in: .global)]
                         )
                 }
             )
-            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 6)
-            .overlay(
-                // Border when expanded
-                Group {
-                    if isExpanded {
-                        RoundedRectangle(cornerRadius: 20)
-                            .strokeBorder(Color.primary.opacity(0.2), lineWidth: 2)
-                    }
-                }
-            )
+            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
             .contentShape(Rectangle())
             .highPriorityGesture(
                 DragGesture(minimumDistance: 30, coordinateSpace: .global)
