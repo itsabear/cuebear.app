@@ -35,7 +35,7 @@ struct BugReportView: View {
                 Section {
                     Text("Help us improve Cue Bear by reporting any issues you've encountered.")
                         .font(.cb(.small))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(CBColor.textSecondary)
                 } header: {
                     Text("Report a Bug")
                 }
@@ -203,7 +203,7 @@ struct CrashAlertView: View {
 
                     Text("Cue Bear encountered an issue during the last session. Would you like to send a bug report?")
                         .font(.cb(.body))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(CBColor.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }

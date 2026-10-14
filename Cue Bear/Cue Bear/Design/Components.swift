@@ -51,7 +51,7 @@ struct CBTransportDock: View {
                     .font(.cb(points: min(32, containerWidth * 0.25), .bold))
                     .foregroundColor(.black)
                     .frame(width: goButtonSize, height: goButtonSize)
-                    .background(isGoEnabled ? Color.white : Color.gray)
+                    .background(isGoEnabled ? CBColor.primary : CBColor.surfaceRaised)
                     .clipShape(Circle())
                     .shadow(color: .black.opacity(isGoPressed ? 0.1 : 0.3), radius: isGoPressed ? 1 : 6, x: 0, y: isGoPressed ? 0 : 3)
                     .scaleEffect(isGoPressed ? 0.92 : 1.0)
@@ -113,11 +113,11 @@ struct WhiteCapsuleButtonStyle: ButtonStyle {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(Color.black.opacity(configuration.isPressed ? 0.7 : 0.5))
+                    .fill(configuration.isPressed ? CBColor.chipPressed : CBColor.chip)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.white.opacity(configuration.isPressed ? 0.4 : 0.2), lineWidth: 1)
+                    .stroke(configuration.isPressed ? CBColor.strokeStrong : CBColor.stroke, lineWidth: CBSize.hairline)
             )
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
@@ -155,11 +155,11 @@ struct ThemedCapsuleButtonStyle: ButtonStyle {
                 .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(Color.black.opacity(configuration.isPressed ? 0.7 : 0.5))
+                        .fill(configuration.isPressed ? CBColor.chipPressed : CBColor.chip)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: cornerRadius)
-                        .stroke(Color.white.opacity(configuration.isPressed ? 0.4 : 0.2), lineWidth: 1)
+                        .stroke(configuration.isPressed ? CBColor.strokeStrong : CBColor.stroke, lineWidth: CBSize.hairline)
                 )
                 .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
                 .opacity(isEnabled ? 1.0 : 0.4)
@@ -204,7 +204,7 @@ private struct CBDialogButtonStyle: ButtonStyle {
                 Group {
                     if isOutlined {
                         RoundedRectangle(cornerRadius: CBRadius.control)
-                            .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                            .stroke(CBColor.strokeStrong, lineWidth: CBSize.hairline)
                     }
                 }
             )
@@ -215,11 +215,11 @@ private struct CBDialogButtonStyle: ButtonStyle {
     private func backgroundColor(pressed: Bool) -> Color {
         switch role {
         case .primary:
-            return pressed ? Color.white.opacity(0.7) : Color.white
+            return pressed ? CBColor.primary.opacity(0.7) : CBColor.primary
         case .destructive:
-            return pressed ? Color.red.opacity(0.7) : Color.red
+            return pressed ? CBColor.danger.opacity(0.7) : CBColor.danger
         case .secondary, .cancel:
-            return pressed ? Color.white.opacity(0.15) : Color.white.opacity(0.08)
+            return pressed ? CBColor.surfaceRaised : CBColor.surface
         }
     }
 }
@@ -276,8 +276,8 @@ struct CBDialog: View {
         }
         .padding(24)
         .frame(maxWidth: 340)
-        .background(RoundedRectangle(cornerRadius: CBRadius.panel).fill(Color.black.opacity(0.85)))
-        .overlay(RoundedRectangle(cornerRadius: CBRadius.panel).stroke(Color.white.opacity(0.12), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: CBRadius.panel).fill(CBColor.background))
+        .overlay(RoundedRectangle(cornerRadius: CBRadius.panel).stroke(CBColor.stroke, lineWidth: CBSize.hairline))
         .shadow(color: .black.opacity(0.5), radius: 30, x: 0, y: 10)
     }
 
@@ -291,7 +291,7 @@ struct CBDialog: View {
         if !message.isEmpty {
             Text(message)
                 .font(themeFont(14, .regular))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundStyle(CBColor.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -305,8 +305,8 @@ struct CBDialog: View {
                 .foregroundColor(.white)
                 .tint(.white)
                 .padding(12)
-                .background(RoundedRectangle(cornerRadius: CBRadius.control).fill(Color.white.opacity(0.08)))
-                .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.25), lineWidth: 1))
+                .background(RoundedRectangle(cornerRadius: CBRadius.control).fill(CBColor.surfaceRaised))
+                .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(CBColor.stroke, lineWidth: CBSize.hairline))
                 .focused($isTextFieldFocused)
                 .onSubmit {
                     if let primary = buttons.first(where: { $0.role == .primary }) {
@@ -385,7 +385,7 @@ struct CBSheetButton: View {
         Button(action: { if !disabled { action() } }) {
             Text(title)
                 .font(.cb(.body, bold ? .bold : .regular))
-                .foregroundColor(disabled ? .white.opacity(0.3) : .white)
+                .foregroundStyle(disabled ? CBColor.textDisabled : CBColor.textPrimary)
                 .lineLimit(1)
                 .fixedSize()   // never squeeze or wrap the label (toolbars on iPadOS 26 propose a narrow width)
                 .padding(.horizontal, 14)
@@ -410,7 +410,7 @@ struct CBSheetIconButton: View {
         Button(action: { if !disabled { action() } }) {
             Image(systemName: systemName)
                 .font(.cbIcon(.large, weight))
-                .foregroundColor(disabled ? .white.opacity(0.3) : .white)
+                .foregroundStyle(disabled ? CBColor.textDisabled : CBColor.textPrimary)
                 .frame(width: 44, height: 44)
                 .cbChip()
                 .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))

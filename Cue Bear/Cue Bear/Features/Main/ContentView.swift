@@ -134,7 +134,7 @@ struct SwipeableCapsuleTutorial: View {
             // Arrow pointing to capsule
             Image(systemName: "arrowtriangle.right.fill")
                 .font(.cbIcon(.large, .regular))
-                .foregroundColor(.blue)
+                .foregroundStyle(CBColor.highlight)
                 .offset(x: -2)
         }
         .fixedSize()
@@ -188,7 +188,7 @@ struct UpwardTutorial: View {
                 // Arrow pointing up - offset horizontally to point at target
                 Image(systemName: "arrowtriangle.up.fill")
                     .font(.cbIcon(.body, .regular))
-                    .foregroundColor(.blue)
+                    .foregroundStyle(CBColor.highlight)
                     .offset(x: arrowOffset, y: 2)
 
                 // Main tutorial bubble
@@ -316,7 +316,7 @@ struct DownwardTutorial: View {
                 // Arrow pointing down - offset horizontally to point at target
                 Image(systemName: "arrowtriangle.down.fill")
                     .font(.cbIcon(.body, .regular))
-                    .foregroundColor(.blue)
+                    .foregroundStyle(CBColor.highlight)
                     .offset(x: arrowOffset, y: -2)
             }
             .fixedSize()
@@ -999,7 +999,7 @@ struct IconPicker: View {
         .popover(isPresented: $showingPopover) {
             IconGridView(symbol: $symbol, icons: icons, showingPopover: $showingPopover)
                 .presentationCompactAdaptation(.popover)
-                .presentationBackground(selectedTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationBackground(CBColor.background)
         }
     }
 }
@@ -1686,23 +1686,23 @@ struct CBControlEditorSheet: View {
                                 .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                         }
                         .padding(.vertical, 4)
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                     }
                 }
 
                 Section(header: Text("Appearance")) {
                     // Control type is preselected by the add buttons; hide the picker
                     HStack {
-                        TextField("Control Name", text: $draft.title, prompt: Text("Control Name").foregroundColor(.secondary))
+                        TextField("Control Name", text: $draft.title, prompt: Text("Control Name").foregroundStyle(CBColor.textSecondary))
                         if !draft.title.isEmpty {
                             Button(action: { draft.title = "" }) {
                                 Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(Color.secondary)
+                                    .foregroundStyle(CBColor.textSecondary)
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
 
                     // Button Type picker - only show for buttons (not faders)
                     if !draft.isFader {
@@ -1713,7 +1713,7 @@ struct CBControlEditorSheet: View {
                             Text("Button").tag(ButtonType.regular)
                             Text("Small Button").tag(ButtonType.small)
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
@@ -1723,18 +1723,18 @@ struct CBControlEditorSheet: View {
                                 .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 .padding(.top, 4)
-                                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                                .cbRow()
                         }
                     }
 
                     if !draft.isFader {
                         IconPicker(symbol: $draft.symbol, icons: icons)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                         Picker("Behavior", selection: $draft.isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
@@ -1745,7 +1745,7 @@ struct CBControlEditorSheet: View {
                             Text("Vertical").tag("vertical")
                             Text("Horizontal").tag("horizontal")
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
@@ -1762,7 +1762,7 @@ struct CBControlEditorSheet: View {
                             }
                         }
                         .id("fader-direction-picker")
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
@@ -1772,7 +1772,7 @@ struct CBControlEditorSheet: View {
                                 .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 .padding(.top, 4)
-                                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                                .cbRow()
                         }
                     }
 
@@ -1800,7 +1800,7 @@ struct CBControlEditorSheet: View {
                             }
                         }
                     )
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 }
                 // Live Preview - Collapsible
                 Section {
@@ -1824,14 +1824,14 @@ struct CBControlEditorSheet: View {
                             Text("Preview")
                         }
                     )
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 }
                 Section(header: Text("MIDI")) {
                     if midiFiltersEnabled && !midiFilter.isEmpty {
                         Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
                             .font(.cb(.caption))
-                            .foregroundColor(.secondary)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .foregroundStyle(CBColor.textSecondary)
+                            .cbRow()
                     }
                     Toggle(isOn: Binding(
                         get: { draft.autoAssign },
@@ -1840,13 +1840,13 @@ struct CBControlEditorSheet: View {
                         Text("Assign MIDI automatically")
                     }
                     .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                     if !draft.isFader {
                         Picker("Type", selection: $draft.kind) {
                             Text("Control Change").tag(MIDIKind.cc)
                             Text("Note").tag(MIDIKind.note)
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
@@ -1855,12 +1855,12 @@ struct CBControlEditorSheet: View {
                             Text("Channel")
                             Spacer()
                             Text("\(globalChannel) (Global Channel)")
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(CBColor.textSecondary)
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                     } else {
                         ChannelPicker(title: "Channel", channel: $draft.channel, disabled: false)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                     }
                     MIDINumberPicker(
                         kind: draft.kind,
@@ -1871,10 +1871,10 @@ struct CBControlEditorSheet: View {
                         editingControl: editing,
                         midiFilter: midiFilter
                     )
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                     if !draft.isFader && draft.kind == .note {
                         VelocityPicker(velocity: $draft.velocity, disabled: false)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                     }
                 }
 
@@ -2474,34 +2474,34 @@ struct CBEditControlSheet: View {
                         Text("Control Type")
                         Spacer()
                         Text(isFaderUI ? "Fader" : "Button")
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(CBColor.textSecondary)
                     }
                     .contentShape(Rectangle())
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                     if !isFaderUI {
                         Toggle("Small Button", isOn: $isSmall)
                             .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                     }
                     HStack {
-                        TextField("Control Name", text: $title, prompt: Text("Control Name").foregroundColor(.secondary))
+                        TextField("Control Name", text: $title, prompt: Text("Control Name").foregroundStyle(CBColor.textSecondary))
                         if !title.isEmpty {
                             Button(action: { title = "" }) {
                                 Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(Color.secondary)
+                                    .foregroundStyle(CBColor.textSecondary)
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                     if !isFaderUI {
                         IconPicker(symbol: $symbol, icons: icons)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                         Picker("Behavior", selection: $isToggle) {
                             Text("Momentary").tag(false)
                             Text("Toggle").tag(true)
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
@@ -2512,7 +2512,7 @@ struct CBEditControlSheet: View {
                             Text("Vertical").tag("vertical")
                             Text("Horizontal").tag("horizontal")
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
@@ -2529,7 +2529,7 @@ struct CBEditControlSheet: View {
                             }
                         }
                         .id("fader-direction-picker-edit")
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
@@ -2553,13 +2553,13 @@ struct CBEditControlSheet: View {
                                         .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                                 } else {
                                     Text("Default")
-                                        .foregroundColor(.secondary)
+                                        .foregroundStyle(CBColor.textSecondary)
                                 }
                             }
                         }
                     )
                     .tint(.secondary)
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 }
                 // Live Preview - Collapsible
                 Section {
@@ -2581,14 +2581,14 @@ struct CBEditControlSheet: View {
                             Text("Preview")
                         }
                     )
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 }
                 Section(header: Text("MIDI")) {
                     if midiFiltersEnabled && !midiFilter.isEmpty {
                         Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
                             .font(.cb(.caption))
-                            .foregroundColor(.secondary)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .foregroundStyle(CBColor.textSecondary)
+                            .cbRow()
                     }
                     Toggle(isOn: Binding(
                         get: { autoAssign },
@@ -2597,18 +2597,18 @@ struct CBEditControlSheet: View {
                         Text("Assign MIDI automatically")
                     }
                     .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                     if !isFaderUI {
                         Picker("Type", selection: $kind) {
                             Text("Control Change").tag(MIDIKind.cc)
                             Text("Note").tag(MIDIKind.note)
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
                     ChannelPicker(title: "Channel", channel: $channel, disabled: false)
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                     MIDINumberPicker(
                         kind: kind,
                         number: $number,
@@ -2618,10 +2618,10 @@ struct CBEditControlSheet: View {
                         editingControl: editing,
                         midiFilter: midiFilter
                     )
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                     if !isFaderUI && kind == .note {
                         VelocityPicker(velocity: $velocity, disabled: false)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                     }
                 }
 
@@ -5006,7 +5006,6 @@ internal struct ContentView: View {
                 rigs: BackupRigManager.shared,
                 controlButtons: $controlButtons,
                 projectName: isUntitledProject(projectName) ? "Untitled show" : projectName,
-                accent: currentTheme.accentColor(for: colorScheme),
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
                 startAfterSongID: lastPlayedCueID,
@@ -5021,7 +5020,6 @@ internal struct ContentView: View {
                 originalSong: song,
                 sharedFaders: controlButtons.filter { $0.isFader == true },
                 otherSongs: store.activeSongs.filter { $0.id != song.id },
-                accent: currentTheme.accentColor(for: colorScheme),
                 onSave: { updated in
                     saveSong(updated)
                     saveIfNamed()
@@ -5032,6 +5030,7 @@ internal struct ContentView: View {
                 },
                 onCancel: { songForDetails = nil }
             )
+            .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
         }
     }
@@ -5049,7 +5048,7 @@ internal struct ContentView: View {
                     connectionCoordinator.connectToWiFi(bridge: item)
                 }
             )
-            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showMidiTable) {
@@ -5093,7 +5092,7 @@ internal struct ContentView: View {
                     markDirty()
                 }
             )
-            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showAddEdit, onDismiss: {
@@ -5160,7 +5159,7 @@ internal struct ContentView: View {
                 globalChannel: globalChannel,
                 midiFilter: midiFilter
             )
-            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showAddEditMIDIOnly) {
@@ -5184,7 +5183,7 @@ internal struct ContentView: View {
                 onCancel: { showAddEditMIDIOnly = false },
                 editingSongName: editingSong?.name
             )
-            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showControlEditor) {
@@ -5299,7 +5298,7 @@ internal struct ContentView: View {
                 flashNewForm: $flashNewFormControl,
                 draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
-            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showEditControlSheet) {
@@ -5346,7 +5345,7 @@ internal struct ContentView: View {
                 flashNewForm: .constant(false),  // Edit mode doesn't use "Save & Add Another"
                 draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
-            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showProjects) {
@@ -5371,7 +5370,7 @@ internal struct ContentView: View {
                     debugPrint("🗑️ Projects list after deletion: \(projectsList)")
                 }
             )
-            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showOnboarding, onDismiss: {
@@ -5388,7 +5387,6 @@ internal struct ContentView: View {
                 usbServer: usbServer,
                 wifiClient: wifiClient,
                 coordinator: connectionCoordinator,
-                accent: currentTheme.accentColor(for: colorScheme),
                 onSendTest: { sendFirstRunTest() },
                 onConnectWiFi: { item in connectionCoordinator.connectToWiFi(bridge: item) },
                 onTryShowMode: {
@@ -5397,30 +5395,30 @@ internal struct ContentView: View {
                 },
                 onDone: { showOnboarding = false }
             )
-            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
             .interactiveDismissDisabled(false)
         }
 
         .sheet(isPresented: $showAboutSheet) {
             AboutSheet()
-                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationBackground(CBColor.background)
                 .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showAppearanceSheet) {
             AppearanceSheet()
-                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationBackground(CBColor.background)
                 .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showAppearanceSettingsSheet) {
             AppearanceSettingsSheet()
-                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationBackground(CBColor.background)
                 .presentationCornerRadius(CBRadius.panel)
         }
         #if DEBUG
         .sheet(isPresented: $showAdminPanel) {
             ThemeAdminPanel()
-                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+                .presentationBackground(CBColor.background)
                 .presentationCornerRadius(CBRadius.panel)
         }
         #endif
@@ -7483,21 +7481,9 @@ private struct CBTopBar: View {
 
                             // Show connection type chip when connected
                             if connectionCoordinator.activeConnection == .usb {
-                                Text("USB")
-                                    .font(.cb(.micro, .semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(.green)
-                                    .clipShape(Capsule())
+                                CBTag(text: "USB", color: CBColor.usb)
                             } else if connectionCoordinator.activeConnection == .wifi {
-                                Text("WiFi")
-                                    .font(.cb(.micro, .semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(.blue)
-                                    .clipShape(Capsule())
+                                CBTag(text: "Wi-Fi", color: CBColor.wifi)
                             }
                         }
                         .padding(.horizontal, 14)
@@ -7581,7 +7567,7 @@ private struct CBTopBar: View {
                 onRenameProject: onRenameProject
             )
             .presentationCompactAdaptation(.popover)
-            .presentationBackground(selectedTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationBackground(CBColor.background)
             .tint(.white)
         }
     }
@@ -7653,7 +7639,7 @@ private struct CBTopBar: View {
                         }
                     )
                     .presentationCompactAdaptation(.popover)
-                    .presentationBackground(selectedTheme.sheetBackgroundColor(for: colorScheme))
+                    .presentationBackground(CBColor.background)
                     .tint(.white)
                 }
 
@@ -7713,148 +7699,6 @@ private struct CBTopBar: View {
         .frame(minHeight: 32)
     }
 
-    private var performanceModeControls: some View {
-        HStack(spacing: 12) {
-            // Connections button
-            Button(action: onConnections) {
-                HStack(spacing: 8) {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .imageScale(.large)
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(connectionTint)
-                        .scaleEffect(connectionCoordinator.activeConnection == .none ? 1.0 : 1.0)
-                        .animation(
-                            connectionCoordinator.activeConnection == .none
-                                ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
-                                : .default,
-                            value: connectionCoordinator.activeConnection
-                        )
-
-                    // Show connection type chip when connected
-                    if connectionCoordinator.activeConnection == .usb {
-                        Text("USB")
-                            .font(.cb(.micro, .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.green)
-                            .clipShape(Capsule())
-                    } else if connectionCoordinator.activeConnection == .wifi {
-                        Text("WiFi")
-                            .font(.cb(.micro, .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.blue)
-                            .clipShape(Capsule())
-                    }
-                }
-            }
-            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: connectionTint))
-
-            // Edit button - pencil icon
-            Button(action: onEditToggle) {
-                Image(systemName: "pencil")
-                    .imageScale(.large)
-                    .foregroundColor(buttonColor)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(IOSPressButtonStyle())
-        }
-    }
-
-    // iPhone only: Combined controls for edit mode (connections + edit actions)
-    private var combinedEditModeControls: some View {
-        HStack(spacing: 12) {
-            // Connections button
-            Button(action: onConnections) {
-                HStack(spacing: 8) {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .imageScale(.large)
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(connectionTint)
-                        .scaleEffect(connectionCoordinator.activeConnection == .none ? 1.0 : 1.0)
-                        .animation(
-                            connectionCoordinator.activeConnection == .none
-                                ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
-                                : .default,
-                            value: connectionCoordinator.activeConnection
-                        )
-
-                    // Show connection type chip when connected
-                    if connectionCoordinator.activeConnection == .usb {
-                        Text("USB")
-                            .font(.cb(.micro, .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.green)
-                            .clipShape(Capsule())
-                    } else if connectionCoordinator.activeConnection == .wifi {
-                        Text("WiFi")
-                            .font(.cb(.micro, .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.blue)
-                            .clipShape(Capsule())
-                    }
-                }
-            }
-            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: connectionTint))
-
-            Button(action: onUndo) {
-                Image(systemName: "arrow.uturn.backward")
-                    .imageScale(.large)
-            }
-            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-            .disabled(!canUndo)
-
-            Button(action: onRedo) {
-                Image(systemName: "arrow.uturn.forward")
-                    .imageScale(.large)
-            }
-            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-            .disabled(!canRedo)
-
-            Button(action: onAdd) {
-                Image(systemName: "plus")
-                    .imageScale(.large)
-            }
-            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-
-            Button("Done", action: onEditToggle)
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-        }
-    }
-
-    private var editModeControls: some View {
-        HStack(spacing: 12) {
-            Button(action: onUndo) {
-                Image(systemName: "arrow.uturn.backward")
-                    .imageScale(.large)
-            }
-            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-            .disabled(!canUndo)
-
-            Button(action: onRedo) {
-                Image(systemName: "arrow.uturn.forward")
-                    .imageScale(.large)
-            }
-            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-            .disabled(!canRedo)
-
-            Button(action: onAdd) {
-                Image(systemName: "plus")
-                    .imageScale(.large)
-            }
-            .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-
-            Button("Done", action: onEditToggle)
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-        }
-    }
 }
 
 // MARK: - Control Area
@@ -11903,11 +11747,11 @@ struct MidiTableSheet: View {
                 Section {
                     Toggle("Global MIDI Channel", isOn: $isGlobalChannel)
                         .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
 
                     if isGlobalChannel {
                         ChannelPicker(title: "Channel", channel: $globalChannel, disabled: false)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                     }
                 } footer: {
                     Text("When enabled, all cues and controls will be assigned to the same MIDI channel. When disabled, each item can use any of the 16 MIDI channels.")
@@ -11920,7 +11764,7 @@ struct MidiTableSheet: View {
                         Text("MIDI Filter")
                     }
                     .tint(selectedTheme.accentColor(for: colorScheme))
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 } header: {
                     Text("Auto-Assignment")
                 } footer: {
@@ -11942,7 +11786,7 @@ struct MidiTableSheet: View {
                         Text("MIDI Assignments")
                     }
                     .tint(selectedTheme.accentColor(for: colorScheme))
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 } footer: {
                     Text("View and edit MIDI assignments for all cues and controls")
                 }
@@ -12001,7 +11845,7 @@ struct MidiAssignmentsView: View {
                         HStack(spacing: 0) {
                                 Button(action: { toggleSort(.name) }) {
                                     HStack(spacing: 4) {
-                                        Text("Name").font(.cb(.small, .semibold)).foregroundColor(.secondary)
+                                        Text("Name").font(.cb(.small, .semibold)).foregroundStyle(CBColor.textSecondary)
                                         sortIndicator(for: .name)
                                     }
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -12010,7 +11854,7 @@ struct MidiAssignmentsView: View {
                                 
                                 Button(action: { toggleSort(.type) }) {
                                     HStack(spacing: 4) {
-                                        Text("Type").font(.cb(.small, .semibold)).foregroundColor(.secondary)
+                                        Text("Type").font(.cb(.small, .semibold)).foregroundStyle(CBColor.textSecondary)
                                         sortIndicator(for: .type)
                                     }
                                 .frame(width: 70, alignment: .center)
@@ -12020,7 +11864,7 @@ struct MidiAssignmentsView: View {
                             if !isGlobalChannel {
                                     Button(action: { toggleSort(.channel) }) {
                                         HStack(spacing: 4) {
-                                            Text("Channel").font(.cb(.small, .semibold)).foregroundColor(.secondary)
+                                            Text("Channel").font(.cb(.small, .semibold)).foregroundStyle(CBColor.textSecondary)
                                             sortIndicator(for: .channel)
                                         }
                                     .frame(width: 80, alignment: .center)
@@ -12030,7 +11874,7 @@ struct MidiAssignmentsView: View {
                                 
                                 Button(action: { toggleSort(.value) }) {
                                     HStack(spacing: 4) {
-                                        Text("Value").font(.cb(.small, .semibold)).foregroundColor(.secondary)
+                                        Text("Value").font(.cb(.small, .semibold)).foregroundStyle(CBColor.textSecondary)
                                         sortIndicator(for: .value)
                                     }
                                 .frame(width: 90, alignment: .center)
@@ -12292,7 +12136,7 @@ struct MidiAssignmentsView: View {
         if sortKey == key {
             Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                 .font(.cbIcon(.micro, .regular))
-                .foregroundColor(.secondary)
+                .foregroundStyle(CBColor.textSecondary)
         } else {
             EmptyView()
         }
@@ -12383,10 +12227,10 @@ struct MidiValueMenu: View {
                     "\(item.value)"
                 Text(displayText)
                     .font(.cb(.body))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(CBColor.textPrimary)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.cbIcon(.micro, .regular))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(CBColor.textSecondary)
             }
         }
         .buttonStyle(.plain)
@@ -12445,47 +12289,47 @@ struct MidiAssignmentEditSheet: View {
                         Text("Name")
                         Spacer()
                         Text(item.name)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(CBColor.textSecondary)
                     }
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
 
                     HStack {
                         Text("Type")
                         Spacer()
                         Text(item.type.displayName)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(CBColor.textSecondary)
                     }
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 }
 
                 Section(header: Text("MIDI Assignment")) {
                     if midiFiltersEnabled && !midiFilter.isEmpty {
                         Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
                             .font(.cb(.caption))
-                            .foregroundColor(.secondary)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .foregroundStyle(CBColor.textSecondary)
+                            .cbRow()
                     }
                     if item.type != .fader {
                         Picker("MIDI Type", selection: $editedType) {
                             Text("Control Change").tag(MIDIKind.cc)
                             Text("Note").tag(MIDIKind.note)
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     }
 
                     if !isGlobalChannel {
                         ChannelPicker(title: "Channel", channel: $editedChannel, disabled: false)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                     } else {
                         HStack {
                             Text("Channel")
                             Spacer()
                             Text("\(globalChannel) (Global)")
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(CBColor.textSecondary)
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                     }
 
                     // Value picker with ownership warnings
@@ -12568,7 +12412,7 @@ struct MidiAssignmentEditSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 }
 
             // Save button section at bottom
@@ -12662,34 +12506,34 @@ struct MidiTableRow: View {
                         .lineLimit(1)
                     Text(item.type.displayName)
                         .font(.cb(.caption))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(CBColor.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 // Type Column
                 Text(item.midiType == .cc ? "CC" : "Note")
                     .font(.cb(.body))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(CBColor.textPrimary)
                     .frame(width: 70, alignment: .center)
 
                 // Channel Column (only shown if not global)
                 if !isGlobalChannel {
                     Text("\(item.channel)")
                         .font(.cb(.body))
-                        .foregroundColor(.primary)
+                        .foregroundStyle(CBColor.textPrimary)
                         .frame(width: 80, alignment: .center)
                 }
 
                 // Value Column
                 Text(item.midiType == .note ? "\(item.value) - \(item.value.midiNoteName)" : "\(item.value)")
                     .font(.cb(.body))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(CBColor.textPrimary)
                     .frame(width: 90, alignment: .center)
 
                 // Chevron to indicate tappable
                 Image(systemName: "chevron.right")
                     .font(.cbIcon(.caption, .regular))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(CBColor.textSecondary)
                     .frame(width: 20)
             }
             .padding(.horizontal, 20)
@@ -12730,15 +12574,15 @@ struct MidiFilterView: View {
                     Text("Enable MIDI Filters")
                 }
                 .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
             }
 
             Section {
                 Text("Exclude these MIDI CC numbers from auto-assignment. Common performance controllers (mod wheel, volume, sustain) are filtered by default to prevent conflicts.")
                     .font(.cb(.small))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(CBColor.textSecondary)
             }
-            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+            .cbRow()
 
             // Add Custom Filter Button
             Section {
@@ -12753,7 +12597,7 @@ struct MidiFilterView: View {
                     }
                 }
                 .tint(selectedTheme.accentColor(for: colorScheme))
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
                 .disabled(!midiFiltersEnabled)
             }
 
@@ -12780,7 +12624,7 @@ struct MidiFilterView: View {
                                     .frame(width: 60, alignment: .leading)
                                 Text(name)
                                     .font(.cb(.body))
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(CBColor.textSecondary)
                             }
                         }
                         .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
@@ -12793,7 +12637,7 @@ struct MidiFilterView: View {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                     }
                     .onDelete { indexSet in
                         for index in indexSet {
@@ -12823,12 +12667,12 @@ struct MidiFilterView: View {
                                 .frame(width: 60, alignment: .leading)
                             Text(name)
                                 .font(.cb(.body))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(CBColor.textSecondary)
                         }
                     }
                     .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
                     .disabled(!midiFiltersEnabled)
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 }
             }
         }
@@ -12861,11 +12705,11 @@ struct AddCustomFilterView: View {
         Form {
             Section {
                 CCNumberPicker(title: "CC Number", ccNumber: $customCC, disabled: false)
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
 
                 TextField("Description", text: $customDescription)
                     .textInputAutocapitalization(.words)
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
             } header: {
                 Text("Custom MIDI Filter")
             } footer: {
@@ -13161,7 +13005,7 @@ struct DraggableNavigationCapsule: View {
         }) {
             Image(systemName: "chevron.left")
                 .font(.cbIcon(.large, .bold))
-                .foregroundColor(.primary)
+                .foregroundStyle(CBColor.textPrimary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
         }
@@ -13392,7 +13236,7 @@ struct SimpleDraggableTransportDock: View {
         }) {
             Image(systemName: "chevron.left")
                 .font(.cbIcon(.large, .bold))
-                .foregroundColor(.primary)
+                .foregroundStyle(CBColor.textPrimary)
                 .frame(width: capsuleSize.width, height: capsuleSize.height, alignment: .center)
                 .contentShape(Rectangle())
         }

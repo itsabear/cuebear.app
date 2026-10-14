@@ -56,7 +56,7 @@ private struct ColorTile: View {
                 ZStack {
                     Color.gray.opacity(0.2)
                     Image(systemName: "xmark")
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(CBColor.textSecondary)
                 }
                 .aspectRatio(1, contentMode: .fit)
                 .cornerRadius(CBRadius.small)

@@ -195,7 +195,7 @@ struct AboutSheet: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .background(Color.red.opacity(0.1))
-            .foregroundColor(.red)
+            .foregroundStyle(CBColor.danger)
             .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
     }
@@ -455,7 +455,7 @@ struct AppearanceSettingsSheet: View {
                     Text("Color used for new cues, buttons, and interactive elements")
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                 }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
 
                 // Auto Assign Colors Section
                 Section {
@@ -470,7 +470,7 @@ struct AppearanceSettingsSheet: View {
                     Text("Randomly assigns a color from the palette when adding new cues or controls")
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                 }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
 
                 // MIDI Data Display Section
                 Section {
@@ -483,7 +483,7 @@ struct AppearanceSettingsSheet: View {
                     Text("Shows CC/Note numbers on cues, buttons, and faders")
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                 }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
 
                 // Unified Cue Size Section (controls both height and font size)
                 Section {
@@ -518,7 +518,7 @@ struct AppearanceSettingsSheet: View {
                     Text("Adjusts the size of cue buttons and text throughout the app")
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                 }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
 
                 // Reset Section
                 Section {
@@ -537,7 +537,7 @@ struct AppearanceSettingsSheet: View {
                             .padding(.vertical, 8)
                     }
                 }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))

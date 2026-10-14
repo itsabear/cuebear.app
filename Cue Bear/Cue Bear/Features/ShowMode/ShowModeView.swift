@@ -22,7 +22,6 @@ struct ShowModeView: View {
     @Binding var controlButtons: [ControlButton]
 
     let projectName: String
-    let accent: Color
     let isGlobalChannel: Bool
     let globalChannel: Int
     /// Song that was last fired before entering Show mode (becomes NOW)
@@ -60,18 +59,18 @@ struct ShowModeView: View {
         GeometryReader { geo in
             let landscape = geo.size.width > geo.size.height
             ZStack {
-                Color.black.ignoresSafeArea()
+                CBColor.stage.ignoresSafeArea()
                 if landscape {
                     HStack(spacing: 0) {
                         setlistColumn
                             .frame(width: min(300, geo.size.width * 0.28))
-                        Divider().background(Color.white.opacity(0.15))
+                        Rectangle().fill(CBColor.separator).frame(width: CBSize.hairline)
                         mainColumn
                     }
                 } else {
                     VStack(spacing: 0) {
                         mainColumn
-                        Divider().background(Color.white.opacity(0.15))
+                        Rectangle().fill(CBColor.separator).frame(height: CBSize.hairline)
                         setlistStrip
                             .frame(height: 96)
                     }
@@ -179,22 +178,20 @@ struct ShowModeView: View {
 
     private var setlistColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("SETLIST")
-                .font(.cb(.small, .bold))
-                .foregroundColor(.white.opacity(0.5))
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
-                .padding(.bottom, 8)
+            CBSectionLabel("Setlist")
+                .padding(.horizontal, CBSpace.xl)
+                .padding(.top, CBSpace.xl)
+                .padding(.bottom, CBSpace.s)
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 6) {
+                    LazyVStack(spacing: CBSpace.s) {
                         ForEach(Array(songs.enumerated()), id: \.element.id) { index, song in
                             setlistRow(index: index, song: song)
                                 .id(song.id)
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 24)
+                    .padding(.horizontal, CBSpace.m)
+                    .padding(.bottom, CBSpace.xl)
                 }
                 .onChange(of: currentID) { _, id in
                     if let id = id { withAnimation { proxy.scrollTo(id, anchor: .center) } }
@@ -202,40 +199,42 @@ struct ShowModeView: View {
             }
             Text("Tap a song to make it next")
                 .font(.cb(.small))
-                .foregroundColor(.white.opacity(0.45))
-                .padding(20)
+                .foregroundStyle(CBColor.textTertiary)
+                .padding(CBSpace.xl)
         }
+        .background(CBColor.background)
     }
 
     private func setlistRow(index: Int, song: Song) -> some View {
         let isNow = song.id == currentID
         let isNext = song.id == nextID
         return Button(action: { chooseNext(song) }) {
-            HStack(spacing: 12) {
+            HStack(spacing: CBSpace.m) {
                 Text("\(index + 1)")
-                    .font(.cb(.body, .semibold))
-                    .foregroundColor(.white.opacity(0.5))
+                    .font(.cbMono(.body, .semibold))
+                    .foregroundStyle(CBColor.textTertiary)
                     .frame(width: 28, alignment: .trailing)
                 Text(song.name)
-                    .font(.system(size: 19, weight: isNow ? .bold : .regular))
-                    .foregroundColor(isPlayed(song) ? .white.opacity(0.45) : .white)
+                    .font(.cb(.large, isNow ? .bold : .regular))
+                    .foregroundStyle(isPlayed(song) ? CBColor.textTertiary : CBColor.textPrimary)
                     .lineLimit(1)
-                Spacer(minLength: 4)
+                Spacer(minLength: CBSpace.xs)
                 if isNow {
-                    Text("NOW").font(.cb(.caption, .bold)).foregroundColor(accent)
+                    CBTag(text: "NOW", color: CBColor.highlight)
                 } else if isNext {
-                    Text("NEXT").font(.cb(.caption, .bold)).foregroundColor(.white.opacity(0.7))
+                    CBTag(text: "NEXT", color: CBColor.surfaceRaised)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, CBSpace.m)
             .frame(height: 48)
             .background(
                 RoundedRectangle(cornerRadius: CBRadius.control)
-                    .fill(isNow ? accent.opacity(0.25) : Color.white.opacity(0.04))
+                    .fill(isNow ? CBColor.highlight.opacity(0.25) : CBColor.surface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: CBRadius.control)
-                    .stroke(isNow ? accent : (isNext ? Color.white.opacity(0.5) : Color.clear), lineWidth: isNow ? 2 : 1)
+                    .stroke(isNow ? CBColor.highlight : (isNext ? CBColor.strokeStrong : Color.clear),
+                            lineWidth: isNow ? CBSize.selection : CBSize.hairline)
             )
             .contentShape(Rectangle())
         }
@@ -256,32 +255,34 @@ struct ShowModeView: View {
     private var setlistStrip: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: CBSpace.s) {
                     ForEach(Array(songs.enumerated()), id: \.element.id) { index, song in
                         Button(action: { chooseNext(song) }) {
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: CBSpace.xs) {
                                 Text("\(index + 1)")
-                                    .font(.cb(.caption, .semibold))
-                                    .foregroundColor(.white.opacity(0.5))
+                                    .font(.cbMono(.caption, .semibold))
+                                    .foregroundStyle(CBColor.textTertiary)
                                 Text(song.name)
-                                    .font(.system(size: 15, weight: song.id == currentID ? .bold : .regular))
-                                    .foregroundColor(.white)
+                                    .font(.cb(.body, song.id == currentID ? .bold : .regular))
+                                    .foregroundStyle(CBColor.textPrimary)
                                     .lineLimit(1)
                             }
-                            .padding(10)
+                            .padding(CBSpace.m)
                             .frame(width: 150, alignment: .leading)
                             .background(RoundedRectangle(cornerRadius: CBRadius.control)
-                                .fill(song.id == currentID ? accent.opacity(0.25) : Color.white.opacity(0.05)))
+                                .fill(song.id == currentID ? CBColor.highlight.opacity(0.25) : CBColor.surface))
                             .overlay(RoundedRectangle(cornerRadius: CBRadius.control)
-                                .stroke(song.id == nextID ? Color.white.opacity(0.5) : Color.clear, lineWidth: 1))
+                                .stroke(song.id == currentID ? CBColor.highlight : (song.id == nextID ? CBColor.strokeStrong : Color.clear),
+                                        lineWidth: song.id == currentID ? CBSize.selection : CBSize.hairline))
                         }
                         .buttonStyle(.plain)
                         .id(song.id)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, CBSpace.l)
+                .padding(.vertical, CBSpace.m)
             }
+            .background(CBColor.background)
             .onChange(of: currentID) { _, id in
                 if let id = id { withAnimation { proxy.scrollTo(id, anchor: .center) } }
             }
@@ -291,10 +292,10 @@ struct ShowModeView: View {
     // MARK: - Main column
 
     private var mainColumn: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: CBSpace.l) {
             topBar
             nowCard
-            HStack(spacing: 16) {
+            HStack(spacing: CBSpace.l) {
                 nextCard
                 goButton
             }
@@ -302,20 +303,20 @@ struct ShowModeView: View {
             controlsArea
             Spacer(minLength: 0)
         }
-        .padding(20)
+        .padding(CBSpace.xl)
     }
 
     private var topBar: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: CBSpace.m) {
+            VStack(alignment: .leading, spacing: CBSpace.xxs) {
                 Text(projectName)
-                    .font(.cb(.body, .semibold))
-                    .foregroundColor(.white)
+                    .font(.cb(.large, .bold))
+                    .foregroundStyle(CBColor.textPrimary)
                     .lineLimit(1)
                 if let list = store.activeCueList {
                     Text(list.name)
                         .font(.cb(.small))
-                        .foregroundColor(.white.opacity(0.55))
+                        .foregroundStyle(CBColor.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -326,17 +327,16 @@ struct ShowModeView: View {
     }
 
     private var exitButton: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "lock.fill").font(.cbIcon(.small, .semibold))
+        HStack(spacing: CBSpace.s) {
+            Image(systemName: "lock.fill").font(.cbIcon(.small))
             Text(showExitHint ? "Hold to exit" : "Exit")
-                .font(.cb(.small, .semibold))
+                .font(.cb(.body, .semibold))
         }
-        .foregroundColor(.white.opacity(0.85))
-        .padding(.horizontal, 14)
-        .frame(height: 36)
-        .background(Capsule().fill(Color.white.opacity(0.1)))
-        .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 1))
-        .contentShape(Capsule())
+        .foregroundStyle(CBColor.textPrimary)
+        .padding(.horizontal, CBSpace.l)
+        .frame(height: CBSize.control)
+        .cbChip()
+        .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
         .onTapGesture {
             withAnimation { showExitHint = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { withAnimation { showExitHint = false } }
@@ -352,85 +352,77 @@ struct ShowModeView: View {
     // MARK: - Now / Next / GO
 
     private var nowCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("NOW")
-                .font(.cb(.small, .bold))
-                .foregroundColor(.white.opacity(0.55))
+        VStack(alignment: .leading, spacing: CBSpace.s) {
+            CBSectionLabel("Now", color: CBColor.highlight)
             if let song = currentSong {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: CBSpace.m) {
                     if let i = songs.firstIndex(where: { $0.id == song.id }) {
                         Text("\(i + 1)")
                             .font(.cb(.heading, .bold))
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundStyle(CBColor.textTertiary)
                     }
                     Text(song.name)
                         .font(.cb(.display, .bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(CBColor.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
                 if let sub = song.subtitle, !sub.isEmpty {
                     Text(sub)
-                        .font(.cb(.large))
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(.cb(.title))
+                        .foregroundStyle(CBColor.textSecondary)
                         .lineLimit(1)
                 }
                 if let notes = song.notes, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(notes)
                         .font(.cb(.large))
-                        .foregroundColor(.white.opacity(0.65))
+                        .foregroundStyle(CBColor.textSecondary)
                         .lineLimit(3)
                 }
             } else {
                 Text("Ready")
                     .font(.cb(.display, .bold))
-                    .foregroundColor(.white.opacity(0.85))
+                    .foregroundStyle(CBColor.textPrimary)
                 Text("Press GO to start the first song")
                     .font(.cb(.large))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundStyle(CBColor.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(accent.opacity(0.14)))
-        .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(accent, lineWidth: 2))
+        .cbCard(fill: CBColor.highlight.opacity(0.14), outline: CBColor.highlight, padding: CBSpace.xl)
         .accessibilityElement(children: .combine)
     }
 
     private var nextCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("NEXT")
-                .font(.cb(.small, .bold))
-                .foregroundColor(.white.opacity(0.55))
+        VStack(alignment: .leading, spacing: CBSpace.xs) {
+            CBSectionLabel("Next")
             if let song = nextSong {
                 Text(song.name)
-                    .font(.cb(.title, .semibold))
-                    .foregroundColor(.white)
+                    .font(.cb(.title, .bold))
+                    .foregroundStyle(CBColor.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             } else {
                 Text("End of the set")
-                    .font(.cb(.title, .semibold))
-                    .foregroundColor(.white.opacity(0.5))
+                    .font(.cb(.title, .bold))
+                    .foregroundStyle(CBColor.textTertiary)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(Color.white.opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(Color.white.opacity(0.2), lineWidth: 1))
+        .cbCard(outline: CBColor.stroke, outlineWidth: CBSize.hairline, padding: CBSpace.xl)
         .accessibilityElement(children: .combine)
     }
 
+    /// Same look as the GO button on the main screen: white, black type.
     private var goButton: some View {
         Button(action: go) {
             Text("GO")
-                .font(.cb(.display, .heavy))
-                .foregroundColor(nextSong == nil ? .white.opacity(0.35) : .white)
+                .font(.cb(.display, .bold))
+                .foregroundStyle(nextSong == nil ? CBColor.textDisabled : CBColor.onPrimary)
                 .frame(width: 200)
                 .frame(maxHeight: .infinity)
                 .background(RoundedRectangle(cornerRadius: CBRadius.card)
-                    .fill(nextSong == nil ? Color.white.opacity(0.06) : accent.opacity(goPressed ? 0.95 : 0.6)))
-                .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(accent, lineWidth: 3))
+                    .fill(nextSong == nil ? CBColor.surface : CBColor.primary.opacity(goPressed ? 0.7 : 1)))
                 .scaleEffect(goPressed ? 0.97 : 1)
         }
         .buttonStyle(.plain)
@@ -455,16 +447,14 @@ struct ShowModeView: View {
 
     private var controlsArea: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: CBSpace.m) {
                 if controlButtons.isEmpty && songExtras.isEmpty {
                     Text("No controls yet. Add them in the main screen's control area.")
                         .font(.cb(.body))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundStyle(CBColor.textTertiary)
                 } else {
-                    Text("CONTROLS")
-                        .font(.cb(.small, .bold))
-                        .foregroundColor(.white.opacity(0.5))
-                    HStack(alignment: .top, spacing: 20) {
+                    CBSectionLabel("Controls")
+                    HStack(alignment: .top, spacing: CBSpace.xl) {
                         buttonGrid
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                         if !sharedFaders.isEmpty || songExtras.contains(where: { $0.style == .fader }) {
@@ -477,16 +467,15 @@ struct ShowModeView: View {
         }
     }
 
-    private let gridColumns = [GridItem(.adaptive(minimum: 120, maximum: 220), spacing: 12)]
+    private let gridColumns = [GridItem(.adaptive(minimum: 120, maximum: 220), spacing: CBSpace.m)]
 
     private var buttonGrid: some View {
-        LazyVGrid(columns: gridColumns, alignment: .leading, spacing: 12) {
+        LazyVGrid(columns: gridColumns, alignment: .leading, spacing: CBSpace.m) {
             ForEach(sharedButtons) { b in
                 ShowControlTile(title: b.title.isEmpty ? "Button" : b.title,
                                 symbol: b.symbol,
                                 isOn: b.isToggle == true && b.toggleState,
-                                isExtra: false,
-                                accent: accent) {
+                                isExtra: false) {
                     onSharedControl(b)
                 }
             }
@@ -494,8 +483,7 @@ struct ShowModeView: View {
                 ShowControlTile(title: extra.title,
                                 symbol: extra.style == .toggle ? "power" : "",
                                 isOn: extra.style == .toggle && (extraToggles[extra.id] ?? false),
-                                isExtra: true,
-                                accent: accent) {
+                                isExtra: true) {
                     pressExtra(extra)
                 }
             }
@@ -503,11 +491,10 @@ struct ShowModeView: View {
     }
 
     private var faderStack: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: CBSpace.m) {
             ForEach(sharedFaders) { b in
                 ShowFaderRow(title: b.title.isEmpty ? "Fader" : b.title,
                              isExtra: false,
-                             accent: accent,
                              value: Binding(
                                 get: { controlButtons.first(where: { $0.id == b.id })?.faderValue ?? 0 },
                                 set: { newValue in
@@ -522,7 +509,6 @@ struct ShowModeView: View {
             ForEach(songExtras.filter { $0.style == .fader }) { extra in
                 ShowFaderRow(title: extra.title,
                              isExtra: true,
-                             accent: accent,
                              value: Binding(
                                 get: { extraFaders[extra.id] ?? 0 },
                                 set: { newValue in
@@ -574,38 +560,36 @@ struct ShowModeView: View {
 
 // MARK: - Pieces
 
+/// A shared control or a song extra. Extras carry a "THIS SONG" tag and a highlight edge.
 private struct ShowControlTile: View {
     let title: String
     let symbol: String
     let isOn: Bool
     let isExtra: Bool
-    let accent: Color
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: CBSpace.xs) {
                 if !symbol.isEmpty {
                     Image(systemName: symbol)
-                        .font(.cbIcon(.large, .semibold))
+                        .font(.cbIcon(.large))
                 }
                 Text(title)
                     .font(.cb(.body, .semibold))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                 if isExtra {
-                    Text("this song")
-                        .font(.cb(.caption, .medium))
-                        .foregroundColor(.white.opacity(0.6))
+                    CBTag(text: "THIS SONG", color: isOn ? CBColor.surfaceRaised : CBColor.highlight)
                 }
             }
-            .foregroundColor(.white)
+            .foregroundStyle(CBColor.textPrimary)
             .frame(maxWidth: .infinity, minHeight: 72)
-            .padding(.vertical, 6)
+            .padding(.vertical, CBSpace.s)
             .background(RoundedRectangle(cornerRadius: CBRadius.card)
-                .fill(isOn ? accent.opacity(0.7) : (isExtra ? accent.opacity(0.16) : Color.white.opacity(0.08))))
+                .fill(isOn ? CBColor.highlight : CBColor.surface))
             .overlay(RoundedRectangle(cornerRadius: CBRadius.card)
-                .stroke(isExtra ? accent : Color.white.opacity(0.2), lineWidth: isExtra ? 2 : 1))
+                .stroke(isExtra ? CBColor.highlight : CBColor.stroke, lineWidth: isExtra ? CBSize.selection : CBSize.hairline))
             .contentShape(RoundedRectangle(cornerRadius: CBRadius.card))
         }
         .buttonStyle(IOSPressButtonStyle())
@@ -617,32 +601,27 @@ private struct ShowControlTile: View {
 private struct ShowFaderRow: View {
     let title: String
     let isExtra: Bool
-    let accent: Color
     @Binding var value: Double
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
+        VStack(alignment: .leading, spacing: CBSpace.xs) {
+            HStack(spacing: CBSpace.s) {
                 Text(title)
                     .font(.cb(.body, .semibold))
-                    .foregroundColor(.white.opacity(0.85))
+                    .foregroundStyle(CBColor.textPrimary)
                 if isExtra {
-                    Text("this song")
-                        .font(.cb(.caption, .medium))
-                        .foregroundColor(accent)
+                    CBTag(text: "THIS SONG")
                 }
                 Spacer()
                 Text("\(Int((value * 127).rounded()))")
-                    .font(.cbMono(.small, .medium))
-                    .foregroundColor(.white.opacity(0.5))
+                    .font(.cbMono(.small))
+                    .foregroundStyle(CBColor.textTertiary)
             }
             Slider(value: $value, in: 0...1)
-                .tint(accent)
+                .tint(CBColor.highlight)
                 .accessibilityLabel(title)
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(isExtra ? accent.opacity(0.12) : Color.white.opacity(0.05)))
-        .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(isExtra ? accent : Color.clear, lineWidth: 1.5))
+        .cbCard(outline: isExtra ? CBColor.highlight : nil, padding: CBSpace.m)
     }
 }
 
@@ -655,25 +634,15 @@ struct ShowStatusPill: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { _ in
             let status = currentStatus
-            HStack(spacing: 8) {
-                Circle().fill(status.color).frame(width: 10, height: 10)
-                Text(status.text)
-                    .font(.cb(.small, .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 36)
-            .background(Capsule().fill(status.color.opacity(0.18)))
-            .overlay(Capsule().stroke(status.color.opacity(0.6), lineWidth: 1))
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Connection: \(status.text)")
+            CBPill(text: status.text, color: status.color)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Connection: \(status.text)")
         }
     }
 
     private var currentStatus: (text: String, color: Color) {
         var parts: [String] = []
-        var color: Color = .green
+        var color: Color = CBColor.success
         switch coordinator.activeConnection {
         case .usb:
             parts.append(wifiClient.isStandbyReady ? "USB, Wi-Fi backup ready" : "USB")
@@ -681,7 +650,7 @@ struct ShowStatusPill: View {
             parts.append("Wi-Fi")
         case .none:
             parts.append("Not connected")
-            color = .red
+            color = CBColor.danger
         }
         switch rigs.health {
         case .none:
@@ -690,15 +659,15 @@ struct ShowStatusPill: View {
             parts.append("Backup Mac OK")
         case .offline:
             parts.append("Backup Mac offline")
-            if color != .red { color = .orange }
+            if color != CBColor.danger { color = CBColor.warning }
         case .sameMac:
             parts.append("Backup is the same Mac")
-            if color != .red { color = .orange }
+            if color != CBColor.danger { color = CBColor.warning }
         }
         if coordinator.activeConnection == .none && rigs.health == .ok {
             // The show carries on through the backup
             parts = ["Main offline", "Backup Mac playing"]
-            color = .orange
+            color = CBColor.warning
         }
         return (parts.joined(separator: " · "), color)
     }

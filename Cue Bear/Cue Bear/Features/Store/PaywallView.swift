@@ -47,7 +47,7 @@ struct PaywallView: View {
                         // App Icon/Logo
                         Image(systemName: "music.note.list")
                             .font(.cbIcon(.hero, .regular))
-                            .foregroundColor(.blue)
+                            .foregroundStyle(CBColor.highlight)
 
                         // Title
                         VStack(spacing: 12) {
@@ -56,7 +56,7 @@ struct PaywallView: View {
 
                             Text("Full-featured MIDI controller for your set list")
                                 .font(.cb(.body))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(CBColor.textSecondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
                         }
@@ -74,11 +74,11 @@ struct PaywallView: View {
                         VStack(spacing: 8) {
                             Text(priceText)
                                 .font(.cb(.display, .bold))
-                                .foregroundColor(.primary)
+                                .foregroundStyle(CBColor.textPrimary)
 
                             Text("One-time purchase")
                                 .font(.cb(.body))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(CBColor.textSecondary)
                         }
                         .padding(.top, 20)
 
@@ -117,7 +117,7 @@ struct PaywallView: View {
                                 }
                                 Text("Restore Purchases")
                                     .font(.cb(.body))
-                                    .foregroundColor(.blue)
+                                    .foregroundStyle(CBColor.highlight)
                             }
                         }
                         .disabled(isPurchasing || isRestoring)
@@ -126,7 +126,7 @@ struct PaywallView: View {
                         if let info = infoMessage {
                             Text(info)
                                 .font(.cb(.small))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(CBColor.textSecondary)
                                 .padding(.horizontal, 40)
                                 .multilineTextAlignment(.center)
                         }
@@ -214,12 +214,12 @@ struct FeatureRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.cbIcon(.title, .regular))
-                .foregroundColor(.blue)
+                .foregroundStyle(CBColor.highlight)
                 .frame(width: 32)
 
             Text(text)
                 .font(.cb(.body))
-                .foregroundColor(.primary)
+                .foregroundStyle(CBColor.textPrimary)
 
             Spacer()
         }

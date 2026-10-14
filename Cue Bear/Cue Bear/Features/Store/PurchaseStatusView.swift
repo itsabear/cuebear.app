@@ -22,7 +22,7 @@ struct PurchaseStatusView: View {
                 Section {
                     HStack {
                         Text("License Type")
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(CBColor.textSecondary)
                         Spacer()
                         Text(licenseTypeText)
                             .fontWeight(.semibold)
@@ -38,7 +38,7 @@ struct PurchaseStatusView: View {
                                     .fontWeight(.semibold)
                                 Text("Thank you for being an early supporter!")
                                     .font(.cb(.caption))
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(CBColor.textSecondary)
                             }
                         }
                     }
@@ -46,13 +46,13 @@ struct PurchaseStatusView: View {
                     if purchaseManager.hasActiveSubscription {
                         HStack {
                             Image(systemName: "arrow.clockwise.circle.fill")
-                                .foregroundColor(.blue)
+                                .foregroundStyle(CBColor.highlight)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Active Subscription")
                                     .fontWeight(.semibold)
                                 Text("Subscription active")
                                     .font(.cb(.caption))
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(CBColor.textSecondary)
                             }
                         }
                     }
@@ -91,7 +91,7 @@ struct PurchaseStatusView: View {
 
                         Text("If you purchased Cue Bear for $4.99, you have lifetime access to all features. When we introduce subscriptions in the future, you'll continue to have full access forever as a thank you for being an early supporter.")
                             .font(.cb(.caption))
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(CBColor.textSecondary)
                     }
                     .padding(.vertical, 4)
                 } header: {
@@ -103,10 +103,10 @@ struct PurchaseStatusView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Transaction ID")
                                 .font(.cb(.caption))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(CBColor.textSecondary)
                             Text(String(describing: transactionID))
                                 .font(.cbMono(.caption, .regular))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(CBColor.textSecondary)
                         }
                     } header: {
                         Text("Debug Info")

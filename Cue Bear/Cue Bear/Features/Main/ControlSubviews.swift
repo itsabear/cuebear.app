@@ -80,7 +80,7 @@ struct CBPerformanceList: View {
 
                             Text("You still have no cues in your cue list")
                                 .font(.cb(.large))
-                                .foregroundColor(.gray)
+                                .foregroundStyle(CBColor.textTertiary)
 
                             Text("Cues are MIDI buttons arranged like a scrollable set list. Click \"Edit\" to add your first cues.")
                                 .font(.cb(.body))
@@ -731,13 +731,13 @@ struct CBSetlistDragPreview: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.name)
                     .font(themeFont?(18, .bold) ?? .body.bold())
-                    .foregroundColor(.primary)
+                    .foregroundStyle(CBColor.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 if let sub = song.subtitle, !sub.isEmpty {
                     Text(sub)
                         .font(.cb(.caption))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(CBColor.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 } else {
@@ -747,7 +747,7 @@ struct CBSetlistDragPreview: View {
             Spacer()
             // Show drag handle on the right during drag
             Image(systemName: "line.3.horizontal")
-                .foregroundColor(.secondary)
+                .foregroundStyle(CBColor.textSecondary)
                 .font(.cbIcon(.large, .regular))
         }
         .padding(.vertical, 10)
@@ -863,7 +863,7 @@ struct CBSetlistColumn: View {
                 // Search TextField
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
+                        .foregroundStyle(CBColor.textTertiary)
                         .font(.cbIcon(.body, .regular))
 
                     TextField("Search cues...", text: $searchText)
@@ -876,7 +876,7 @@ struct CBSetlistColumn: View {
                             searchText = ""
                         }) {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
+                                .foregroundStyle(CBColor.textTertiary)
                                 .font(.cbIcon(.body, .regular))
                         }
                         .buttonStyle(.plain)
@@ -1078,7 +1078,7 @@ struct CBLibraryColumn: View {
                 // Search TextField
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
+                        .foregroundStyle(CBColor.textTertiary)
                         .font(.cbIcon(.body, .regular))
 
                     TextField("Search songs...", text: $searchText)
@@ -1091,7 +1091,7 @@ struct CBLibraryColumn: View {
                             searchText = ""
                         }) {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
+                                .foregroundStyle(CBColor.textTertiary)
                                 .font(.cbIcon(.body, .regular))
                         }
                         .buttonStyle(.plain)
@@ -1276,9 +1276,9 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
         HStack(spacing: 12) {
             leading()
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.cb(.body, .bold)).foregroundColor(.primary)
+                Text(title).font(.cb(.body, .bold)).foregroundStyle(CBColor.textPrimary)
                 if let sub = subtitle, !sub.isEmpty {
-                    Text(sub).font(.cb(.caption)).foregroundColor(.secondary)
+                    Text(sub).font(.cb(.caption)).foregroundStyle(CBColor.textSecondary)
                 } else {
                     Text(" ").font(.cb(.caption)).foregroundColor(.clear)
                 }
@@ -1345,457 +1345,6 @@ struct CBBatchToolbar: View {
     }
 }
 
-// MARK: - Bridge Device Card
-private struct BridgeDeviceCard: View {
-    let computerName: String
-    let isConnected: Bool
-    let isConnecting: Bool
-    let isClickable: Bool
-    let connectionType: ConnectionType
-    let onTap: (() -> Void)?
-    
-    enum ConnectionType {
-        case usb, wifi
-        
-        var color: Color {
-            let themeID = UserDefaults.standard.string(forKey: "selectedThemeID") ?? "default"
-            let theme = AppTheme.allThemes.first { $0.id == themeID } ?? AppTheme.defaultTheme
-            return theme.accentColor(for: .dark)
-        }
-        
-        var connectedColor: Color {
-            return .green
-        }
-        
-        var icon: String {
-            return "bearpaw_32x32"
-        }
-    }
-    
-    init(computerName: String, isConnected: Bool, isConnecting: Bool = false, connectionType: ConnectionType, isClickable: Bool = false, onTap: (() -> Void)? = nil) {
-        self.computerName = computerName
-        self.isConnected = isConnected
-        self.isConnecting = isConnecting
-        self.connectionType = connectionType
-        self.isClickable = isClickable
-        self.onTap = onTap
-    }
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Bear paw icon with loading animation
-            if isConnecting {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: connectionType.color))
-                    .scaleEffect(0.8)
-                    .frame(width: 20, height: 20)
-            } else {
-                Image(connectionType.icon)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .foregroundColor(isConnected ? connectionType.connectedColor : connectionType.color)
-                    .frame(width: 20, height: 20)
-            }
-            
-            // Computer name
-            VStack(alignment: .leading, spacing: 2) {
-                Text(computerName)
-                    .font(.cb(.body, .medium))
-                    .foregroundColor(isConnected ? connectionType.connectedColor : connectionType.color)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                
-                Text(connectionType == .usb ? "USB Bridge" : "WiFi Bridge")
-                    .font(.cb(.caption, .regular))
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            // Connection status indicator
-            Circle()
-                .fill(isConnected ? connectionType.connectedColor : .gray.opacity(0.3))
-                .frame(width: 8, height: 8)
-                .scaleEffect(isConnected ? 1.0 : 0.8)
-                .animation(.easeInOut(duration: 0.2), value: isConnected)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: CBRadius.card)
-                .fill(isConnected ? 
-                    LinearGradient(
-                        colors: [connectionType.connectedColor.opacity(0.08), connectionType.connectedColor.opacity(0.04)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ) : 
-                    LinearGradient(
-                        colors: [connectionType.color.opacity(0.08), connectionType.color.opacity(0.04)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CBRadius.card)
-                .stroke(
-                    isConnected ? 
-                        LinearGradient(
-                            colors: [connectionType.connectedColor.opacity(0.3), connectionType.connectedColor.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ) : 
-                        LinearGradient(
-                            colors: [connectionType.color.opacity(0.3), connectionType.color.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                    lineWidth: 0.5
-                )
-        )
-        .shadow(
-            color: isConnected ? connectionType.connectedColor.opacity(0.1) : connectionType.color.opacity(0.1),
-            radius: 2,
-            x: 0,
-            y: 1
-        )
-        .scaleEffect(isClickable ? 1.0 : 1.0)
-        .onTapGesture {
-            if isClickable, let onTap = onTap {
-                withAnimation(.easeInOut(duration: 0.1)) {
-                    onTap()
-                }
-            }
-        }
-    }
-}
-
-// The following sheets are moved out for clarity
-struct CBConnectionsSheet: View {
-    @ObservedObject var usbServer: ConnectionManager
-    @ObservedObject var wifiClient: BridgeOutput
-    @ObservedObject var connectionCoordinator: ConnectionCoordinator
-
-    var onDisconnectWifi: () -> Void
-    var onConnectWifiItem: (BridgeOutput.Item) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
-    @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
-
-    // Loading state - show spinner while checking for bridges
-    @State private var isCheckingConnections = true
-
-    private var selectedTheme: AppTheme {
-        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
-    }
-
-    private var noBridgeDetected: Bool {
-        !usbServer.usbBridgeAvailable && wifiClient.discovered.isEmpty
-    }
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Custom header — bypasses iOS 18+/26 toolbar glass capsule chrome
-                HStack {
-                    Spacer()
-                    CBSheetButton(title: "Done", bold: true) { dismiss() }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-
-                Group {
-                    if isCheckingConnections {
-                        // Show loading state while checking for bridges
-                        loadingView
-                    } else if noBridgeDetected {
-                        // Show special "Download Bridge" view when no bridges detected
-                        downloadBridgeView
-                    } else {
-                        // Show normal connections form
-                        connectionsForm
-                    }
-                }
-            }
-            .toolbar(.hidden, for: .navigationBar)
-        }
-        .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
-        .onAppear {
-            // If we already have connection info, skip loading
-            if usbServer.usbBridgeAvailable || !wifiClient.discovered.isEmpty || connectionCoordinator.activeConnection != .none {
-                isCheckingConnections = false
-            } else {
-                // Give the system time to discover bridges
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isCheckingConnections = false
-                    }
-                }
-            }
-        }
-        .onChange(of: usbServer.usbBridgeAvailable) { _, available in
-            // If bridge becomes available, stop loading immediately
-            if available && isCheckingConnections {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    isCheckingConnections = false
-                }
-            }
-        }
-        .onChange(of: wifiClient.discovered.count) { _, count in
-            // If WiFi bridges found, stop loading immediately
-            if count > 0 && isCheckingConnections {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    isCheckingConnections = false
-                }
-            }
-        }
-    }
-
-    private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(selectedTheme.accentColor(for: colorScheme))
-
-            Text("Searching for bridges...")
-                .font(.cb(.body, .semibold))
-                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
-
-            Text("Looking for USB and Wi-Fi connections")
-                .font(.cb(.small))
-                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(selectedTheme.backgroundColor(for: colorScheme))
-        .navigationTitle("Connections")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var connectionsForm: some View {
-        Form {
-            Section(header: Text("USB").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
-                    KeyValueRow("Status", connectionCoordinator.activeConnection == .usb ? "Connected" : "Waiting")
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    if connectionCoordinator.activeConnection == .usb {
-                        Button("Disconnect USB", role: .destructive) {
-                            connectionCoordinator.disconnectUSB()
-                        }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    }
-
-
-                    // Bridge device card for USB connection - show ONLY when Bridge app is running
-                    if usbServer.usbBridgeAvailable {
-                        BridgeDeviceCard(
-                            computerName: usbServer.connectedComputerName ?? "Bear Bridge",
-                            isConnected: connectionCoordinator.activeConnection == .usb,
-                            isConnecting: usbServer.isConnecting,
-                            connectionType: .usb,
-                            isClickable: connectionCoordinator.activeConnection != .usb, // Clickable when not connected
-                            onTap: {
-                                if connectionCoordinator.activeConnection != .usb {
-                                    // Force USB connection attempt
-                                    connectionCoordinator.forceUSBReconnection()
-                                }
-                            }
-                        )
-                        .transition(.scale.combined(with: .opacity))
-                        .animation(.easeInOut(duration: 0.2), value: usbServer.usbBridgeAvailable)
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    } else {
-                        Text("Bridge app not running")
-                            .foregroundColor(.secondary)
-                            .font(.cb(.caption))
-                            .transition(.opacity)
-                            .animation(.easeInOut(duration: 0.2), value: usbServer.usbBridgeAvailable)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    }
-                }
-
-                Section(header: Text("Wi-Fi").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
-                    KeyValueRow("Status", connectionCoordinator.activeConnection == .wifi ? "Connected" : "Not Connected")
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    if connectionCoordinator.activeConnection == .wifi {
-                        Button("Disconnect Wi-Fi", role: .destructive) { onDisconnectWifi() }
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    }
-
-
-                    if wifiClient.discovered.isEmpty {
-                        Text("Searching on local network…").foregroundColor(.secondary)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                    } else {
-                        ForEach(wifiClient.discovered, id: \.id) { item in
-                            BridgeDeviceCard(
-                                computerName: item.name,
-                                // v1.0.4: Fix WiFi chip showing disconnected when USB unplugs
-                                // Use connectionCoordinator.activeConnection as source of truth instead of item.id comparison
-                                // because discovered array rebuilds with new IDs after USB disconnect
-                                isConnected: connectionCoordinator.activeConnection == .wifi && wifiClient.current?.name == item.name,
-                                isConnecting: wifiClient.isConnecting && wifiClient.current?.name == item.name,
-                                connectionType: .wifi,
-                                isClickable: true,
-                                onTap: {
-                                    debugPrint("🔌 DEBUG: Bridge tapped - \(item.name)")
-                                    connectionCoordinator.connectToWiFi(bridge: item)
-                                }
-                            )
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
-                        }
-                    }
-                }
-
-                // v1.3 (Cue Bear Next): two computers at once
-                BackupComputerSection(rigs: BackupRigManager.shared,
-                                      wifiClient: wifiClient,
-                                      rowBackground: selectedTheme.titleBarColor(for: colorScheme),
-                                      headerColor: selectedTheme.secondaryTextColor(for: colorScheme))
-            }
-            .scrollContentBackground(.hidden)
-            .background(selectedTheme.backgroundColor(for: colorScheme))
-            .tint(selectedTheme.accentColor(for: colorScheme))
-            .navigationTitle("Connections")
-            .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var downloadBridgeView: some View {
-        let accentColor = selectedTheme.accentColor(for: colorScheme)
-
-        return VStack(spacing: 0) {
-            Spacer()
-
-            VStack(spacing: 20) {
-                // Icon - matching onboarding style (72pt, light weight)
-                Image(systemName: "laptopcomputer.and.arrow.down")
-                    .font(.cbIcon(.hero, .light))
-                    .foregroundColor(accentColor)
-                    .frame(height: 72)
-
-                // Title - matching onboarding style (28pt, bold, rounded)
-                Text("Ready to Connect?")
-                    .font(.cb(.heading, .bold))
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
-                    .padding(.horizontal, 40)
-
-                // Description - matching onboarding style (17pt, secondary)
-                Text("Download Cue Bear Bridge for your Mac to start sending MIDI to your DAW.")
-                    .font(.cb(.body, .regular))
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 50)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                // QR Code
-                VStack(spacing: 12) {
-                    if let qrImage = generateQRCode(from: "https://cuebear.app/bridge") {
-                        Image(uiImage: qrImage)
-                            .interpolation(.none)
-                            .resizable()
-                            .frame(width: 160, height: 160)
-                            .padding(12)
-                            .background(selectedTheme.titleBarColor(for: colorScheme))
-                            .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
-                    } else {
-                        RoundedRectangle(cornerRadius: CBRadius.card)
-                            .fill(selectedTheme.titleBarColor(for: colorScheme))
-                            .frame(width: 160, height: 160)
-                            .overlay(
-                                Image(systemName: "qrcode")
-                                    .font(.cbIcon(.hero, .regular))
-                                    .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.5))
-                            )
-                    }
-
-                    Text("Scan to download")
-                        .font(.cb(.small))
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 8)
-            }
-
-            Spacer()
-
-            // Bottom section with button and footer
-            VStack(spacing: 20) {
-                // Download button - matching onboarding "Get Started" style
-                Button(action: {
-                    if let url = URL(string: "https://cuebear.app/bridge") {
-                        UIApplication.shared.open(url)
-                    }
-                }) {
-                    HStack(spacing: 8) {
-                        Text("cuebear.app/bridge")
-                            .font(.cb(.body, .semibold))
-                        Image(systemName: "arrow.up.forward")
-                            .font(.cbIcon(.small, .semibold))
-                    }
-                    .foregroundColor(selectedTheme.accentContrastColor(for: colorScheme))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(accentColor)
-                    .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
-                }
-                .padding(.horizontal, 40)
-
-                // Footer text
-                Text("Once installed, connections will appear here automatically")
-                    .font(.cb(.small))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            .padding(.bottom, 50)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(selectedTheme.backgroundColor(for: colorScheme))
-        .navigationTitle("Connections")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-
-    private func KeyValueRow(_ key: String, _ value: String) -> some View {
-        HStack {
-            Text(key)
-            Spacer()
-            Text(value).foregroundColor(.secondary)
-        }
-    }
-
-    private func gitCommitHash() -> String {
-        // Try to read git commit hash from build-time generated file
-        if let path = Bundle.main.path(forResource: "GitCommit", ofType: "txt"),
-           let hash = try? String(contentsOfFile: path, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines) {
-            return String(hash.prefix(7))
-        }
-        // Fallback to build number if git hash not available
-        return Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-    }
-
-    private func generateQRCode(from string: String) -> UIImage? {
-        let data = Data(string.utf8)
-
-        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
-        filter.setValue(data, forKey: "inputMessage")
-        filter.setValue("H", forKey: "inputCorrectionLevel") // High error correction
-
-        guard let ciImage = filter.outputImage else { return nil }
-
-        // Scale up the QR code for better quality
-        let transform = CGAffineTransform(scaleX: 10, y: 10)
-        let scaledImage = ciImage.transformed(by: transform)
-
-        let context = CIContext()
-        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
-
-        return UIImage(cgImage: cgImage)
-    }
-}
-
-
 struct CBProjectsSheet: View {
     @Binding var projectName: String
     let projects: [String]
@@ -1832,13 +1381,13 @@ struct CBProjectsSheet: View {
                         }
                     }
                 }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
 
                 Section(header: Text("Saved Projects").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
                     if projects.isEmpty {
                         Text("No saved projects yet.")
                             .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                     } else {
                         ForEach(projects, id: \.self) { name in
                             HStack {
@@ -1855,7 +1404,7 @@ struct CBProjectsSheet: View {
                                 }
                                 .buttonStyle(.plain)
                             }
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
                         }
                     }
                 }
@@ -1952,12 +1501,12 @@ struct CBAddEditCueSheet: View {
                         TextField("Name", text: $name, prompt: Text(defaultName).foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme)))
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(false)
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
                     TextField("Subtitle (Tempo/Key/Notes)", text: $subtitle, prompt: Text("Subtitle (Tempo/Key/Notes)").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme)))
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(false)
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
                     // Color Picker - Inline Disclosure
@@ -1984,20 +1533,20 @@ struct CBAddEditCueSheet: View {
                             }
                         }
                     )
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 }
                 Section(header: Text("MIDI").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
                     if midiFiltersEnabled && !midiFilter.isEmpty {
                         Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
                             .font(.cb(.caption))
-                            .foregroundColor(.secondary)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .foregroundStyle(CBColor.textSecondary)
+                            .cbRow()
                     }
                     Toggle(isOn: $midiEnabled) {
                         Text("Enable MIDI")
                     }
                     .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
 
                     if midiEnabled {
                         Toggle(isOn: Binding(
@@ -2007,7 +1556,7 @@ struct CBAddEditCueSheet: View {
                             Text("Assign MIDI automatically")
                         }
                         .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                     }
 
                     if midiEnabled {
@@ -2015,12 +1564,12 @@ struct CBAddEditCueSheet: View {
                             Text("Control Change").tag(MIDIKind.cc)
                             Text("Note").tag(MIDIKind.note)
                         }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                         .tint(selectedTheme.secondaryTextColor(for: colorScheme))
                         .foregroundStyle(selectedTheme.primaryTextColor(for: colorScheme))
 
                         ChannelPicker(title: "Channel", channel: $channel, disabled: false)
-                            .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                            .cbRow()
 
                         MIDINumberPicker(
                             kind: kind,
@@ -2032,17 +1581,17 @@ struct CBAddEditCueSheet: View {
                             editingSong: editingSong,
                             midiFilter: midiFilter
                         )
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
 
                         if kind == .note {
                             VelocityPicker(velocity: $velocity, disabled: false)
-                                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                                .cbRow()
                         }
                     }
                 }
                 if let err = error {
                     Text(err).foregroundColor(selectedTheme.errorColor(for: colorScheme))
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                 }
             }
             .scrollContentBackground(.hidden)
@@ -2519,20 +2068,20 @@ struct CBMIDIPickerSheet: View {
                     Text("Control Change").tag(MIDIKind.cc)
                     Text("Note").tag(MIDIKind.note)
                 }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
                 Stepper(value: $number, in: 0...127) {
                     Text(kind == .cc ? "CC Number: \(number)" : "Note Number: \(number)")
                 }
-                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                .cbRow()
                 Stepper(value: $channel, in: 1...16) { Text("Channel: \(channel)") }
-                    .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                    .cbRow()
                 if kind == .note {
                     Stepper(value: $velocity, in: 1...127) { Text("Velocity: \(velocity)") }
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                 }
                 if let owner = conflictOwner() {
                     Text("⚠️ MIDI taken by: \(owner)").foregroundColor(selectedTheme.warningColor(for: colorScheme))
-                        .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+                        .cbRow()
                 }
             }
             .scrollContentBackground(.hidden)
@@ -3161,7 +2710,7 @@ struct SongLibraryPopover: View {
                 } label: {
                     Label("Add", systemImage: "plus.circle")
                 }
-                .tint(.green)
+                .tint(CBColor.success)
             }
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -3586,7 +3135,7 @@ struct CueListChooserPopover: View {
                             if cueList.id == activeCueListID {
                                 Image(systemName: "checkmark")
                                     .font(.cbIcon(.small, .semibold))
-                                    .foregroundColor(.green)
+                                    .foregroundStyle(CBColor.success)
                             }
                         }
 

@@ -52,7 +52,7 @@ struct PairingOverlay: View {
                 .multilineTextAlignment(.center)
             Text("Your Mac is asking whether to allow this iPad. Click Allow on the Mac only if it shows this code:")
                 .font(.cb(.body))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CBColor.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Text(SecureLink.formattedCode(code))
@@ -62,7 +62,7 @@ struct PairingOverlay: View {
                 .accessibilityLabel("Pairing code \(code.map { String($0) }.joined(separator: " "))")
             Text("You only need to do this once for each Mac.")
                 .font(.cb(.caption))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CBColor.textSecondary)
             Button("Cancel", role: .cancel, action: onCancel)
 
         case .declined:
@@ -86,12 +86,12 @@ struct PairingOverlay: View {
     private func resultView(symbol: String, title: String, message: String) -> some View {
         Image(systemName: symbol)
             .font(.cbIcon(.display, .regular))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(CBColor.textSecondary)
         Text(title)
             .font(.cb(.large, .semibold))
         Text(message)
             .font(.cb(.body))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(CBColor.textSecondary)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
         Button("OK", action: onDismiss)

@@ -41,7 +41,7 @@ struct ThemeAdminPanel: View {
                             .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                         Text("🔒 Debug Mode Only")
                             .font(.cb(.caption))
-                            .foregroundColor(.orange)
+                            .foregroundStyle(CBColor.warning)
                     }
                     .padding(.top)
 
@@ -230,7 +230,7 @@ struct ColorRow: View {
                     .foregroundColor(isDerived ? .secondary : .primary)
                 Text("#\(hex)")
                     .font(.cbMono(.caption))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(CBColor.textSecondary)
             }
 
             Spacer()
@@ -261,7 +261,7 @@ struct ColorRow: View {
 
                 Text("New Hex: \(selectedColor.toHex() ?? hex)")
                     .font(.cbMono(.caption))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(CBColor.textSecondary)
 
                 HStack {
                     Button("Copy New Hex") {
@@ -280,7 +280,7 @@ struct ColorRow: View {
 
                 Text("Note: Changes are not saved. Copy the hex code and update AppTheme.swift manually.")
                     .font(.cb(.caption))
-                    .foregroundColor(.orange)
+                    .foregroundStyle(CBColor.warning)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -330,7 +330,7 @@ struct ContrastCheckerSection: View {
 
             Text("Standards: AAA ≥7.0 | AA ≥4.5 | Large AA ≥3.0")
                 .font(.cb(.caption))
-                .foregroundColor(.secondary)
+                .foregroundStyle(CBColor.textSecondary)
                 .padding(.horizontal)
         }
     }
@@ -388,7 +388,7 @@ struct ContrastRow: View {
             Spacer()
             Text(String(format: "%.2f:1", ratio))
                 .font(.cbMono(.small))
-                .foregroundColor(.secondary)
+                .foregroundStyle(CBColor.textSecondary)
             Text(rating.0)
                 .font(.cb(.caption, .bold))
                 .foregroundColor(.white)

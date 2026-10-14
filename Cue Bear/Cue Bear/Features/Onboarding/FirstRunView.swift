@@ -14,7 +14,6 @@ struct FirstRunView: View {
     @ObservedObject var usbServer: ConnectionManager
     @ObservedObject var wifiClient: BridgeOutput
     @ObservedObject var coordinator: ConnectionCoordinator
-    let accent: Color
     var onSendTest: () -> Void
     var onConnectWiFi: (BridgeOutput.Item) -> Void
     var onTryShowMode: () -> Void
@@ -32,68 +31,56 @@ struct FirstRunView: View {
     private var isConnected: Bool { coordinator.activeConnection != .none }
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            CBSheetHeader(title: "Getting started", trailingTitle: "Done", trailingAction: onDone)
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: CBSpace.xl) {
                     header
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: CBSpace.m) {
                         stepBridge
                         stepConnect
                         stepMIDI
                     }
                     dawGuide
                 }
-                .padding(24)
+                .padding(CBSpace.xl)
             }
-            .navigationTitle("Getting started")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDone).fontWeight(.semibold)
-                }
+            Button(action: onTryShowMode) {
+                Label("Try Show mode", systemImage: "play.rectangle.fill")
             }
-            .safeAreaInset(edge: .bottom) {
-                HStack(spacing: 12) {
-                    Button(action: onTryShowMode) {
-                        Label("Try Show mode", systemImage: "play.rectangle.fill")
-                            .font(.cb(.body, .semibold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(accent)
-                }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial)
-            }
+            .buttonStyle(CBButtonStyle(kind: .primary, fullWidth: true, height: CBSize.largeControl))
+            .padding(.horizontal, CBSpace.xl)
+            .padding(.vertical, CBSpace.m)
         }
+        .cbSheetChrome()
     }
 
     // MARK: - Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: CBSpace.s) {
             Text("Welcome to Cue Bear")
                 .font(.cb(.heading, .bold))
             Text("You're in a demo show already. Try it in Show mode, then connect your Mac. Each step below ticks itself when it works.")
                 .font(.cb(.body))
-                .foregroundColor(.secondary)
+                .foregroundStyle(CBColor.textSecondary)
         }
     }
 
     // MARK: - Steps
 
     private var stepBridge: some View {
-        ChecklistStep(number: 1, title: "Cue Bear Bridge running on your Mac", done: bridgeFound, accent: accent) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
+        ChecklistStep(number: 1, title: "Cue Bear Bridge running on your Mac", done: bridgeFound) {
+            HStack(alignment: .top, spacing: CBSpace.l) {
+                VStack(alignment: .leading, spacing: CBSpace.m) {
                     Text("Get the free Bridge app for your Mac at cuebear.app/bridge, then open it. It lives in the menu bar.")
-                        .foregroundColor(.secondary)
-                    Link("Open cuebear.app/bridge", destination: URL(string: Self.bridgeURL)!)
-                        .font(.cb(.body, .semibold))
+                        .foregroundStyle(CBColor.textSecondary)
+                    Link(destination: URL(string: Self.bridgeURL)!) {
+                        Label("Open cuebear.app/bridge", systemImage: "arrow.up.forward")
+                    }
+                    .buttonStyle(.cbSecondary)
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: CBSpace.s)
                 QRCodeView(text: Self.bridgeURL)
                     .frame(width: 96, height: 96)
                     .accessibilityLabel("QR code for cuebear.app/bridge")
@@ -102,21 +89,19 @@ struct FirstRunView: View {
     }
 
     private var stepConnect: some View {
-        ChecklistStep(number: 2, title: connectTitle, done: isConnected, accent: accent) {
-            VStack(alignment: .leading, spacing: 8) {
+        ChecklistStep(number: 2, title: connectTitle, done: isConnected) {
+            VStack(alignment: .leading, spacing: CBSpace.m) {
                 if isConnected {
                     Text(coordinator.activeConnection == .usb ? "Connected by USB cable." : "Connected over Wi-Fi.")
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(CBColor.textSecondary)
                 } else {
                     Text("Plug in the USB cable, or pick your Mac below to use Wi-Fi. The first time, the Mac shows a 6-digit code: check it matches the iPad and click Allow.")
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(CBColor.textSecondary)
                     ForEach(wifiClient.discovered) { item in
                         Button(action: { onConnectWiFi(item) }) {
                             Label("Connect to \(item.name)", systemImage: "wifi")
-                                .font(.cb(.body, .semibold))
                         }
-                        .buttonStyle(.bordered)
-                        .tint(accent)
+                        .buttonStyle(.cbSecondary)
                     }
                 }
             }
@@ -134,32 +119,29 @@ struct FirstRunView: View {
     }
 
     private var stepMIDI: some View {
-        ChecklistStep(number: 3, title: "MIDI reaching your DAW", done: midiConfirmed, accent: accent) {
-            VStack(alignment: .leading, spacing: 10) {
+        ChecklistStep(number: 3, title: "MIDI reaching your DAW", done: midiConfirmed) {
+            VStack(alignment: .leading, spacing: CBSpace.m) {
                 Text("In your DAW, turn on the MIDI input called \"Bear Bridge\". Then send a test note (middle C) and watch for it.")
-                    .foregroundColor(.secondary)
-                HStack(spacing: 12) {
+                    .foregroundStyle(CBColor.textSecondary)
+                HStack(spacing: CBSpace.m) {
                     Button(action: {
                         onSendTest()
                         testSent = true
                     }) {
                         Label("Send test note", systemImage: "music.note")
-                            .font(.cb(.body, .semibold))
                     }
-                    .buttonStyle(.bordered)
-                    .tint(accent)
+                    .buttonStyle(.cbSecondary)
                     .disabled(!isConnected)
 
                     if testSent && !midiConfirmed {
                         Button("I saw it") { midiConfirmed = true }
-                            .buttonStyle(.borderedProminent)
-                            .tint(accent)
+                            .buttonStyle(.cbPrimary)
                     }
                 }
                 if !isConnected {
                     Text("Connect first (step 2).")
-                        .font(.cb(.caption))
-                        .foregroundColor(.secondary)
+                        .font(.cb(.small))
+                        .foregroundStyle(CBColor.textTertiary)
                 }
             }
         }
@@ -202,31 +184,25 @@ struct FirstRunView: View {
     ]
 
     private var dawGuide: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: CBSpace.m) {
             Text("Which DAW do you use?")
-                .font(.cb(.large, .semibold))
+                .font(.cb(.title, .bold))
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: CBSpace.s) {
                     ForEach(Self.guides) { guide in
-                        Button(action: { chosenDAW = guide.id }) {
-                            Text(guide.id)
-                                .font(.cb(.body, .semibold))
-                                .padding(.horizontal, 14)
-                                .frame(height: 36)
-                                .background(Capsule().fill(chosenDAW == guide.id ? accent.opacity(0.22) : Color.secondary.opacity(0.12)))
-                                .overlay(Capsule().stroke(chosenDAW == guide.id ? accent : Color.clear, lineWidth: 1.5))
+                        DAWChip(title: guide.id, isChosen: chosenDAW == guide.id) {
+                            chosenDAW = guide.id
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
             if let guide = Self.guides.first(where: { $0.id == chosenDAW }) {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: CBSpace.s) {
                     ForEach(Array(guide.steps.enumerated()), id: \.offset) { index, step in
-                        HStack(alignment: .top, spacing: 10) {
+                        HStack(alignment: .top, spacing: CBSpace.m) {
                             Text("\(index + 1).")
-                                .font(.cb(.body, .semibold))
-                                .foregroundColor(accent)
+                                .font(.cb(.body, .bold))
+                                .foregroundStyle(CBColor.highlight)
                                 .frame(width: 22, alignment: .trailing)
                             Text(step)
                                 .font(.cb(.body))
@@ -234,9 +210,8 @@ struct FirstRunView: View {
                         }
                     }
                 }
-                .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(Color.secondary.opacity(0.08)))
+                .cbCard()
             }
         }
     }
@@ -244,40 +219,62 @@ struct FirstRunView: View {
 
 // MARK: - Pieces
 
+/// A choice chip: white when chosen, like the primary button.
+private struct DAWChip: View {
+    let title: String
+    let isChosen: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.cb(.body, .semibold))
+                .foregroundStyle(isChosen ? CBColor.onPrimary : CBColor.textPrimary)
+                .padding(.horizontal, CBSpace.l)
+                .frame(height: CBSize.control)
+                .background(RoundedRectangle(cornerRadius: CBRadius.control)
+                    .fill(isChosen ? CBColor.primary : CBColor.surface))
+                .overlay(RoundedRectangle(cornerRadius: CBRadius.control)
+                    .stroke(isChosen ? Color.clear : CBColor.stroke, lineWidth: CBSize.hairline))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isChosen ? .isSelected : [])
+    }
+}
+
 private struct ChecklistStep<Content: View>: View {
     let number: Int
     let title: String
     let done: Bool
-    let accent: Color
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: CBSpace.m) {
             ZStack {
                 Circle()
-                    .fill(done ? Color.green.opacity(0.18) : Color.clear)
-                    .overlay(Circle().stroke(done ? Color.green : accent, style: StrokeStyle(lineWidth: 2, dash: done ? [] : [4, 3])))
+                    .fill(done ? CBColor.success.opacity(0.18) : Color.clear)
+                    .overlay(Circle().stroke(done ? CBColor.success : CBColor.strokeStrong,
+                                             style: StrokeStyle(lineWidth: CBSize.selection, dash: done ? [] : [4, 3])))
                 if done {
                     Image(systemName: "checkmark")
                         .font(.cbIcon(.small, .bold))
-                        .foregroundColor(.green)
+                        .foregroundStyle(CBColor.success)
                 } else {
                     Text("\(number)")
                         .font(.cb(.small, .bold))
-                        .foregroundColor(accent)
+                        .foregroundStyle(CBColor.textSecondary)
                 }
             }
             .frame(width: 30, height: 30)
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: CBSpace.s) {
                 Text(title)
-                    .font(.cb(.large, .semibold))
+                    .font(.cb(.large, .bold))
                 content()
                     .font(.cb(.body))
             }
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(Color.secondary.opacity(0.06)))
+        .cbCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Step \(number): \(title)\(done ? ", done" : "")")
     }
@@ -293,10 +290,10 @@ private struct QRCodeView: View {
                 .interpolation(.none)
                 .resizable()
                 .scaledToFit()
-                .padding(6)
+                .padding(CBSpace.s)
                 .background(RoundedRectangle(cornerRadius: CBRadius.small).fill(Color.white))
         } else {
-            RoundedRectangle(cornerRadius: CBRadius.small).stroke(Color.secondary)
+            RoundedRectangle(cornerRadius: CBRadius.small).stroke(CBColor.stroke)
         }
     }
 
