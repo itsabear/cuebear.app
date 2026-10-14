@@ -176,20 +176,10 @@ cp -R "$BUILT_APP" "$APP_BUNDLE"
 log_success "App copied to: $APP_BUNDLE"
 
 # ============================================================================
-# Step 2.5: Replace iproxy with universal version
+# Step 2.5: No iproxy helper since v1.2.4 (the USB tunnel runs inside the Bridge)
 # ============================================================================
 
-log_info "Replacing iproxy with universal binary..."
-
-UNIVERSAL_IPROXY="$PROJECT_DIR/CueBearBridgeInstaller/build-universal/CueBearBridge.app/Contents/MacOS/iproxy"
-if [ -f "$UNIVERSAL_IPROXY" ]; then
-    rm -f "$APP_BUNDLE/Contents/MacOS/iproxy"
-    cp "$UNIVERSAL_IPROXY" "$APP_BUNDLE/Contents/MacOS/iproxy"
-    chmod +x "$APP_BUNDLE/Contents/MacOS/iproxy"
-    log_success "Universal iproxy installed"
-else
-    log_warning "Universal iproxy not found at: $UNIVERSAL_IPROXY"
-fi
+rm -f "$APP_BUNDLE/Contents/MacOS/iproxy" "$APP_BUNDLE/Contents/Resources/Helpers/iproxy"
 
 # ============================================================================
 # Step 3: Bundle Required Dylibs

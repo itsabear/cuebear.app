@@ -1,9 +1,13 @@
-// Minimal IProxyManager - CPU optimized version with event-driven USB detection
+// USB tunnel to the iPad, with event-driven USB detection
 import Foundation
 import Network
 import Darwin // For socket functions
 import AppKit // For NSWorkspace notifications
 
+/// Runs the USB tunnel to the iPad (127.0.0.1:8077 on the Mac → port 9360 on the iPad).
+/// Since v1.2.4 the tunnel runs inside the Bridge (DirectUSBRelay below); the separate
+/// `iproxy` helper program is no longer used. The class keeps its old name so the rest of
+/// the app doesn't need to change.
 final class IProxyManager: ObservableObject {
     @Published var isRunning = false
     @Published var status: String = "Idle"
@@ -11,22 +15,11 @@ final class IProxyManager: ObservableObject {
     @Published var boundLocalPort: UInt16?
     @Published var persistedUDID: String? = nil
 
-    // Fix Issue #13: Use NSLock to protect process state
-    private let processLock = NSLock()
-    private var process: Process?
+    private let localPort: UInt16 = 8077
     private let devicePort: UInt16 = 9360
     private var usbMuxdMonitor: USBMuxdMonitor?
     private var sleepObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
-    private var consecutiveRestartFailures = 0
-    private let maxConsecutiveRestarts = 3
-
-    /// Experimental: run the USB tunnel inside the Bridge instead of the iproxy process.
-    static let directUSBDefaultsKey = "UseDirectUSB"
-    /// On by default (v1.2.1). Users can still switch back to the classic iproxy helper.
-    static var useDirectUSB: Bool {
-        UserDefaults.standard.object(forKey: directUSBDefaultsKey) as? Bool ?? true
-    }
     private var directRelay: DirectUSBRelay?
 
     init() {
@@ -41,192 +34,37 @@ final class IProxyManager: ObservableObject {
     }
 
     func start() throws {
-        Logger.shared.log("🔧 IProxyManager: Starting minimal iproxy...")
+        Logger.shared.log("🔧 IProxyManager: Starting USB tunnel...")
         stop()
-
         status = "Starting..."
 
-        if Self.useDirectUSB {
-            try startDirectRelay()
-            return
-        }
-
-        // Let bundled iproxy handle device detection - it will fail gracefully if no device is connected
-        // The bundled iproxy doesn't need external tools like idevice_id to detect iOS devices
-        // Removing this check fixes auto-start issues when idevice_id is not installed
-
-        guard let iproxyPath = findBundledIproxy(), FileManager.default.isExecutableFile(atPath: iproxyPath) else {
-            status = "Missing helper"
-            Logger.shared.log("🔧 IProxyManager: ❌ iproxy helper not found")
-            throw NSError(domain: "IProxyManager", code: 1002, userInfo: [NSLocalizedDescriptionKey: "iproxy helper not found"])
-        }
-
-        Logger.shared.log("🔧 IProxyManager: Found iproxy at: \(iproxyPath)")
-        
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: iproxyPath)
-        proc.arguments = ["8077", "\(devicePort)"]
-        
-        Logger.shared.log("🔧 IProxyManager: Starting iproxy with args: \(proc.arguments ?? [])")
-        
-        proc.terminationHandler = { [weak self] p in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.isRunning = false
-                let exitCode = p.terminationStatus
-                self.status = "Stopped (code: \(exitCode))"
-                Logger.shared.log("🔧 IProxyManager: iproxy stopped with code \(exitCode)")
-
-                // Auto-restart iproxy if it crashed unexpectedly (non-zero exit code)
-                // Don't restart if:
-                // - Manually stopped (exit code 15 = SIGTERM)
-                // - No device connected (exit code 9 = SIGKILL from immediate failure)
-                // - Already hit max consecutive restart attempts
-                if exitCode != 0 && exitCode != 15 && exitCode != 9 {
-                    if self.consecutiveRestartFailures >= self.maxConsecutiveRestarts {
-                        Logger.shared.log("🔧 IProxyManager: ❌ Max restart attempts (\(self.maxConsecutiveRestarts)) reached - stopping auto-restart")
-                        self.consecutiveRestartFailures = 0
-                        return
-                    }
-
-                    self.consecutiveRestartFailures += 1
-                    let delay: TimeInterval = Double(self.consecutiveRestartFailures) * 2.0 // Exponential backoff: 2s, 4s, 6s
-                    Logger.shared.log("🔧 IProxyManager: ⚠️ iproxy crashed unexpectedly - auto-restarting in \(Int(delay))s (attempt \(self.consecutiveRestartFailures)/\(self.maxConsecutiveRestarts))...")
-
-                    DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
-                        do {
-                            try self?.start()
-                            Logger.shared.log("🔧 IProxyManager: ✅ iproxy auto-restarted successfully after crash")
-                        } catch {
-                            Logger.shared.log("🔧 IProxyManager: ❌ Failed to auto-restart iproxy: \(error)")
-                        }
-                    }
-                } else if exitCode == 9 {
-                    Logger.shared.log("🔧 IProxyManager: ℹ️ iproxy stopped (exit code 9) - likely no device connected. Not auto-restarting.")
-                    self.consecutiveRestartFailures = 0
-                }
-            }
-        }
-        
-        do {
-            try proc.run()
-            // Fix Issue #13: Protect process access with lock
-            processLock.lock()
-            process = proc
-            processLock.unlock()
-            isRunning = true
-            status = "Running"
-            boundLocalPort = 8077
-            consecutiveRestartFailures = 0 // Reset failure counter on successful start
-            Logger.shared.log("🔧 IProxyManager: ✅ iproxy started successfully")
-
-            // Add simple port binding check (non-aggressive)
-            checkPortBinding()
-        } catch {
-            status = "Failed to start"
-            Logger.shared.log("🔧 IProxyManager: ❌ Failed to start iproxy: \(error)")
-            throw error
-        }
-    }
-    
-    private func checkPortBinding() {
-        // Simple, non-aggressive port check
-        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) {
-            let fd = socket(AF_INET, SOCK_STREAM, 0)
-            if fd >= 0 {
-                defer { close(fd) }
-                var addr = sockaddr_in()
-                addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-                addr.sin_family = sa_family_t(AF_INET)
-                addr.sin_port = CFSwapInt16HostToBig(8077)
-                addr.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
-                
-                let res = withUnsafePointer(to: &addr) {
-                    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                        connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
-                    }
-                }
-                
-                DispatchQueue.main.async {
-                    if res == 0 {
-                        Logger.shared.log("🔧 IProxyManager: ✅ Port 8077 is listening")
-                    } else {
-                        Logger.shared.log("🔧 IProxyManager: ⚠️ Port 8077 not listening (normal if no device)")
-                    }
-                }
-            }
-        }
-    }
-
-    /// Direct USB mode: same local port, no external process.
-    private func startDirectRelay() throws {
-        let relay = DirectUSBRelay(localPort: 8077, devicePort: devicePort)
+        let relay = DirectUSBRelay(localPort: localPort, devicePort: devicePort)
         relay.preferredUDID = persistedUDID
         do {
             try relay.start()
         } catch {
             status = "Failed to start"
-            Logger.shared.log("🔧 IProxyManager: ❌ Direct USB failed to start: \(error.localizedDescription)")
+            lastError = error.localizedDescription
+            Logger.shared.log("🔧 IProxyManager: ❌ USB tunnel failed to start: \(error.localizedDescription)")
             throw error
         }
         directRelay = relay
         isRunning = true
-        status = "Running (direct USB)"
-        boundLocalPort = 8077
-        consecutiveRestartFailures = 0
-        Logger.shared.log("🔧 IProxyManager: ✅ Direct USB relay running (no iproxy process)")
+        lastError = nil
+        status = "Running"
+        boundLocalPort = localPort
+        Logger.shared.log("🔧 IProxyManager: ✅ USB tunnel running")
     }
 
     func stop(manual: Bool = true) {
         directRelay?.stop()
         directRelay = nil
-
-        // Kill any existing iproxy processes to prevent port conflicts
-        let task = Process()
-        task.launchPath = "/usr/bin/pkill"
-        task.arguments = ["-f", "iproxy.*8077"]
-        task.launch()
-        task.waitUntilExit()
-
-        // Fix Issue #13: Protect process access with lock
-        processLock.lock()
-        process?.terminate()
-        process = nil
-        processLock.unlock()
         isRunning = false
-        status = manual ? "Stopped" : "Stopped"
+        status = "Stopped"
         boundLocalPort = nil
-        Logger.shared.log("🔧 IProxyManager: Stopped iproxy")
+        Logger.shared.log("🔧 IProxyManager: Stopped USB tunnel")
     }
 
-    private func findBundledIproxy() -> String? {
-        // Priority 1: Check for bundled iproxy in app bundle (self-contained distribution)
-        if let bundlePath = Bundle.main.executablePath {
-            let appBundlePath = (bundlePath as NSString).deletingLastPathComponent
-            let bundledIproxy = (appBundlePath as NSString).appendingPathComponent("iproxy")
-
-            if FileManager.default.fileExists(atPath: bundledIproxy) {
-                Logger.shared.log("🔧 IProxyManager: Using bundled iproxy at: \(bundledIproxy)")
-                return bundledIproxy
-            }
-        }
-
-        // Priority 2: Check system paths (fallback for development)
-        let systemIproxy = "/usr/local/bin/iproxy"
-        let homebrewIproxy = "/opt/homebrew/bin/iproxy"
-
-        if FileManager.default.fileExists(atPath: systemIproxy) {
-            Logger.shared.log("🔧 IProxyManager: Using system iproxy at: \(systemIproxy)")
-            return systemIproxy
-        } else if FileManager.default.fileExists(atPath: homebrewIproxy) {
-            Logger.shared.log("🔧 IProxyManager: Using Homebrew iproxy at: \(homebrewIproxy)")
-            return homebrewIproxy
-        } else {
-            Logger.shared.log("🔧 IProxyManager: ❌ No iproxy found (checked bundled, system, and Homebrew paths)")
-            return nil
-        }
-    }
-    
     // MARK: - USB Device Detection via libusbmuxd
 
     private func setupUSBMuxdMonitoring() {
@@ -238,34 +76,34 @@ final class IProxyManager: ObservableObject {
         monitor.onDeviceAttached = { [weak self] in
             Logger.shared.log("🔧 IProxyManager: 🎯 iOS device attached! Starting automatic connection...")
 
-            // CRITICAL FIX: Only start iproxy if it's not already running
-            // This prevents killing a working iproxy process when multiple attach events fire
+            // CRITICAL FIX: Only start USB tunnel if it's not already running
+            // This prevents killing a working USB tunnel process when multiple attach events fire
             guard let self = self, !self.isRunning else {
-                Logger.shared.log("🔧 IProxyManager: iproxy already running - skipping auto-start")
+                Logger.shared.log("🔧 IProxyManager: USB tunnel already running - skipping auto-start")
                 return
             }
 
-            // Automatically start iproxy when iOS device is detected
+            // Automatically start USB tunnel when iOS device is detected
             DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 // Double-check isRunning after the delay
                 guard let self = self, !self.isRunning else {
-                    Logger.shared.log("🔧 IProxyManager: iproxy already running after delay - skipping auto-start")
+                    Logger.shared.log("🔧 IProxyManager: USB tunnel already running after delay - skipping auto-start")
                     return
                 }
 
                 do {
                     try self.start()
                 } catch {
-                    Logger.shared.log("🔧 IProxyManager: ❌ Failed to auto-start iproxy: \(error)")
+                    Logger.shared.log("🔧 IProxyManager: ❌ Failed to auto-start USB tunnel: \(error)")
                 }
             }
         }
 
         // Handle device detached
         monitor.onDeviceDetached = { [weak self] in
-            Logger.shared.log("🔧 IProxyManager: 📱 iOS device detached! Stopping iproxy...")
+            Logger.shared.log("🔧 IProxyManager: 📱 iOS device detached! Stopping USB tunnel...")
 
-            // Stop iproxy when iOS device is disconnected
+            // Stop USB tunnel when iOS device is disconnected
             self?.stop(manual: false)
 
             // Notify connection manager about disconnect
@@ -323,34 +161,34 @@ final class IProxyManager: ObservableObject {
     }
 
     private func handleSystemSleep() {
-        Logger.shared.log("🔧 IProxyManager: 💤 System going to sleep - stopping iproxy")
+        Logger.shared.log("🔧 IProxyManager: 💤 System going to sleep - stopping USB tunnel")
         stop(manual: false)
     }
 
     private func handleSystemWake() {
-        Logger.shared.log("🔧 IProxyManager: ⏰ System woke up - restarting iproxy after 2s delay")
+        Logger.shared.log("🔧 IProxyManager: ⏰ System woke up - restarting USB tunnel after 2s delay")
 
         // Wait a moment for USB subsystem to be ready after wake
         DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) { [weak self] in
             do {
                 try self?.start()
-                Logger.shared.log("🔧 IProxyManager: ✅ iproxy restarted successfully after wake")
+                Logger.shared.log("🔧 IProxyManager: ✅ USB tunnel restarted successfully after wake")
 
                 // SLEEP/WAKE FIX: Notify MacConnectionManager to reset failure counter
                 // This gives Bridge fresh reconnection attempts after Mac wakes
                 NotificationCenter.default.post(name: .iproxyDidRestartAfterWake, object: nil)
             } catch {
-                Logger.shared.log("🔧 IProxyManager: ❌ Failed to restart iproxy after wake: \(error)")
+                Logger.shared.log("🔧 IProxyManager: ❌ Failed to restart USB tunnel after wake: \(error)")
                 // Retry after a longer delay if first attempt fails
                 DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { [weak self] in
                     do {
                         try self?.start()
-                        Logger.shared.log("🔧 IProxyManager: ✅ iproxy restarted on retry after wake")
+                        Logger.shared.log("🔧 IProxyManager: ✅ USB tunnel restarted on retry after wake")
 
                         // Notify on successful retry as well
                         NotificationCenter.default.post(name: .iproxyDidRestartAfterWake, object: nil)
                     } catch {
-                        Logger.shared.log("🔧 IProxyManager: ❌ Failed to restart iproxy on retry: \(error)")
+                        Logger.shared.log("🔧 IProxyManager: ❌ Failed to restart USB tunnel on retry: \(error)")
                     }
                 }
             }
@@ -363,16 +201,12 @@ extension Notification.Name {
     static let iosDeviceDisconnected = Notification.Name("iosDeviceDisconnected")
     static let iproxyDidRestartAfterWake = Notification.Name("iproxyDidRestartAfterWake")
 }
-// MARK: - Direct USB relay (experimental, v1.2.1 step 1)
+// MARK: - Direct USB relay (v1.2.4)
 //
-// Does the same job as the bundled `iproxy` program, inside the Bridge: listens on
+// Does the job the bundled `iproxy` program used to do, inside the Bridge: listens on
 // 127.0.0.1:<localPort> and, for each connection, opens a tunnel to <devicePort> on the
 // iPad through Apple's USB service (usbmuxd), then copies bytes both ways.
 // MacConnectionManager connects to 127.0.0.1:8077 exactly as before, so nothing else changes.
-//
-// On by default. Switch off with "Direct USB (beta)" in the menu-bar menu, or:
-//   defaults write com.cuebear.bridge.clean UseDirectUSB -bool NO
-// When off, the classic iproxy process is used as before.
 
 final class DirectUSBRelay {
     private let localPort: UInt16

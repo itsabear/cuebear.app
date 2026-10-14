@@ -4,7 +4,6 @@ struct ContentView: View {
     @EnvironmentObject var app: BridgeApp
     @State private var udidText: String = ""
     @ObservedObject var logger = Logger.shared
-    @AppStorage(IProxyManager.directUSBDefaultsKey) private var useDirectUSB = true
 
     var body: some View {
         VStack(spacing: 12) {
@@ -27,13 +26,6 @@ struct ContentView: View {
                         Button("Stop") { app.stop() }
                         Button("Test MIDI") { app.midi.sendTestCC() }
                     }.buttonStyle(.borderedProminent)
-                    Toggle("Direct USB (experimental)", isOn: $useDirectUSB)
-                        .toggleStyle(.switch)
-                        .help("Runs the USB connection inside the Bridge instead of the separate iproxy helper. Turn off to go back to the classic connection.")
-                        .onChange(of: useDirectUSB) { enabled in
-                            Logger.shared.log("🔧 USB engine switched to \(enabled ? "direct" : "classic iproxy") - restarting USB")
-                            try? app.iproxy.start()
-                        }
                 }
             }
             Divider().padding(.vertical, 4)

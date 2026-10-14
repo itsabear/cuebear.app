@@ -85,7 +85,7 @@
 			buildPhases = (
 				AA1130000000000000000000 /* Sources */,
 				AA1131000000000000000000 /* Resources */,
-				AA1132000000000000000000 /* Run Script - Embed iproxy (optional) */,
+				AA1132000000000000000000 /* Run Script - Embed libraries */,
 			);
 			buildRules = (
 			);
@@ -141,20 +141,19 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		AA1132000000000000000000 /* Run Script - Embed iproxy (optional) */ = {
+		AA1132000000000000000000 /* Run Script - Embed libraries */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputPaths = (
 			);
-			name = "Run Script - Embed iproxy (optional)";
+			name = "Run Script - Embed libraries";
 			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)/Contents/MacOS/iproxy",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"🔧 Bundling libraries and iproxy...\"\nAPP_BUNDLE=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nFRAMEWORKS_DIR=\"${APP_BUNDLE}/Contents/Frameworks\"\n\n# Copy universal libraries\necho \"📦 Copying universal libraries...\"\nmkdir -p \"$FRAMEWORKS_DIR\"\ncp \"${SRCROOT}/Frameworks/\"*.dylib \"$FRAMEWORKS_DIR/\" || echo \"⚠️  Failed to copy libraries\"\necho \"✅ Libraries copied\"\n\n# Bundle iproxy\nBUNDLE_SCRIPT=\"${SRCROOT}/CueBearBridgeInstaller/scripts/bundle_iproxy.sh\"\n\nif [ -f \"$BUNDLE_SCRIPT\" ]; then\n  echo \"Running bundle_iproxy.sh for Xcode build...\"\n  \"$BUNDLE_SCRIPT\" \"$APP_BUNDLE\" || true\n  echo \"✅ iproxy bundling complete\"\nelse\n  echo \"⚠️  bundle_iproxy.sh not found at $BUNDLE_SCRIPT\"\n  echo \"⚠️  App will require system iproxy from Homebrew\"\nfi\n\n# Re-sign libraries and app bundle after copying\necho \"🔏 Code signing libraries and app bundle...\"\n\n# Sign each library individually first\nfor lib in \"$FRAMEWORKS_DIR\"/*.dylib; do\n  if [ -f \"$lib\" ]; then\n    echo \"  Signing $(basename \"$lib\")...\"\n    codesign --force --sign - \"$lib\" || echo \"⚠️  Failed to sign $(basename \"$lib\")\"\n  fi\ndone\n\n# Then sign the app bundle\nif [ \"${CONFIGURATION}\" = \"Debug\" ]; then\n  # For Debug builds, use ad-hoc signing\n  codesign --force --deep --sign - \"$APP_BUNDLE\" || echo \"⚠️  Code signing failed\"\n  echo \"✅ App bundle signed (ad-hoc)\"\nelse\n  # For Release builds, also use ad-hoc signing (will be properly signed later for distribution)\n  codesign --force --deep --sign - \"$APP_BUNDLE\" || echo \"⚠️  Code signing failed\"\n  echo \"✅ App bundle signed (ad-hoc for local testing)\"\nfi\n\nexit 0\n";
+			shellScript = "echo \"🔧 Bundling libraries...\"\nAPP_BUNDLE=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nFRAMEWORKS_DIR=\"${APP_BUNDLE}/Contents/Frameworks\"\n\n# Copy universal libraries\necho \"📦 Copying universal libraries...\"\nmkdir -p \"$FRAMEWORKS_DIR\"\ncp \"${SRCROOT}/Frameworks/\"*.dylib \"$FRAMEWORKS_DIR/\" || echo \"⚠️  Failed to copy libraries\"\necho \"✅ Libraries copied\"\n\n# v1.2.4: the USB tunnel runs inside the Bridge; the iproxy helper is no longer bundled.\nrm -f \"${APP_BUNDLE}/Contents/MacOS/iproxy\"\n\n# Re-sign libraries and app bundle after copying\necho \"🔏 Code signing libraries and app bundle...\"\n\n# Sign each library individually first\nfor lib in \"$FRAMEWORKS_DIR\"/*.dylib; do\n  if [ -f \"$lib\" ]; then\n    echo \"  Signing $(basename \"$lib\")...\"\n    codesign --force --sign - \"$lib\" || echo \"⚠️  Failed to sign $(basename \"$lib\")\"\n  fi\ndone\n\n# Then sign the app bundle\nif [ \"${CONFIGURATION}\" = \"Debug\" ]; then\n  # For Debug builds, use ad-hoc signing\n  codesign --force --deep --sign - \"$APP_BUNDLE\" || echo \"⚠️  Code signing failed\"\n  echo \"✅ App bundle signed (ad-hoc)\"\nelse\n  # For Release builds, also use ad-hoc signing (will be properly signed later for distribution)\n  codesign --force --deep --sign - \"$APP_BUNDLE\" || echo \"⚠️  Code signing failed\"\n  echo \"✅ App bundle signed (ad-hoc for local testing)\"\nfi\n\nexit 0\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
