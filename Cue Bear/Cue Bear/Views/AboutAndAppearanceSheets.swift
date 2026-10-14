@@ -21,10 +21,6 @@ struct AboutSheet: View {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 
-    private var gitCommitHash: String {
-        GitInfo.commitHash
-    }
-
     var body: some View {
         NavigationView {
             ScrollView {
@@ -45,11 +41,6 @@ struct AboutSheet: View {
                             Text("Version \(appVersion) (\(buildNumber))")
                                 .font(.custom("Sora-Regular", size: 15))
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-
-                            Text("Commit: \(gitCommitHash)")
-                                .font(.custom("Sora-Regular", size: 12))
-                                .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.7))
-                                .fontDesign(.monospaced)
                         }
                     }
                     .padding(.top, 40)

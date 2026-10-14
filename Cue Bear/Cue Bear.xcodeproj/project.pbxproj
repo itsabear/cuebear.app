@@ -192,7 +192,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9E6AAA082E50EE4B00F22798 /* Build configuration list for PBXNativeTarget "Cue Bear" */;
 			buildPhases = (
-				9EGITHASH2E50EE4A00F22799 /* Update Git Hash */,
 				9E6AA9E02E50EE4A00F22798 /* Sources */,
 				9E6AA9E12E50EE4A00F22798 /* Frameworks */,
 				9E6AA9E22E50EE4A00F22798 /* Resources */,
@@ -338,27 +337,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		9EGITHASH2E50EE4A00F22799 /* Update Git Hash */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Update Git Hash";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/../scripts/update_git_info.sh\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9E6AA9E02E50EE4A00F22798 /* Sources */ = {
