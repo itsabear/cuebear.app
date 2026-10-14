@@ -79,7 +79,10 @@ final class BackupRigManager: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] showing in
                 guard let self = self else { return }
-                PairingWindowPresenter.shared.setVisible(showing, wifiClient: self.client, tint: self.tint)
+                let client = self.client, tint = self.tint
+                Task { @MainActor in
+                    PairingWindowPresenter.shared.setVisible(showing, wifiClient: client, tint: tint)
+                }
             }
             .store(in: &cancellables)
 
