@@ -29,7 +29,8 @@ DERIVED_DATA="$BUILD_DIR/DerivedData"
 
 APP_NAME="CueBearBridge"
 BUNDLE_ID="com.cuebear.bridge.clean"
-VERSION="1.0.0"
+# Read the version from the app's Info.plist so the package always matches the app
+VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_DIR/Info.plist" 2>/dev/null || echo "0.0.0")"
 
 XCODE_PROJECT="$PROJECT_DIR/CueBearBridge.xcodeproj"
 XCODE_SCHEME="CueBearBridge"
@@ -233,8 +234,9 @@ mkdir -p "$HELPERS_DIR"
 SOURCE_HELPERS="$PROJECT_DIR/Resources/Helpers"
 
 if [ ! -d "$SOURCE_HELPERS" ]; then
-    log_error "Source helpers directory not found: $SOURCE_HELPERS"
-    exit 1
+    # Since v1.2.4 there are no helper programs (iproxy was the only one)
+    log_info "No helper binaries to bundle"
+    mkdir -p "$SOURCE_HELPERS"
 fi
 
 log_info "Copying helpers from: $SOURCE_HELPERS"
