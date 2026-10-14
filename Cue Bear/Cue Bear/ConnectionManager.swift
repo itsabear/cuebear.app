@@ -445,7 +445,8 @@ class ConnectionManager: ObservableObject {
                     debugPrint("🔗 ConnectionManager: Self is nil, returning")
                     return 
                 }
-                self.usbQueue.async {
+                self.usbQueue.async { [weak self] in
+                    guard let self = self else { return }
                     self.logMain("🔗 USB: accepted \(connection.endpoint)")
                     // Gate: only one active connection (but check if existing connection is actually valid)
                     if let existingConnection = self.activeUSB {
