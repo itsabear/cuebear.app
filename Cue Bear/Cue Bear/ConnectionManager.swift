@@ -1084,6 +1084,11 @@ class ConnectionManager: ObservableObject {
                     timer.invalidate()
                     return
                 }
+                // In the background iOS freezes this app, so silence there means nothing.
+                guard UIApplication.shared.applicationState == .active else {
+                    self.lastHeartbeat = Date()
+                    return
+                }
                 let silence = Date().timeIntervalSince(self.lastHeartbeat)
                 guard silence > self.usbSilenceTimeout else { return }
 
@@ -1731,6 +1736,10 @@ class ConnectionManager: ObservableObject {
     @objc private func appWillEnterForeground() {
         debugPrint("🔗 ConnectionManager: App entering foreground - ending background task")
         endBackgroundTask()
+        if Self.unifiedUSBReceive {
+            // Give the link a fresh grace period: heartbeats queued while frozen arrive in a burst.
+            lastHeartbeat = Date()
+        }
 
         // FIX: Ensure listener is running when returning to foreground
         // The listener may have stopped while in background, so restart it if needed
