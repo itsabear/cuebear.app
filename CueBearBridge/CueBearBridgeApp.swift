@@ -114,6 +114,10 @@ struct MenuBarView: View {
             Divider()
             SecuritySection(server: app.wifiServer)
 
+            // Experimental: run the USB tunnel inside the Bridge (no iproxy helper)
+            Divider()
+            DirectUSBToggle(app: app)
+
             // Settings Section
             Divider()
 
@@ -191,6 +195,31 @@ struct MenuBarView: View {
         .background(Color(NSColor.controlBackgroundColor))
     }
 
+}
+
+/// Experimental switch between the classic iproxy helper and the built-in USB relay.
+struct DirectUSBToggle: View {
+    let app: BridgeApp
+    @AppStorage(IProxyManager.directUSBDefaultsKey) private var useDirectUSB = false
+
+    var body: some View {
+        HStack {
+            Text("Direct USB (beta)")
+                .font(.system(size: 13))
+                .foregroundColor(.primary)
+            Spacer()
+            Toggle("", isOn: $useDirectUSB)
+                .toggleStyle(SwitchToggleStyle())
+                .labelsHidden()
+                .onChange(of: useDirectUSB) { enabled in
+                    Logger.shared.log("🔧 USB engine switched to \(enabled ? "direct" : "classic iproxy") - restarting USB")
+                    try? app.iproxy.start()
+                }
+        }
+        .help("Runs the USB connection inside the Bridge instead of the separate iproxy helper. Turn off to go back to the classic connection.")
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+    }
 }
 
 /// v1.2.1: shows who is connected, whether the link is paired, and pairing controls.
