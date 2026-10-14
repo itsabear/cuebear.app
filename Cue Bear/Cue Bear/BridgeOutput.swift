@@ -76,6 +76,8 @@ final class BridgeOutput: ObservableObject {
     private var reconnectWork: DispatchWorkItem?
     private var reconnectAttempt = 0
     private var userInitiatedDisconnect = false
+    /// True when the current link was opened only as a USB backup (the user never chose it).
+    private var startedAsStandby = false
     private var lastReceived = Date.distantPast
     private var lastSuccessfulMessage = Date.distantPast
     private var backgroundSupportConfigured = false
@@ -93,6 +95,12 @@ final class BridgeOutput: ObservableObject {
     private let heartbeatInterval: TimeInterval = 2.0
     private let staleAfter: TimeInterval = 6.0         // 1.2.1 Bridges send a heartbeat every 2 s
     private let reconnectDelays: [TimeInterval] = [0.5, 1, 2, 4, 8]
+
+    /// v1.2.1 step 3: while USB is active, keep a quiet Wi-Fi link to the same Mac open as a backup
+    /// (and keep reconnecting it if it drops), so unplugging switches to Wi-Fi with no gap.
+    /// Set to false for the old behaviour (Wi-Fi stays as it was when USB took over).
+    static let keepStandbyWhileSuspended = true
+    private static let knownBridgeNamesKey = "CueBear.KnownWiFiBridgeNames"   // [bridgeID: Bonjour name]
 
     init() {
         // Tokens from the old (never-completed) pairing scheme are no longer used.
@@ -179,6 +187,7 @@ final class BridgeOutput: ObservableObject {
         cancelReconnect()
         userInitiatedDisconnect = false
         isSuspended = false
+        startedAsStandby = false
         current = item
         isConnecting = true
         bridgeName = item.name
@@ -277,6 +286,9 @@ final class BridgeOutput: ObservableObject {
         if wasSuspended {
             // USB is active. resume() reconnects Wi-Fi when USB goes away.
             isSuspended = true
+            if Self.keepStandbyWhileSuspended {
+                scheduleReconnect()   // quietly rebuild the backup link
+            }
             return
         }
         scheduleReconnect()
@@ -290,10 +302,15 @@ final class BridgeOutput: ObservableObject {
         debugPrint("BridgeOutput: Reconnecting to \(item.name) in \(delay)s (attempt \(reconnectAttempt))")
 
         let work = DispatchWorkItem { [weak self] in
-            guard let self = self, !self.userInitiatedDisconnect, self.connection == nil, !self.isSuspended else { return }
+            guard let self = self, !self.userInitiatedDisconnect, self.connection == nil else { return }
+            guard !self.isSuspended || Self.keepStandbyWhileSuspended else { return }
             // Prefer a freshly discovered entry with the same name (the Bridge may have restarted).
             let target = self.discovered.first { $0.name == item.name } ?? item
-            self.connect(to: target)
+            if self.isSuspended {
+                self.connectStandby(to: target)
+            } else {
+                self.connect(to: target)
+            }
         }
         reconnectWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
@@ -334,6 +351,50 @@ final class BridgeOutput: ObservableObject {
             reconnectAttempt = 0
             connect(to: item)
         }
+    }
+
+    // MARK: - Wi-Fi backup while on USB (v1.2.1 step 3)
+
+    /// Opens a Wi-Fi link that stays in the background (suspended) until resume() is called.
+    /// Never starts pairing or shows anything on screen: if this iPad isn't paired, it just gives up.
+    func connectStandby(to item: Item) {
+        let attempts = reconnectAttempt
+        let standbyOnly = current == nil || startedAsStandby
+        connect(to: item)
+        reconnectAttempt = attempts      // keep the back-off going across standby retries
+        isSuspended = true
+        isConnecting = false             // the backup link never shows as "connecting" in the UI
+        startedAsStandby = standbyOnly
+    }
+
+    /// The backup link can't be used (not paired, or the Bridge is busy). Drop it quietly.
+    private func abandonStandby() {
+        if startedAsStandby {
+            disconnect()     // forget it entirely; the user never picked this Wi-Fi connection
+        } else {
+            stopTrying()
+        }
+    }
+
+    /// The discovered Bridge that this iPad has paired with over Wi-Fi and whose ID matches `bridgeID`.
+    func standbyCandidate(forBridgeID bridgeID: String) -> Item? {
+        guard BridgeKeyStore.key(for: bridgeID) != nil,
+              let names = UserDefaults.standard.dictionary(forKey: Self.knownBridgeNamesKey) as? [String: String],
+              let name = names[bridgeID] else { return nil }
+        return discovered.first { $0.name == name }
+    }
+
+    /// True when there's no Wi-Fi link and none is being set up or retried.
+    var isIdle: Bool {
+        connection == nil && reconnectWork == nil && !isConnecting
+    }
+
+    private func rememberBridgeName() {
+        guard let id = bridgeID, let name = current?.name else { return }
+        var names = UserDefaults.standard.dictionary(forKey: Self.knownBridgeNamesKey) as? [String: String] ?? [:]
+        guard names[id] != name else { return }
+        names[id] = name
+        UserDefaults.standard.set(names, forKey: Self.knownBridgeNamesKey)
     }
 
     // MARK: - Receiving
@@ -380,6 +441,7 @@ final class BridgeOutput: ObservableObject {
         case SecureLink.MessageType.authOK:
             debugPrint("BridgeOutput: Paired link authenticated")
             linkState = .authenticated
+            rememberBridgeName()
             switch pairingPrompt?.stage {
             case .some(.contacting), .some(.confirmOnMac(_)):
                 pairingPrompt = nil
@@ -392,12 +454,20 @@ final class BridgeOutput: ObservableObject {
             let reason = json["reason"] as? String ?? "unknown"
             debugPrint("BridgeOutput: Authentication failed (\(reason)) - pairing again")
             if let id = bridgeID { BridgeKeyStore.delete(for: id) }
-            startPairing()
+            if isSuspended {
+                abandonStandby()  // pair again later, when the user is actually on Wi-Fi
+            } else {
+                startPairing()
+            }
 
         case SecureLink.MessageType.busy:
             let other = json["device_name"] as? String ?? "another iPad"
-            pairingPrompt = PairingPrompt(bridgeName: bridgeName, stage: .busy(otherDevice: other))
-            stopTrying()
+            if isSuspended {
+                abandonStandby()
+            } else {
+                pairingPrompt = PairingPrompt(bridgeName: bridgeName, stage: .busy(otherDevice: other))
+                stopTrying()
+            }
 
         case SecureLink.MessageType.pairKey:
             handlePairKey(json)
@@ -426,7 +496,10 @@ final class BridgeOutput: ObservableObject {
             break   // lastReceived is already updated
 
         case "midi_input":
-            handleMIDIInputFromDAW(json)
+            // While suspended the same message also arrives over USB; handle it once.
+            if !isSuspended {
+                handleMIDIInputFromDAW(json)
+            }
 
         default:
             break
@@ -454,6 +527,9 @@ final class BridgeOutput: ObservableObject {
 
         if let key = BridgeKeyStore.key(for: id) {
             sendAuth(key: key)
+        } else if isSuspended {
+            debugPrint("BridgeOutput: Not paired with \(bridgeName) - no Wi-Fi backup while on USB")
+            abandonStandby()
         } else {
             startPairing()
         }

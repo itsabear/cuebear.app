@@ -21,6 +21,11 @@ class ConnectionCoordinator: ObservableObject {
     private var usbMonitorTimer: Timer?
     private var wifiMonitorTimer: Timer?
     
+    /// v1.2.1 step 3: while on USB, keep a paired Wi-Fi link to the same Mac ready in the background,
+    /// so pulling the cable switches to Wi-Fi with no gap, and plugging back in returns to USB.
+    /// Set to false for the old behaviour.
+    static let seamlessHandover = true
+
     enum ConnectionType {
         case none
         case usb
@@ -81,6 +86,37 @@ class ConnectionCoordinator: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        if Self.seamlessHandover {
+            // The Bridge ID (from the USB handshake) and Bonjour results arrive at different moments;
+            // try to set up the Wi-Fi backup whenever either changes.
+            usbServer.$usbBridgeID
+                .removeDuplicates()
+                .sink { [weak self] _ in
+                    Task { @MainActor in self?.armWiFiStandby() }
+                }
+                .store(in: &cancellables)
+            wifiClient.$discovered
+                .map { $0.map(\.name) }
+                .removeDuplicates()
+                .sink { [weak self] _ in
+                    Task { @MainActor in self?.armWiFiStandby() }
+                }
+                .store(in: &cancellables)
+        }
+    }
+
+    /// Opens the quiet Wi-Fi backup link if USB is active, the Mac on USB has been paired over
+    /// Wi-Fi before, and it's visible on the network. Does nothing otherwise.
+    private func armWiFiStandby() {
+        guard Self.seamlessHandover,
+              activeConnection == .usb,
+              let usbServer = usbServer, usbServer.isConnected,
+              let wifiClient = wifiClient, wifiClient.isIdle,
+              let bridgeID = usbServer.usbBridgeID,
+              let item = wifiClient.standbyCandidate(forBridgeID: bridgeID) else { return }
+        debugPrint("🔌 ConnectionCoordinator: Opening Wi-Fi backup link to \(item.name) while on USB")
+        wifiClient.connectStandby(to: item)
     }
     
     private func handleUSBConnectionChange(_ isConnected: Bool) {
@@ -96,6 +132,7 @@ class ConnectionCoordinator: ObservableObject {
             activeConnection = .usb
             connectionStatus = "USB Connected"
             debugPrint("🔌 ConnectionCoordinator: Updated activeConnection to .usb")
+            armWiFiStandby()
 
             // Reset manual flags since connection is now established
             isManualUSBConnection = false
@@ -120,9 +157,17 @@ class ConnectionCoordinator: ObservableObject {
             if wifiClient.isSuspended {
                 debugPrint("🔌 ConnectionCoordinator: WiFi connection was suspended - resuming it now")
                 wifiClient.resume()  // v1.0.8: Resume the suspended WiFi connection
-                activeConnection = .wifi
-                connectionStatus = "WiFi Connected"
-                debugPrint("🔌 ConnectionCoordinator: ✅ WiFi resumed and activeConnection switched to .wifi")
+                if wifiClient.isConnected || !Self.seamlessHandover {
+                    activeConnection = .wifi
+                    connectionStatus = "WiFi Connected"
+                    debugPrint("🔌 ConnectionCoordinator: ✅ WiFi resumed and activeConnection switched to .wifi")
+                } else {
+                    // The Wi-Fi link isn't up yet (or there was none); handleWiFiConnectionChange
+                    // switches over as soon as it is.
+                    activeConnection = .none
+                    connectionStatus = "Disconnected"
+                    debugPrint("🔌 ConnectionCoordinator: WiFi not ready yet after USB loss")
+                }
             } else if wifiClient.isConnected {
                 // WiFi is already active (Story 6: USB cable was plugged but didn't connect)
                 activeConnection = .wifi

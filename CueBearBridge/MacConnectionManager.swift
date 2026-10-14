@@ -241,7 +241,9 @@ final class MacConnectionManager: ObservableObject {
         let displayName = getDisplayName()
         
         // Send CB/2 protocol handshake with name parameter for better display
-        let handshakeMessage = "CB/2 auth=psk1 name=\(displayName)\n"
+        // v1.2.1: id= lets the iPad recognise this Mac on Wi-Fi too, so it can keep Wi-Fi ready
+        // as a backup while on USB. Older iPad apps ignore unknown fields. name= must stay last.
+        let handshakeMessage = "CB/2 auth=psk1 id=\(PairedDeviceStore.shared.bridgeID) name=\(displayName)\n"
         guard let data = handshakeMessage.data(using: .utf8) else { return }
 
         connection?.send(content: data, completion: .contentProcessed { [weak self] err in

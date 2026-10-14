@@ -14,6 +14,8 @@ class ConnectionManager: ObservableObject {
     @Published var lastConnectionTime: Date?
     @Published var connectionAttempts: Int = 0
     @Published var connectedComputerName: String? = nil
+    /// v1.2.1: the Bridge's stable ID, sent in the USB handshake by Bridge 1.2.4+ (nil for older Bridges).
+    @Published var usbBridgeID: String? = nil
     @Published var connectionQuality: ConnectionQuality = .disconnected
     
     // Dedicated queue for all USB socket work (no UI here).
@@ -679,9 +681,13 @@ class ConnectionManager: ObservableObject {
         var _: [String] = [] // features - not used in basic handshake
         var _: TimeInterval = 0 // timestamp - not used in basic handshake
         var computerName = ""
+        var bridgeID: String? = nil
         
         for part in parts.dropFirst() {
-            if part.hasPrefix("auth=") {
+            if part.hasPrefix("id=") {
+                let id = String(part.dropFirst(3))
+                bridgeID = id.isEmpty ? nil : id
+            } else if part.hasPrefix("auth=") {
                 auth = String(part.dropFirst(5))
             } else if part.hasPrefix("nonce=") {
                 _ = String(part.dropFirst(6)) // nonce - not used
@@ -700,6 +706,7 @@ class ConnectionManager: ObservableObject {
         let cleanComputerName = computerName.hasSuffix(".local") ? String(computerName.dropLast(6)) : computerName
         DispatchQueue.main.async {
             self.connectedComputerName = cleanComputerName
+            self.usbBridgeID = bridgeID
             self.logMain("🤝 USB: Set connectedComputerName to: '\(cleanComputerName)'")
         }
         
