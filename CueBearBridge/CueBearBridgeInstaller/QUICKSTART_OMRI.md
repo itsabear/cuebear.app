@@ -75,7 +75,7 @@ Should show:
 xcrun notarytool store-credentials "cuebear-notarize" \
   --apple-id "omribehr@gmail.com" \
   --team-id "2U78NYVLQN" \
-  --password "qdxf-yaql-hidh-ruam"
+  --password "<your app-specific password>"
 ```
 
 **Replace:**
@@ -232,7 +232,7 @@ security find-identity -v -p codesigning
 xcrun notarytool store-credentials "cuebear-notarize" \
   --apple-id "omribehr@gmail.com" \
   --team-id "YOUR_TEAM_ID" \
-  --password "xxxx-xxxx-xxxx-xxxx"
+  --password "<your app-specific password>"
 
 # 3. Build signed and notarized installer
 cd "/Users/omribehr/Library/CloudStorage/Dropbox/Unsorted items/Cue Bear/CueBearBridge/CueBearBridgeInstaller"
