@@ -494,6 +494,9 @@ final class DirectUSBRelay {
         }
         var yes: Int32 = 1
         setsockopt(device, SOL_SOCKET, SO_NOSIGPIPE, &yes, socklen_t(MemoryLayout<Int32>.size))
+        // libusbmuxd can hand back a non-blocking socket; the pump threads expect blocking I/O.
+        Self.setBlocking(device)
+        Self.setBlocking(client)
 
         lock.lock()
         guard running else {
@@ -542,6 +545,13 @@ final class DirectUSBRelay {
         return firstUSB
     }
 
+    static func setBlocking(_ fd: Int32) {
+        let flags = fcntl(fd, F_GETFL, 0)
+        if flags >= 0 && (flags & O_NONBLOCK) != 0 {
+            _ = fcntl(fd, F_SETFL, flags & ~O_NONBLOCK)
+        }
+    }
+
     private static func posixError(_ what: String) -> NSError {
         let code = errno
         return NSError(domain: NSPOSIXErrorDomain, code: Int(code),
@@ -551,6 +561,12 @@ final class DirectUSBRelay {
 
 /// Copies bytes both ways between two sockets until either side closes.
 private final class TunnelPair {
+    /// Waits (up to 1 s) until the socket is ready; used if a socket is non-blocking.
+    static func waitUntil(_ fd: Int32, events: Int16) {
+        var pfd = pollfd(fd: fd, events: events, revents: 0)
+        _ = poll(&pfd, 1, 1000)
+    }
+
     private let a: Int32
     private let b: Int32
     private let lock = NSLock()
@@ -574,21 +590,40 @@ private final class TunnelPair {
 
     private func pump(from source: Int32, to destination: Int32) {
         var buffer = [UInt8](repeating: 0, count: 16 * 1024)
+        var reason = "closed"
         outer: while true {
             let received = buffer.withUnsafeMutableBytes { recv(source, $0.baseAddress, $0.count, 0) }
-            if received < 0 && errno == EINTR { continue }
-            if received <= 0 { break }
+            if received < 0 {
+                let code = errno
+                if code == EINTR { continue }
+                if code == EAGAIN || code == EWOULDBLOCK {
+                    Self.waitUntil(source, events: Int16(POLLIN))
+                    continue
+                }
+                reason = "read error \(code)"
+                break
+            }
+            if received == 0 { reason = source == a ? "Bridge side closed" : "iPad side closed"; break }
 
             var offset = 0
             while offset < received {
                 let sent = buffer.withUnsafeBytes {
                     send(destination, $0.baseAddress! + offset, received - offset, 0)
                 }
-                if sent < 0 && errno == EINTR { continue }
-                if sent <= 0 { break outer }
+                if sent < 0 {
+                    let code = errno
+                    if code == EINTR { continue }
+                    if code == EAGAIN || code == EWOULDBLOCK {
+                        Self.waitUntil(destination, events: Int16(POLLOUT))
+                        continue
+                    }
+                    reason = "write error \(code)"
+                    break outer
+                }
                 offset += sent
             }
         }
+        Logger.shared.log("🔌 DirectUSB: \(reason)")
 
         // Wake the other direction, then whoever finishes last closes both sockets.
         shutdown(a, SHUT_RDWR)
