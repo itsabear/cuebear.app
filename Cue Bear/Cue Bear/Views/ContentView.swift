@@ -5082,8 +5082,52 @@ internal struct ContentView: View {
     // MARK: - View Modifiers (extracted to fix compiler type-checking timeout)
 
     @ViewBuilder
-    private func applySheets<V: View>(_ view: V) -> some View {
+    /// v1.3 (Cue Bear Next): Show mode and Notes & Extras, kept out of the long sheet chain below
+    /// so the compiler can type-check each part quickly.
+    private func applyNextFeatures<V: View>(_ view: V) -> some View {
         view
+        // v1.3 (Cue Bear Next): the stage screen
+        .fullScreenCover(isPresented: $showShowMode) {
+            ShowModeView(
+                store: store,
+                coordinator: connectionCoordinator,
+                wifiClient: wifiClient,
+                usbServer: usbServer,
+                rigs: BackupRigManager.shared,
+                controlButtons: $controlButtons,
+                projectName: isUntitledProject(projectName) ? "Untitled show" : projectName,
+                accent: currentTheme.accentColor(for: colorScheme),
+                isGlobalChannel: isGlobalChannel,
+                globalChannel: globalChannel,
+                startAfterSongID: lastPlayedCueID,
+                onFire: { song in trigger(song) },
+                onSharedControl: { button in triggerControl(button) },
+                onExit: { showShowMode = false }
+            )
+        }
+        // v1.3 (Cue Bear Next): Notes & Extras for one song
+        .sheet(item: $songForDetails) { song in
+            SongDetailsSheet(
+                originalSong: song,
+                sharedFaders: controlButtons.filter { $0.isFader == true },
+                otherSongs: store.activeSongs.filter { $0.id != song.id },
+                accent: currentTheme.accentColor(for: colorScheme),
+                onSave: { updated in
+                    saveSong(updated)
+                    saveIfNamed()
+                    songForDetails = nil
+                },
+                onCopyExtras: { ids, extras in
+                    copyExtras(extras, toSongIDs: ids)
+                },
+                onCancel: { songForDetails = nil }
+            )
+            .presentationCornerRadius(20)
+        }
+    }
+
+    private func applySheets<V: View>(_ view: V) -> some View {
+        applyNextFeatures(view)
         // MARK: Sheets
         .sheet(isPresented: $showConnections) {
             CBConnectionsSheet(
@@ -5442,44 +5486,7 @@ internal struct ContentView: View {
             .presentationCornerRadius(20)
             .interactiveDismissDisabled(false)
         }
-        // v1.3 (Cue Bear Next): the stage screen
-        .fullScreenCover(isPresented: $showShowMode) {
-            ShowModeView(
-                store: store,
-                coordinator: connectionCoordinator,
-                wifiClient: wifiClient,
-                usbServer: usbServer,
-                rigs: BackupRigManager.shared,
-                controlButtons: $controlButtons,
-                projectName: isUntitledProject(projectName) ? "Untitled show" : projectName,
-                accent: currentTheme.accentColor(for: colorScheme),
-                isGlobalChannel: isGlobalChannel,
-                globalChannel: globalChannel,
-                startAfterSongID: lastPlayedCueID,
-                onFire: { song in trigger(song) },
-                onSharedControl: { button in triggerControl(button) },
-                onExit: { showShowMode = false }
-            )
-        }
-        // v1.3 (Cue Bear Next): Notes & Extras for one song
-        .sheet(item: $songForDetails) { song in
-            SongDetailsSheet(
-                originalSong: song,
-                sharedFaders: controlButtons.filter { $0.isFader == true },
-                otherSongs: store.activeSongs.filter { $0.id != song.id },
-                accent: currentTheme.accentColor(for: colorScheme),
-                onSave: { updated in
-                    saveSong(updated)
-                    saveIfNamed()
-                    songForDetails = nil
-                },
-                onCopyExtras: { ids, extras in
-                    copyExtras(extras, toSongIDs: ids)
-                },
-                onCancel: { songForDetails = nil }
-            )
-            .presentationCornerRadius(20)
-        }
+
         .sheet(isPresented: $showAboutSheet) {
             AboutSheet()
                 .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))

@@ -449,10 +449,19 @@ struct CBPerformanceRow: View {
                     Spacer()
 
                     // Name large at bottom
-                    Text(song.name)
-                        .font(.custom("Sora-Bold", size: 21 * fontSize))
-                        .foregroundColor(adaptiveTextColor)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(song.name)
+                            .font(.custom("Sora-Bold", size: 21 * fontSize))
+                            .foregroundColor(adaptiveTextColor)
+                            .lineLimit(1)
+                        // v1.3 (Cue Bear Next): this song has notes, extras or remembered levels
+                        if song.hasSongDetails {
+                            Image(systemName: "music.note.list")
+                                .font(.system(size: 13 * fontSize, weight: .semibold))
+                                .foregroundColor(adaptiveTextColor.opacity(0.7))
+                                .accessibilityLabel("Has notes or extras")
+                        }
+                    }
                 }
 
                 Spacer(minLength: 12)
@@ -2167,6 +2176,20 @@ struct CBAddEditCueSheet: View {
                         }
                         .disabled(isDisabled)
                     } else {
+                        // v1.3 (Cue Bear Next): notes, song-only controls, remembered levels.
+                        // Closes this sheet (unsaved edits here are discarded) and opens Notes & Extras.
+                        if let songID = editingSong?.id {
+                            Button {
+                                onCancel()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                                    NotificationCenter.default.post(name: Notification.Name("cbOpenSongDetails"),
+                                                                    object: nil, userInfo: ["songID": songID])
+                                }
+                            } label: {
+                                Label("Notes & Extras", systemImage: "music.note.list")
+                            }
+                        }
+
                         if onDuplicate != nil {
                             Button {
                                 if let song = editingSong {
