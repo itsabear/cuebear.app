@@ -3317,6 +3317,8 @@ internal struct ContentView: View {
     // Projects
     @State private var showProjects = false
     @State private var showOnboarding = false
+    @State private var showShowMode = false  // v1.3: the stage screen (Now, Next, GO)
+    @State private var songForDetails: Song? = nil  // v1.3: Notes & Extras sheet
     @Binding var crashAlertActive: Bool  // Prevents onboarding from showing while crash alert is active
     @AppStorage("lastProjectName") private var projectName: String = "Untitled"
     @State private var projectsList: [String] = []
@@ -3629,6 +3631,10 @@ internal struct ContentView: View {
                 onCreateCueList: {
                     newCueListName = "New Cue List"
                     showNewCueListPrompt = true
+                },
+                onShowMode: {
+                    if isEditing { isEditing = false }
+                    showShowMode = true
                 }
             )
     }
@@ -4135,6 +4141,17 @@ internal struct ContentView: View {
 
                 // Use ConnectionCoordinator to send MIDI through the active connection
                 connectionCoordinator.sendMIDI(type: .cc, channel: channelToUse, number: cc, value: value, label: title, buttonID: id.uuidString)
+            }
+            .store(in: &notificationCancellables)
+
+        // v1.3: open "Notes & Extras" for a song (from the cue row's menu)
+        NotificationCenter.default.publisher(for: Notification.Name("cbOpenSongDetails"))
+            .sink { [self] notif in
+                guard let id = notif.userInfo?["songID"] as? UUID else { return }
+                if let song = store.activeSongs.first(where: { $0.id == id })
+                    ?? songLibrary.first(where: { $0.id == id }) {
+                    songForDetails = song
+                }
             }
             .store(in: &notificationCancellables)
 
@@ -5404,19 +5421,64 @@ internal struct ContentView: View {
             .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showOnboarding, onDismiss: {
-            // Tutorial 1: Show Edit button tutorial after onboarding dismisses
-            debugPrint("📖 [Tutorial] Onboarding dismissed. hasSeenTutorial1=\(hasSeenTutorial1)")
-            if !hasSeenTutorial1 {
-                debugPrint("📖 [Tutorial] Scheduling Tutorial 1 (Edit button)")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    self.requestTutorial(1)
-                }
-            }
+            // v1.3 (Cue Bear Next): the step-by-step tutorials are retired; the demo show
+            // and the connect checklist replace them.
+            UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
         }) {
-            OnboardingView()
-                .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-                .presentationCornerRadius(20)
-                .interactiveDismissDisabled(false)
+            FirstRunView(
+                usbServer: usbServer,
+                wifiClient: wifiClient,
+                coordinator: connectionCoordinator,
+                accent: currentTheme.accentColor(for: colorScheme),
+                onSendTest: { sendFirstRunTest() },
+                onConnectWiFi: { item in connectionCoordinator.connectToWiFi(bridge: item) },
+                onTryShowMode: {
+                    showOnboarding = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { showShowMode = true }
+                },
+                onDone: { showOnboarding = false }
+            )
+            .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
+            .presentationCornerRadius(20)
+            .interactiveDismissDisabled(false)
+        }
+        // v1.3 (Cue Bear Next): the stage screen
+        .fullScreenCover(isPresented: $showShowMode) {
+            ShowModeView(
+                store: store,
+                coordinator: connectionCoordinator,
+                wifiClient: wifiClient,
+                usbServer: usbServer,
+                rigs: BackupRigManager.shared,
+                controlButtons: $controlButtons,
+                projectName: isUntitledProject(projectName) ? "Untitled show" : projectName,
+                accent: currentTheme.accentColor(for: colorScheme),
+                isGlobalChannel: isGlobalChannel,
+                globalChannel: globalChannel,
+                startAfterSongID: lastPlayedCueID,
+                onFire: { song in trigger(song) },
+                onSharedControl: { button in triggerControl(button) },
+                onExit: { showShowMode = false }
+            )
+        }
+        // v1.3 (Cue Bear Next): Notes & Extras for one song
+        .sheet(item: $songForDetails) { song in
+            SongDetailsSheet(
+                originalSong: song,
+                sharedFaders: controlButtons.filter { $0.isFader == true },
+                otherSongs: store.activeSongs.filter { $0.id != song.id },
+                accent: currentTheme.accentColor(for: colorScheme),
+                onSave: { updated in
+                    saveSong(updated)
+                    saveIfNamed()
+                    songForDetails = nil
+                },
+                onCopyExtras: { ids, extras in
+                    copyExtras(extras, toSongIDs: ids)
+                },
+                onCancel: { songForDetails = nil }
+            )
+            .presentationCornerRadius(20)
         }
         .sheet(isPresented: $showAboutSheet) {
             AboutSheet()
@@ -5667,6 +5729,13 @@ internal struct ContentView: View {
             }
 
             hasCompletedInitialLaunch = true
+
+            // v1.3 (Cue Bear Next): a brand-new user starts inside a real demo show
+            if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
+                && songLibrary.isEmpty
+                && ProjectIO.list().contains(DemoShows.firstShowName) {
+                loadProject(named: DemoShows.firstShowName)
+            }
 
             // Show onboarding if not yet seen
             let hasSeenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
@@ -6088,6 +6157,49 @@ internal struct ContentView: View {
     private func sendFaderMIDI(channel: Int, cc: Int, value: Int, title: String, buttonID: UUID) {
         // Use ConnectionCoordinator to send MIDI through the active connection
         connectionCoordinator.sendMIDI(type: .cc, channel: channel, number: cc, value: value, label: title, buttonID: buttonID.uuidString)
+    }
+
+    // MARK: - v1.3 (Cue Bear Next) helpers
+
+    /// First-run checklist: sends a recognisable test message so the user can see it arrive in the DAW.
+    private func sendFirstRunTest() {
+        let channelToUse = isGlobalChannel ? globalChannel : 1
+        connectionCoordinator.sendMIDI(type: .note, channel: channelToUse, number: 60, value: 100,
+                                       label: "Cue Bear test", buttonID: "cuebear-first-run-test")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            connectionCoordinator.sendMIDI(type: .note, channel: channelToUse, number: 60, value: 0,
+                                           label: "Cue Bear test", buttonID: "cuebear-first-run-test")
+        }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    /// "Copy extras to other songs": each target song gets its own copies (new IDs).
+    private func copyExtras(_ extras: [SongExtra], toSongIDs ids: [UUID]) {
+        guard !extras.isEmpty, !ids.isEmpty else { return }
+        for id in ids {
+            guard var target = store.activeSongs.first(where: { $0.id == id })
+                    ?? songLibrary.first(where: { $0.id == id }) else { continue }
+            var merged = target.extras ?? []
+            for e in extras where !merged.contains(where: { $0.title == e.title && $0.number == e.number }) {
+                var copy = e
+                copy.id = UUID()
+                merged.append(copy)
+            }
+            target.extras = merged
+            saveSong(target)
+        }
+        saveIfNamed()
+    }
+
+    /// Saves straight away when the show already has a name; otherwise just marks it changed
+    /// (no name prompt popping up over a sheet).
+    private func saveIfNamed() {
+        let trimmed = projectName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || isUntitledProject(trimmed) {
+            isDirty = true
+        } else {
+            saveCurrentProject(overwrite: true)
+        }
     }
 
     private func cueGo() {
@@ -7369,6 +7481,9 @@ private struct CBTopBar: View {
     var onDeleteCueList: (UUID) -> Void = { _ in }
     var onCreateCueList: () -> Void = {}
 
+    // v1.3: open Show mode
+    var onShowMode: () -> Void = {}
+
     @Environment(\.colorScheme) private var colorScheme
 
     private var selectedTheme: AppTheme {
@@ -7421,6 +7536,30 @@ private struct CBTopBar: View {
 
             // RIGHT CAPSULES: Separate capsules for connections and edit
             HStack(spacing: 8) {
+                // v1.3: Show mode capsule (hide when editing)
+                if !isEditing {
+                    Button(action: onShowMode) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "play.rectangle.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                            Text("Show")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .frame(height: 44)
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
+                    }
+                    .buttonStyle(IOSPressButtonStyle())
+                    .accessibilityLabel("Show mode")
+                    .accessibilityHint("Opens the stage screen with Now, Next and GO")
+                    .transition(.opacity.combined(with: .scale))
+                }
+
                 // Connections capsule (hide when editing)
                 if !isEditing {
                     Button(action: onConnections) {

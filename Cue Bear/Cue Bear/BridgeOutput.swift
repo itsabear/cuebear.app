@@ -348,6 +348,27 @@ final class BridgeOutput: ObservableObject {
         }
     }
 
+    // MARK: - Status for the Show mode pill and the backup computer (v1.3, Cue Bear Next)
+
+    /// False for the backup computer's link: its DAW must not move the iPad's faders.
+    var forwardsDAWInput: Bool = true
+
+    /// The Bridge's stable ID for the current link (known once the Bridge has said hello).
+    var currentBridgeID: String? { bridgeID }
+
+    /// The name of the Mac this link goes to, as shown on the network.
+    var currentBridgeName: String? { current?.name }
+
+    /// A quiet Wi-Fi link is open in the background while USB carries the show.
+    var isStandbyReady: Bool {
+        isSuspended && connection != nil && (linkState == .authenticated || linkState == .legacy)
+    }
+
+    /// Ready to carry MIDI right now (authenticated or an older Bridge), not suspended.
+    var isLinkReady: Bool {
+        !isSuspended && connection != nil && (linkState == .authenticated || linkState == .legacy)
+    }
+
     // MARK: - Wi-Fi backup while on USB (v1.2.1 step 3)
 
     /// Opens a Wi-Fi link that stays in the background (suspended) until resume() is called.
@@ -492,7 +513,8 @@ final class BridgeOutput: ObservableObject {
 
         case "midi_input":
             // While suspended the same message also arrives over USB; handle it once.
-            if !isSuspended {
+            // A backup computer's link never moves the iPad's controls (the main computer leads).
+            if !isSuspended && forwardsDAWInput {
                 handleMIDIInputFromDAW(json)
             }
 

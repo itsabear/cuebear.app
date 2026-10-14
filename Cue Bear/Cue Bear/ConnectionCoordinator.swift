@@ -310,6 +310,11 @@ class ConnectionCoordinator: ObservableObject {
     // MARK: - Public Interface
     
     func sendMIDI(type: MIDIKind, channel: Int, number: Int, value: Int, label: String, buttonID: String) {
+        // v1.3 (Cue Bear Next): two computers at once. The backup Mac gets every message too,
+        // even when the main connection is down, so the show keeps going on the backup.
+        BackupRigManager.shared.forward(type: type, channel: channel, number: number, value: value,
+                                        label: label, buttonID: buttonID)
+
         switch activeConnection {
         case .usb:
             usbServer?.sendMIDI(type: type, channel: channel, number: number, value: value, label: label, buttonID: buttonID)

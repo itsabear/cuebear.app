@@ -53,10 +53,9 @@
                         FontDebugHelper.checkCustomFonts()
                         #endif
 
-                        // Simulator-only: ship a sample project for demos/screenshots, never on a real device
-                        #if targetEnvironment(simulator)
-                        installDemoProjectsIfNeeded()
-                        #endif
+                        // v1.3 (Cue Bear Next): demo shows install on every device, so a new user
+                        // can press GO before setting anything up.
+                        DemoShows.installIfNeeded()
 
                         // Prevent screen from locking during live performance
                         UIApplication.shared.isIdleTimerDisabled = true
@@ -74,6 +73,8 @@
                         connectionCoordinator.configure(usbServer: usbServer, wifiClient: wifiClient)
                         // Start connections through coordinator
                         connectionCoordinator.startConnections()
+                        // v1.3: two computers at once (backup Mac), if one has been chosen
+                        BackupRigManager.shared.configure(mainWiFi: wifiClient, usbServer: usbServer, tint: .accentColor)
                     }
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                         debugPrint("📱 iPad: App entered background - iOS grants ~30s before suspension")

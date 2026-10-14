@@ -36,6 +36,15 @@ public struct Song: Identifiable, Codable, Equatable {
     // Alias system - if set, this cue is an alias of another cue
     public var aliasedCueID: UUID? = nil
 
+    // v1.3 (Cue Bear Next): what belongs to this song only.
+    // The show's shared controls stay on every song; these add to them.
+    /// Notes shown on the Show mode card (key, tempo, cues to the band…)
+    public var notes: String? = nil
+    /// Controls that appear only while this song is current
+    public var extras: [SongExtra]? = nil
+    /// Shared fader levels to jump to when this song starts: control ID (uuidString) → MIDI value 0–127
+    public var rememberedLevels: [String: Int]? = nil
+
     public init(id: UUID = UUID(), name: String, subtitle: String? = nil, cc: Int, channel: Int) {
         self.id = id
         self.name = name
@@ -62,6 +71,48 @@ public struct Song: Identifiable, Codable, Equatable {
         colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex)
         midiEnabled = try container.decodeIfPresent(Bool.self, forKey: .midiEnabled) ?? true
         aliasedCueID = try container.decodeIfPresent(UUID.self, forKey: .aliasedCueID)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        extras = try container.decodeIfPresent([SongExtra].self, forKey: .extras)
+        rememberedLevels = try container.decodeIfPresent([String: Int].self, forKey: .rememberedLevels)
+    }
+}
+
+// MARK: - Song extras (v1.3, Cue Bear Next)
+
+/// A control that belongs to one song only (shown in Show mode while that song is current).
+public struct SongExtra: Identifiable, Codable, Equatable {
+    public enum Style: String, Codable, CaseIterable {
+        case button   // sends on press
+        case toggle   // latches on / off
+        case fader    // sends 0–127
+    }
+
+    public var id: UUID
+    public var title: String
+    public var style: Style
+    public var kind: MIDIKind      // .cc or .note (faders always send CC)
+    public var number: Int         // CC or note number, 0–127
+    public var channel: Int        // 1–16
+    public var velocity: Int       // for notes and buttons/toggles sent as CC "on" value
+
+    public init(id: UUID = UUID(), title: String, style: Style = .button, kind: MIDIKind = .cc,
+                number: Int, channel: Int = 1, velocity: Int = 127) {
+        self.id = id
+        self.title = title
+        self.style = style
+        self.kind = kind
+        self.number = number
+        self.channel = channel
+        self.velocity = velocity
+    }
+}
+
+extension Song {
+    /// True when the song carries anything beyond the shared controls.
+    var hasSongDetails: Bool {
+        !(notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !(extras ?? []).isEmpty
+            || !(rememberedLevels ?? [:]).isEmpty
     }
 }
 

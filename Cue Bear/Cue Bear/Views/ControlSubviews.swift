@@ -537,6 +537,13 @@ struct CBPerformanceRow: View {
                 Button(action: onRename) {
                     Label("Edit", systemImage: "pencil")
                 }
+                // v1.3 (Cue Bear Next): notes, song-only controls, remembered fader levels
+                Button(action: {
+                    NotificationCenter.default.post(name: Notification.Name("cbOpenSongDetails"),
+                                                    object: nil, userInfo: ["songID": song.id])
+                }) {
+                    Label("Notes & Extras", systemImage: "music.note.list")
+                }
                 Button(action: onDuplicate) {
                     Label("Duplicate", systemImage: "doc.on.doc")
                 }
@@ -1631,6 +1638,12 @@ struct CBConnectionsSheet: View {
                         }
                     }
                 }
+
+                // v1.3 (Cue Bear Next): two computers at once
+                BackupComputerSection(rigs: BackupRigManager.shared,
+                                      wifiClient: wifiClient,
+                                      rowBackground: selectedTheme.titleBarColor(for: colorScheme),
+                                      headerColor: selectedTheme.secondaryTextColor(for: colorScheme))
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
