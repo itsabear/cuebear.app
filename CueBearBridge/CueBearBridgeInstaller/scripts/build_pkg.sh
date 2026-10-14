@@ -282,6 +282,9 @@ log_step "Step 6: Signing app bundle"
 
 log_info "Running codesign script..."
 
+# Dropbox adds extended attributes that codesign rejects ("detritus not allowed")
+xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+
 "$SCRIPT_DIR/codesign_app.sh" "$APP_BUNDLE" "$SIGNING_IDENTITY_APP"
 
 log_success "App bundle signed"
