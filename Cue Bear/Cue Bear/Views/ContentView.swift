@@ -5468,6 +5468,11 @@ internal struct ContentView: View {
             // v1.3 (Cue Bear Next): the step-by-step tutorials are retired; the demo show
             // and the connect checklist replace them.
             UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
+            hasSeenTutorial1 = true
+            hasSeenTutorial2 = true
+            hasSeenTutorial2b = true
+            hasSeenTutorial2c = true
+            hasSeenTutorial3 = true
         }) {
             FirstRunView(
                 usbServer: usbServer,

@@ -82,6 +82,7 @@ struct ShowModeView: View {
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .focusable()
+        .focusEffectDisabled()
         .focused($hasKeyFocus)
         // Bluetooth page-turner pedals (AirTurn and similar) and keyboards
         .onKeyPress(.downArrow) { go(); return .handled }

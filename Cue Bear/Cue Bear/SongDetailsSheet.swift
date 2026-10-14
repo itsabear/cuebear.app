@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct SongDetailsSheet: View {
     let originalSong: Song
@@ -206,6 +207,7 @@ private struct RememberedLevelRow: View {
 
 private struct SongExtraEditor: View {
     @State private var draft: SongExtra
+    @State private var isLearning = false
     let isNew: Bool
     var onSave: (SongExtra) -> Void
     var onDelete: () -> Void
@@ -241,6 +243,10 @@ private struct SongExtraEditor: View {
                         }
                         .pickerStyle(.segmented)
                     }
+                    Button(action: { isLearning.toggle() }) {
+                        Label(isLearning ? "Listening… move a control in your DAW" : "Learn from DAW",
+                              systemImage: isLearning ? "dot.radiowaves.left.and.right" : "wand.and.stars")
+                    }
                     Stepper(value: $draft.number, in: 0...127) {
                         HStack {
                             Text(draft.style == .fader || draft.kind == .cc ? "CC number" : "Note")
@@ -274,6 +280,23 @@ private struct SongExtraEditor: View {
                         Label("Delete extra", systemImage: "trash")
                     }
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("cbMIDIInputFromDAW"))) { notif in
+                // MIDI learn: take the next CC or note the DAW sends back through the Bridge
+                guard isLearning, let info = notif.userInfo as? [String: Any],
+                      let type = info["type"] as? String, let channel = info["channel"] as? Int else { return }
+                if type == "cc", let cc = info["cc"] as? Int {
+                    draft.kind = .cc
+                    draft.number = cc
+                    draft.channel = channel
+                    isLearning = false
+                } else if type == "note", let note = info["note"] as? Int, draft.style != .fader {
+                    draft.kind = .note
+                    draft.number = note
+                    draft.channel = channel
+                    isLearning = false
+                }
+                if !isLearning { UINotificationFeedbackGenerator().notificationOccurred(.success) }
             }
             .navigationTitle(draft.title.isEmpty ? "Extra" : draft.title)
             .navigationBarTitleDisplayMode(.inline)
