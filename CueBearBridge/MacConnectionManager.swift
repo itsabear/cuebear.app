@@ -635,14 +635,22 @@ final class MacConnectionManager: ObservableObject {
     
     private func startHeartbeatSending() {
         Logger.shared.log("🔗 MacConnectionManager: Starting heartbeat sending")
-        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.sendHeartbeat()
+        // v1.2.1: schedule on the main run loop. This is called from a network queue,
+        // which has no run loop, so the timer used to be created but never fired.
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.heartbeatTimer?.invalidate()
+            self.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+                self?.sendHeartbeat()
+            }
         }
     }
-    
+
     private func stopHeartbeatSending() {
-        heartbeatTimer?.invalidate()
-        heartbeatTimer = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.heartbeatTimer?.invalidate()
+            self?.heartbeatTimer = nil
+        }
         Logger.shared.log("🔗 MacConnectionManager: Stopped heartbeat sending")
     }
     

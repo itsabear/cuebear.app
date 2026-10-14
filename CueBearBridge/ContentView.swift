@@ -4,7 +4,7 @@ struct ContentView: View {
     @EnvironmentObject var app: BridgeApp
     @State private var udidText: String = ""
     @ObservedObject var logger = Logger.shared
-    @AppStorage(IProxyManager.directUSBDefaultsKey) private var useDirectUSB = false
+    @AppStorage(IProxyManager.directUSBDefaultsKey) private var useDirectUSB = true
 
     var body: some View {
         VStack(spacing: 12) {

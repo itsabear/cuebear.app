@@ -23,8 +23,9 @@ final class IProxyManager: ObservableObject {
 
     /// Experimental: run the USB tunnel inside the Bridge instead of the iproxy process.
     static let directUSBDefaultsKey = "UseDirectUSB"
+    /// On by default (v1.2.1). Users can still switch back to the classic iproxy helper.
     static var useDirectUSB: Bool {
-        UserDefaults.standard.bool(forKey: directUSBDefaultsKey)
+        UserDefaults.standard.object(forKey: directUSBDefaultsKey) as? Bool ?? true
     }
     private var directRelay: DirectUSBRelay?
 
@@ -369,9 +370,9 @@ extension Notification.Name {
 // iPad through Apple's USB service (usbmuxd), then copies bytes both ways.
 // MacConnectionManager connects to 127.0.0.1:8077 exactly as before, so nothing else changes.
 //
-// Turned on with the "Direct USB (experimental)" switch in the Bridge Logs window, or:
-//   defaults write com.cuebear.bridge.clean UseDirectUSB -bool YES
-// Off by default; when off, the classic iproxy process is used as before.
+// On by default. Switch off with "Direct USB (beta)" in the menu-bar menu, or:
+//   defaults write com.cuebear.bridge.clean UseDirectUSB -bool NO
+// When off, the classic iproxy process is used as before.
 
 final class DirectUSBRelay {
     private let localPort: UInt16

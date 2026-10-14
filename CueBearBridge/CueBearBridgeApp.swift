@@ -200,7 +200,7 @@ struct MenuBarView: View {
 /// Experimental switch between the classic iproxy helper and the built-in USB relay.
 struct DirectUSBToggle: View {
     let app: BridgeApp
-    @AppStorage(IProxyManager.directUSBDefaultsKey) private var useDirectUSB = false
+    @AppStorage(IProxyManager.directUSBDefaultsKey) private var useDirectUSB = true
 
     var body: some View {
         HStack {
