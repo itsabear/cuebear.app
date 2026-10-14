@@ -182,18 +182,11 @@
         var body: some View {
             ContentView(crashAlertActive: $crashAlertActive)
                 .tint(selectedTheme.accentColor(for: colorScheme))
-                // v1.2.1: pairing with the Mac Bridge. An overlay rather than a sheet,
-                // so it can't collide with sheets or popovers the main view presents.
-                .overlay {
-                    if let prompt = wifiClient.pairingPrompt {
-                        PairingOverlay(
-                            prompt: prompt,
-                            onCancel: { wifiClient.cancelPairing() },
-                            onDismiss: { wifiClient.dismissPairingPrompt() }
-                        )
-                        .tint(selectedTheme.accentColor(for: colorScheme))
-                    }
+                // v1.2.1: pairing with the Mac Bridge, shown in its own top-level window
+                // so it appears above sheets and popovers (see PairingOverlay.swift).
+                .onChange(of: wifiClient.pairingPrompt != nil) { _, showing in
+                    PairingWindowPresenter.shared.setVisible(showing, wifiClient: wifiClient,
+                                                             tint: selectedTheme.accentColor(for: colorScheme))
                 }
-                .animation(.easeInOut(duration: 0.2), value: wifiClient.pairingPrompt)
         }
     }

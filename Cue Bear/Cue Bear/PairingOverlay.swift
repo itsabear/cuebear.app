@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct PairingOverlay: View {
     let prompt: BridgeOutput.PairingPrompt
@@ -104,4 +105,60 @@ struct PairingOverlay: View {
         onCancel: {},
         onDismiss: {}
     )
+}
+
+// MARK: - Top-level presentation
+//
+// The pairing panel must appear above everything, including sheets and popovers
+// (Welcome screen, connections menu). A SwiftUI overlay on the root view sits
+// underneath those, so the panel lives in its own window at alert level.
+
+/// Root of the pairing window: follows the Wi-Fi client's prompt live.
+private struct PairingWindowRoot: View {
+    @ObservedObject var wifiClient: BridgeOutput
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            if let prompt = wifiClient.pairingPrompt {
+                PairingOverlay(
+                    prompt: prompt,
+                    onCancel: { wifiClient.cancelPairing() },
+                    onDismiss: { wifiClient.dismissPairingPrompt() }
+                )
+                .tint(tint)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: wifiClient.pairingPrompt)
+    }
+}
+
+@MainActor
+final class PairingWindowPresenter {
+    static let shared = PairingWindowPresenter()
+    private var window: UIWindow?
+
+    func setVisible(_ visible: Bool, wifiClient: BridgeOutput, tint: Color) {
+        if visible {
+            guard window == nil else { return }
+            guard let scene = UIApplication.shared.connectedScenes
+                    .compactMap({ $0 as? UIWindowScene })
+                    .first(where: { $0.activationState == .foregroundActive })
+                    ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+                return
+            }
+            let host = UIHostingController(rootView: PairingWindowRoot(wifiClient: wifiClient, tint: tint))
+            host.view.backgroundColor = .clear
+
+            let newWindow = UIWindow(windowScene: scene)
+            newWindow.windowLevel = .alert + 1
+            newWindow.backgroundColor = .clear
+            newWindow.rootViewController = host
+            newWindow.isHidden = false
+            window = newWindow
+        } else {
+            window?.isHidden = true
+            window = nil
+        }
+    }
 }
