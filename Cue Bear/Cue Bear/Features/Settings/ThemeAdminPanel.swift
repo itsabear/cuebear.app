@@ -391,7 +391,7 @@ struct ContrastRow: View {
                 .foregroundStyle(CBColor.textSecondary)
             Text(rating.0)
                 .font(.cb(.caption, .bold))
-                .foregroundColor(.white)
+                .foregroundStyle(CBColor.textPrimary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(rating.1)
@@ -423,7 +423,7 @@ struct ExportSection: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color.blue)
-                .foregroundColor(.white)
+                .foregroundStyle(CBColor.textPrimary)
                 .cornerRadius(CBRadius.card)
             }
             .padding(.horizontal)
@@ -439,7 +439,7 @@ struct ExportSection: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color.purple)
-                .foregroundColor(.white)
+                .foregroundStyle(CBColor.textPrimary)
                 .cornerRadius(CBRadius.card)
             }
             .padding(.horizontal)

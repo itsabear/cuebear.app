@@ -106,17 +106,17 @@ struct SwipeableCapsuleTutorial: View {
                 HStack(spacing: 8) {
                     Image(systemName: "hand.draw")
                         .font(.cbIcon(.large, .regular))
-                        .foregroundColor(.white)
+                        .foregroundStyle(CBColor.textPrimary)
 
                     Text(text)
                         .font(.cb(.small, .medium))
-                        .foregroundColor(.white)
+                        .foregroundStyle(CBColor.textPrimary)
                 }
 
                 if let onSkip = onSkip {
                     Button("Skip") { onSkip() }
                         .font(.cb(.caption, .regular))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundStyle(CBColor.textSecondary)
                 }
             }
             .padding(.horizontal, 16)
@@ -196,18 +196,18 @@ struct UpwardTutorial: View {
                     HStack(spacing: 8) {
                         Image(systemName: "hand.tap")
                             .font(.cbIcon(.large, .regular))
-                            .foregroundColor(.white)
+                            .foregroundStyle(CBColor.textPrimary)
 
                         Text(message)
                             .font(.cb(.small, .medium))
-                            .foregroundColor(.white)
+                            .foregroundStyle(CBColor.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
                     if let onSkip = onSkip {
                         Button("Skip") { onSkip() }
                             .font(.cb(.caption, .regular))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundStyle(CBColor.textSecondary)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -280,18 +280,18 @@ struct DownwardTutorial: View {
                     HStack(spacing: 8) {
                         Image(systemName: "hand.tap")
                             .font(.cbIcon(.large, .regular))
-                            .foregroundColor(.white)
+                            .foregroundStyle(CBColor.textPrimary)
 
                         Text(message)
                             .font(.cb(.small, .medium))
-                            .foregroundColor(.white)
+                            .foregroundStyle(CBColor.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
                     if let onSkip = onSkip {
                         Button("Skip") { onSkip() }
                             .font(.cb(.caption, .regular))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundStyle(CBColor.textSecondary)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -493,26 +493,8 @@ struct DestructiveWideButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.cb(.body, .semibold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-        }
-        .buttonStyle(DestructiveWideButtonStyle())
-    }
-}
-
-struct DestructiveWideButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: CBRadius.control)
-                    .fill(configuration.isPressed ? Color.red.opacity(0.7) : Color.red)
-            )
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+        Button(title, action: action)
+            .buttonStyle(CBButtonStyle(kind: .destructive, fullWidth: true, height: CBSize.largeControl))
     }
 }
 
@@ -3720,7 +3702,7 @@ internal struct ContentView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "magnifyingglass")
                                     .font(.cbIcon(points: setlistBatchMode ? 18 : 16, .regular))
-                                    .foregroundColor(.white)
+                                    .foregroundStyle(CBColor.textPrimary)
 
                                 if !setlistBatchMode {
                                     TextField("Search cues...", text: $setlistQuery)
@@ -3771,14 +3753,14 @@ internal struct ContentView: View {
                                 }) {
                                     Image(systemName: reorderMode ? "checkmark" : "list.bullet")
                                         .font(.cbIcon(.large, .regular))
-                                        .foregroundColor(.white)
+                                        .foregroundStyle(CBColor.textPrimary)
                                         .frame(width: 44, height: 44)
                                         .background(
                                             RoundedRectangle(cornerRadius: CBRadius.control)
-                                                .fill(Color.black.opacity(0.5))
+                                                .fill(CBColor.chip)
                                                 .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                                         )
-                                        .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                                        .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(CBColor.stroke, lineWidth: CBSize.hairline))
                                         .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
                                 }
                                 .buttonStyle(IOSPressButtonStyle())
@@ -3792,7 +3774,7 @@ internal struct ContentView: View {
                                     }) {
                                         Text("All")
                                             .font(.cb(.small, .medium))
-                                            .foregroundColor(.white)
+                                            .foregroundStyle(CBColor.textPrimary)
                                             .padding(.horizontal, 10)
                                             .frame(height: 44)
                                     }
@@ -3803,7 +3785,7 @@ internal struct ContentView: View {
                                     }) {
                                         Text("Clear")
                                             .font(.cb(.small, .medium))
-                                            .foregroundColor(.white)
+                                            .foregroundStyle(CBColor.textPrimary)
                                             .padding(.horizontal, 10)
                                             .frame(height: 44)
                                     }
@@ -3839,7 +3821,7 @@ internal struct ContentView: View {
                                     }) {
                                         Image(systemName: "xmark")
                                             .font(.cbIcon(.small, .medium))
-                                            .foregroundColor(.white)
+                                            .foregroundStyle(CBColor.textPrimary)
                                             .frame(width: 36, height: 44)
                                     }
                                     .buttonStyle(IOSPressButtonStyle())
@@ -3853,7 +3835,7 @@ internal struct ContentView: View {
                                     }) {
                                         Image(systemName: "checklist")
                                             .font(.cbIcon(.large, .regular))
-                                            .foregroundColor(.white)
+                                            .foregroundStyle(CBColor.textPrimary)
                                             .frame(width: 44, height: 44)
                                     }
                                     .buttonStyle(IOSPressButtonStyle())
@@ -3889,10 +3871,10 @@ internal struct ContentView: View {
         // Floating action button with rounded rectangle to match app button style
         Image(systemName: "slider.horizontal.3")
             .font(.cbIcon(.title, .medium))
-            .foregroundColor(.white)
+            .foregroundStyle(CBColor.textPrimary)
             .frame(width: 56, height: 56)
             .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(Color.black.opacity(0.8)))
-            .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(Color.white.opacity(0.2), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(CBColor.stroke, lineWidth: CBSize.hairline))
             .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
             .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 4)
             .opacity(controlsCapsulePressed ? 0.5 : 1.0)
@@ -7322,7 +7304,7 @@ private struct SplashScreen: View {
                 // App name
                 Text("Cue Bear")
                     .font(.cb(.display, .bold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(CBColor.textPrimary)
 
                 // Subtle loading indicator
                 ProgressView()
@@ -7456,7 +7438,7 @@ private struct CBTopBar: View {
                             Text("Show")
                                 .font(.cb(.body, .semibold))
                         }
-                        .foregroundStyle(.white)
+                        .foregroundStyle(CBColor.textPrimary)
                         .padding(.horizontal, 14)
                         .frame(height: 44)
                         .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
@@ -7534,13 +7516,13 @@ private struct CBTopBar: View {
             HStack(spacing: 6) {
                 Text(activeCueList?.name ?? "Untitled")
                     .font(themeFont(17, .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(CBColor.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 Image(systemName: showCueListChooser ? "chevron.up" : "chevron.down")
                     .font(.cbIcon(.caption, .semibold))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(CBColor.textSecondary)
             }
             .padding(.horizontal, 14)
             .frame(height: 44)
@@ -7581,7 +7563,7 @@ private struct CBTopBar: View {
         Button(action: onMenuToggle) {
             Image(systemName: showSideMenu ? "xmark" : "line.3.horizontal")
                 .font(.cbIcon(.large, .medium))
-                .foregroundStyle(.white)
+                .foregroundStyle(CBColor.textPrimary)
                 .frame(width: 44, height: 44)
                 .rotationEffect(.degrees(showSideMenu ? 90 : 0))
                 .contentTransition(.symbolEffect(.replace))
@@ -7601,7 +7583,7 @@ private struct CBTopBar: View {
                 }) {
                     Image(systemName: "book")
                         .imageScale(.large)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundStyle(CBColor.textPrimary)
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(IOSPressButtonStyle())
@@ -7646,7 +7628,7 @@ private struct CBTopBar: View {
                 Button(action: onUndo) {
                     Image(systemName: "arrow.uturn.backward")
                         .imageScale(.large)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundStyle(CBColor.textPrimary)
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(IOSPressButtonStyle())
@@ -7657,7 +7639,7 @@ private struct CBTopBar: View {
                 Button(action: onRedo) {
                     Image(systemName: "arrow.uturn.forward")
                         .imageScale(.large)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundStyle(CBColor.textPrimary)
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(IOSPressButtonStyle())
@@ -7668,7 +7650,7 @@ private struct CBTopBar: View {
                 Button(action: onAdd) {
                     Image(systemName: "plus")
                         .imageScale(.large)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundStyle(CBColor.textPrimary)
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(IOSPressButtonStyle())
@@ -8177,7 +8159,7 @@ private struct CBControlSection: View {
                             }) {
                                 Text(isEditing ? "Done" : "Edit")
                                     .font(.cb(.body, .medium))
-                                    .foregroundColor(.white)
+                                    .foregroundStyle(CBColor.textPrimary)
                                     .padding(.horizontal, 12)
                                     .frame(height: 44)
                             }
@@ -8191,7 +8173,7 @@ private struct CBControlSection: View {
                                 }) {
                                     Image(systemName: "chevron.up")
                                         .font(.cbIcon(.body, .semibold))
-                                        .foregroundColor(.white)
+                                        .foregroundStyle(CBColor.textPrimary)
                                         .frame(width: 44, height: 44)
                                 }
                                 .buttonStyle(IOSPressButtonStyle())
@@ -8269,7 +8251,7 @@ private struct CBControlSection: View {
                     // Page indicator
                     Text(pageIndicatorText)
                         .font(.cb(.small))
-                        .foregroundColor(.white)
+                        .foregroundStyle(CBColor.textPrimary)
                         .frame(minWidth: 32)
 
                     // Next page button
@@ -8386,7 +8368,7 @@ private struct CBControlSection: View {
                     }) {
                         Image(systemName: buttons.isEmpty ? "chevron.down" : "checkmark")
                             .font(.cbIcon(.large, .medium))
-                            .foregroundColor(.white)
+                            .foregroundStyle(CBColor.textPrimary)
                             .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
@@ -8403,7 +8385,7 @@ private struct CBControlSection: View {
                     }) {
                         Text("Edit")
                             .font(.cb(.body))
-                            .foregroundColor(.white)
+                            .foregroundStyle(CBColor.textPrimary)
                             .padding(.horizontal, 14)
                             .frame(height: 44)
                     }
@@ -8423,7 +8405,7 @@ private struct CBControlSection: View {
                         }) {
                             Image(systemName: "chevron.down")
                                 .font(.cbIcon(.body, .medium))
-                                .foregroundColor(.white)
+                                .foregroundStyle(CBColor.textPrimary)
                                 .frame(width: 40, height: 44)
                         }
                         .buttonStyle(.plain)
@@ -8703,7 +8685,7 @@ private struct CBControlSection: View {
                     .fill(Color.black.opacity(0.8))
                     .overlay(
                         RoundedRectangle(cornerRadius: CBRadius.panel)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            .stroke(CBColor.stroke, lineWidth: CBSize.hairline)
                     )
                     .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
             )
@@ -13058,10 +13040,10 @@ struct DraggableNavigationCapsule: View {
             .background(
                 GeometryReader { geo in
                     RoundedRectangle(cornerRadius: CBRadius.panel)
-                        .fill(Color.black.opacity(0.5))
+                        .fill(CBColor.chip)
                         .overlay(
                             RoundedRectangle(cornerRadius: CBRadius.panel)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                .stroke(CBColor.stroke, lineWidth: CBSize.hairline)
                         )
                         .preference(
                             key: CapsuleBoundsPreferenceKey.self,
@@ -13292,7 +13274,7 @@ struct SimpleDraggableTransportDock: View {
                         .fill(Color.black.opacity(0.8))
                         .overlay(
                             RoundedRectangle(cornerRadius: CBRadius.panel)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                .stroke(CBColor.stroke, lineWidth: CBSize.hairline)
                         )
                         .preference(
                             key: CapsuleBoundsPreferenceKey.self,

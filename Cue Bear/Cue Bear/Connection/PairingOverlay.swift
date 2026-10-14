@@ -16,16 +16,20 @@ struct PairingOverlay: View {
             Color.black.opacity(0.45)
                 .ignoresSafeArea()
 
-            VStack(spacing: 18) {
+            VStack(spacing: CBSpace.l) {
                 content
             }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 28)
+            .padding(.horizontal, CBSpace.xxl)
+            .padding(.vertical, CBSpace.xl)
             .frame(maxWidth: 440)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: CBRadius.panel, style: .continuous))
-            .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
-            .padding(24)
+            .background(RoundedRectangle(cornerRadius: CBRadius.panel).fill(CBColor.background))
+            .overlay(RoundedRectangle(cornerRadius: CBRadius.panel).stroke(CBColor.stroke, lineWidth: CBSize.hairline))
+            .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
+            .padding(CBSpace.xl)
         }
+        .font(.cb(.body))
+        .foregroundStyle(CBColor.textPrimary)
+        .preferredColorScheme(.dark)
         .transition(.opacity)
         .accessibilityAddTraits(.isModal)
     }
@@ -36,17 +40,18 @@ struct PairingOverlay: View {
         case .contacting:
             Image(systemName: "lock.shield")
                 .font(.cbIcon(.display, .regular))
-                .foregroundStyle(.tint)
+                .foregroundStyle(CBColor.highlight)
             Text("Pairing with \(prompt.bridgeName)")
                 .font(.cb(.large, .semibold))
                 .multilineTextAlignment(.center)
             ProgressView()
             Button("Cancel", role: .cancel, action: onCancel)
+                .buttonStyle(.cbSecondary)
 
         case .confirmOnMac(let code):
             Image(systemName: "lock.shield")
                 .font(.cbIcon(.display, .regular))
-                .foregroundStyle(.tint)
+                .foregroundStyle(CBColor.highlight)
             Text("Pair with \(prompt.bridgeName)")
                 .font(.cb(.large, .semibold))
                 .multilineTextAlignment(.center)
@@ -64,6 +69,7 @@ struct PairingOverlay: View {
                 .font(.cb(.caption))
                 .foregroundStyle(CBColor.textSecondary)
             Button("Cancel", role: .cancel, action: onCancel)
+                .buttonStyle(.cbSecondary)
 
         case .declined:
             resultView(symbol: "xmark.circle",
@@ -95,7 +101,7 @@ struct PairingOverlay: View {
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
         Button("OK", action: onDismiss)
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.cbPrimary)
     }
 }
 

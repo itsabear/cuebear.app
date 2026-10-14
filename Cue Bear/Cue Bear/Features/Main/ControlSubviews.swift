@@ -905,7 +905,7 @@ struct CBSetlistColumn: View {
                                         .frame(width: 24, height: 24)
                                     Image(systemName: "checkmark")
                                         .font(.cbIcon(.caption, .bold))
-                                        .foregroundColor(.white)
+                                        .foregroundStyle(CBColor.textPrimary)
                                 }
                             }
                             .frame(width: 24, height: 24)
@@ -1120,7 +1120,7 @@ struct CBLibraryColumn: View {
                                         .frame(width: 24, height: 24)
                                     Image(systemName: "checkmark")
                                         .font(.cbIcon(.caption, .bold))
-                                        .foregroundColor(.white)
+                                        .foregroundStyle(CBColor.textPrimary)
                                 }
                             }
                             .frame(width: 24, height: 24)
@@ -1325,8 +1325,7 @@ struct CBBatchToolbar: View {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onAddToSetlist()
                 } label: { Label("Add to Setlist", systemImage: "plus.circle.fill") }
-                .buttonStyle(.borderedProminent)
-                .tint(selectedTheme.accentColor(for: colorScheme))
+                .buttonStyle(.cbPrimary)
                 .disabled(selectedCount == 0)
 
                 Button(role: .destructive) {
@@ -1699,7 +1698,7 @@ struct CBAddEditCueSheet: View {
         return HStack {
             Button("Cancel") { onCancel() }
                 .font(.cb(.body))
-                .foregroundColor(.white)
+                .foregroundStyle(CBColor.textPrimary)
                 .padding(.horizontal, 14)
                 .frame(height: 44)
                 .cbChip()
@@ -1758,7 +1757,7 @@ struct CBAddEditCueSheet: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.cbIcon(.large, .medium))
-                        .foregroundColor(.white)
+                        .foregroundStyle(CBColor.textPrimary)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -2464,14 +2463,14 @@ struct SongLibraryPopover: View {
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
                             .font(.cbIcon(.large, .regular))
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundStyle(CBColor.textPrimary)
                             .frame(width: 44, height: 44)
                             .background(
                                 RoundedRectangle(cornerRadius: CBRadius.control)
-                                    .fill(Color.black.opacity(0.5))
+                                    .fill(CBColor.chip)
                                     .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                             )
-                            .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(CBColor.stroke, lineWidth: CBSize.hairline))
                             .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
                     }
                 }
@@ -2898,14 +2897,14 @@ struct CueListChooserPopover: View {
                 Button(action: onCreateNew) {
                     Image(systemName: "plus")
                         .font(.cbIcon(.large, .medium))
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundStyle(CBColor.textPrimary)
                         .frame(width: 44, height: 44)
                         .background(
                             RoundedRectangle(cornerRadius: CBRadius.control)
-                                .fill(Color.black.opacity(0.5))
+                                .fill(CBColor.chip)
                                 .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                         )
-                        .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(CBColor.stroke, lineWidth: CBSize.hairline))
                         .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
                 }
 
@@ -2993,14 +2992,14 @@ struct CueListChooserPopover: View {
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
                             .font(.cbIcon(.large, .regular))
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundStyle(CBColor.textPrimary)
                             .frame(width: 44, height: 44)
                             .background(
                                 RoundedRectangle(cornerRadius: CBRadius.control)
-                                    .fill(Color.black.opacity(0.5))
+                                    .fill(CBColor.chip)
                                     .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                             )
-                            .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(CBColor.stroke, lineWidth: CBSize.hairline))
                             .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
                     }
                 }
@@ -3214,7 +3213,7 @@ struct SwipeableCueListRow: View {
                             onDelete()
                         }) {
                             Image(systemName: "trash")
-                                .foregroundColor(.white)
+                                .foregroundStyle(CBColor.textPrimary)
                                 .frame(width: deleteButtonWidth)
                                 .frame(maxHeight: .infinity)
                         }

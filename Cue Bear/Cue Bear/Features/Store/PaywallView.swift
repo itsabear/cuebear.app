@@ -96,7 +96,7 @@ struct PaywallView: View {
                                         .font(.cb(.large, .bold))
                                 }
                             }
-                            .foregroundColor(.white)
+                            .foregroundStyle(CBColor.textPrimary)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
                             .background(Color.blue)
