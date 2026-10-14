@@ -943,6 +943,9 @@ class ConnectionManager: ObservableObject {
                     self?.logMain("🔗 Clearing activeUSB for clean disconnect - ready for new Bridge")
                     self?.activeUSB = nil
                 }
+                if Self.unifiedUSBReceive {
+                    connection.cancel()   // close our end too, so the dead socket can't report again later
+                }
 
                 // Update connection state when connection is completed
                 DispatchQueue.main.async { [weak self] in
@@ -998,6 +1001,9 @@ class ConnectionManager: ObservableObject {
                 if let activeConn = self?.activeUSB, connection === activeConn {
                     self?.logMain("🔗 Clearing activeUSB for clean disconnect - ready for new Bridge")
                     self?.activeUSB = nil
+                }
+                if Self.unifiedUSBReceive {
+                    connection.cancel()   // close our end too, so the dead socket can't report again later
                 }
 
                 // Update connection state when connection is completed
