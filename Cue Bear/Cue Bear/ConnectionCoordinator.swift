@@ -25,6 +25,7 @@ class ConnectionCoordinator: ObservableObject {
     /// so pulling the cable switches to Wi-Fi with no gap, and plugging back in returns to USB.
     /// Set to false for the old behaviour.
     static let seamlessHandover = true
+    private var lastStandbyAttempt = Date.distantPast
 
     enum ConnectionType {
         case none
@@ -56,6 +57,30 @@ class ConnectionCoordinator: ObservableObject {
         
         // Add additional monitoring for debugging
         monitorConnectionState()
+
+        if Self.seamlessHandover {
+            // Safety net: once a second, make sure the active connection matches reality.
+            usbMonitorTimer?.invalidate()
+            usbMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.reconcileActiveConnection() }
+            }
+        }
+    }
+
+    /// USB is preferred whenever it's connected (unless the user just picked Wi-Fi or disconnected USB).
+    private func reconcileActiveConnection() {
+        guard let usbServer = usbServer else { return }
+        if usbServer.isConnected {
+            if activeConnection != .usb && !isManualWiFiConnection && !isManualUSBDisconnection {
+                debugPrint("🔌 ConnectionCoordinator: USB is connected but \(activeConnection) was active - switching to USB")
+                handleUSBConnectionChange(true)
+            } else if activeConnection == .usb {
+                armWiFiStandby()
+            }
+        } else if activeConnection == .usb {
+            debugPrint("🔌 ConnectionCoordinator: USB marked active but not connected - re-evaluating")
+            handleUSBConnectionChange(false)
+        }
     }
     
     private func monitorConnectionState() {
@@ -114,7 +139,9 @@ class ConnectionCoordinator: ObservableObject {
               let usbServer = usbServer, usbServer.isConnected,
               let wifiClient = wifiClient, wifiClient.isIdle,
               let bridgeID = usbServer.usbBridgeID,
-              let item = wifiClient.standbyCandidate(forBridgeID: bridgeID) else { return }
+              let item = wifiClient.standbyCandidate(forBridgeID: bridgeID),
+              Date().timeIntervalSince(lastStandbyAttempt) > 15 else { return }
+        lastStandbyAttempt = Date()
         debugPrint("🔌 ConnectionCoordinator: Opening Wi-Fi backup link to \(item.name) while on USB")
         wifiClient.connectStandby(to: item)
     }
@@ -218,6 +245,17 @@ class ConnectionCoordinator: ObservableObject {
 
         // Inform USB server about WiFi connection state to keep USB chip visible
         usbServer.setWiFiConnectionState(isConnected)
+
+        // v1.2.1: with seamless handover, USB wins whenever it's up, unless the user just chose Wi-Fi.
+        // (Before, any Wi-Fi link coming up would shut USB down.)
+        if isConnected, Self.seamlessHandover, !isManualWiFiConnection,
+           let wifiClient = wifiClient, usbServer.isConnected {
+            debugPrint("🔌 ConnectionCoordinator: Wi-Fi came up while USB is connected - keeping USB, Wi-Fi on standby")
+            wifiClient.suspend()
+            activeConnection = .usb
+            connectionStatus = "USB Connected"
+            return
+        }
 
         // Allow manual WiFi connections even when USB is active
         // This enables user override functionality

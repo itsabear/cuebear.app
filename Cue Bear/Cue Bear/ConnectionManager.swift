@@ -46,6 +46,14 @@ class ConnectionManager: ObservableObject {
     /// With unifiedUSBReceive: the Bridge sends a heartbeat every 2 s, so 6 s of silence means the cable or Bridge is gone.
     private let usbSilenceTimeout: TimeInterval = 6.0
     private weak var watchedUSBConnection: NWConnection?
+
+    /// True when `connection` is an old USB connection that has already been replaced.
+    /// Its late "closed" events must not mark the new, working connection as disconnected.
+    /// Only call on usbQueue (where activeUSB is changed).
+    private func isStaleUSB(_ connection: NWConnection) -> Bool {
+        guard Self.unifiedUSBReceive, let active = activeUSB else { return false }
+        return active !== connection
+    }
     private let healthCheckInterval: TimeInterval = 2.0
     private let reconnectInterval: TimeInterval = 0.5  // Faster reconnection attempts
     private let heartbeatCheckInterval: TimeInterval = 1.0  // Check for heartbeat every 1 second
@@ -478,6 +486,10 @@ class ConnectionManager: ObservableObject {
                     self.activeUSB = connection
                     connection.stateUpdateHandler = { [weak self] st in
                         self?.logMain("🔗 USB conn state: \(st)")
+                        if let self = self, self.isStaleUSB(connection) {
+                            self.logMain("🔗 USB: ignoring state \(st) from a replaced connection")
+                            return
+                        }
                         self?.handleConnectionStateChange(st, connection: connection)
 
                         // Immediate disconnect detection for USB cable removal
@@ -912,6 +924,10 @@ class ConnectionManager: ObservableObject {
                 self?.processReceivedData(data, from: connection)
             }
             
+            if let self = self, self.isStaleUSB(connection) {
+                return   // replaced connection: its end is not our end
+            }
+
             if let error = error {
                 debugPrint("🔗 ConnectionManager: Receive error: \(error)")
                 debugPrint("🔗 ConnectionManager: Error details: \(error.localizedDescription)")
@@ -968,6 +984,10 @@ class ConnectionManager: ObservableObject {
                 self?.processReceivedData(data, from: connection)
             }
             
+            if let self = self, self.isStaleUSB(connection) {
+                return   // replaced connection: its end is not our end
+            }
+
             if error != nil {
                 self?.handleConnectionFailure()
                 return
@@ -1469,6 +1489,7 @@ class ConnectionManager: ObservableObject {
         if let connection = activeUSB {
             connection.stateUpdateHandler = { [weak self] state in
                 debugPrint("🔗 ConnectionManager: Direct state update - \(state)")
+                if let self = self, self.isStaleUSB(connection) { return }
                 switch state {
                 case .cancelled, .failed:
                     debugPrint("🔗 ConnectionManager: Direct disconnect detected - \(state)")
