@@ -49,9 +49,9 @@
 			isa = PBXGroup;
 			children = (
 				AA1112000000000000000001 /* CueBearBridgeApp.swift */,
+				0558A9C21D2141E58BC44369 /* OnboardingWindow.swift */,
 				AA1112000000000000000002 /* ContentView.swift */,
 				AA1112000000000000000003 /* IProxyManager.swift */,
-				489894C27C7C45A7B6F68045 /* USBMuxdMonitor.swift */,
 				A313445E766241B89A2BB542 /* CueBearBridge-Bridging-Header.h */,
 				AA1112000000000000000004 /* MacConnectionManager.swift */,
 				AA1112000000000000000005 /* MIDIManager.swift */,
@@ -193,7 +193,6 @@
 				HEADER_SEARCH_PATHS = (
 					/opt/homebrew/include,
 				);
-				INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LIBRARY_SEARCH_PATHS = (
@@ -235,7 +234,6 @@
 				HEADER_SEARCH_PATHS = (
 					/opt/homebrew/include,
 				);
-				INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LIBRARY_SEARCH_PATHS = (
