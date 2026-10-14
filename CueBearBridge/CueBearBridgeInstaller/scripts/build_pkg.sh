@@ -106,7 +106,10 @@ if [ -z "$SIGNING_IDENTITY_APP" ]; then
     log_success "Found: $SIGNING_IDENTITY_APP"
 fi
 
-if [ -z "$SIGNING_IDENTITY_INSTALLER" ]; then
+# DMG_ONLY=1: build and sign the app only (for a drag-to-Applications DMG); no installer package
+DMG_ONLY="${DMG_ONLY:-0}"
+
+if [ "$DMG_ONLY" != "1" ] && [ -z "$SIGNING_IDENTITY_INSTALLER" ]; then
     log_info "Auto-detecting Developer ID Installer certificate..."
     # Note: Use -p basic (not codesigning) for installer certificates
     # Installer certs use OID 1.2.840.113635.100.4.13 (Package Signing)
@@ -282,6 +285,11 @@ log_info "Running codesign script..."
 "$SCRIPT_DIR/codesign_app.sh" "$APP_BUNDLE" "$SIGNING_IDENTITY_APP"
 
 log_success "App bundle signed"
+
+if [ "$DMG_ONLY" = "1" ]; then
+    log_success "Signed app ready: $APP_BUNDLE (DMG_ONLY - skipping installer package)"
+    exit 0
+fi
 
 # ============================================================================
 # Step 7: Create Package Root
