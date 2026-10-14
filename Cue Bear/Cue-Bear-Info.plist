@@ -22,6 +22,11 @@
 			</array>
 		</dict>
 	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchScreenBackground</string>
+	</dict>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_cuebear._tcp</string>
@@ -38,6 +43,22 @@
 		<string>NunitoSans-Black.ttf</string>
 		<string>CormorantGaramond-Italic.ttf</string>
 		<string>SpaceGrotesk-Medium.ttf</string>
+		<string>Satoshi-Regular.otf</string>
+		<string>Satoshi-Bold.otf</string>
+		<string>GeneralSans-Regular.otf</string>
+		<string>GeneralSans-Bold.otf</string>
+		<string>SpaceGrotesk-Regular.ttf</string>
+		<string>SpaceGrotesk-Bold.ttf</string>
+		<string>PlusJakartaSans-Regular.ttf</string>
+		<string>PlusJakartaSans-Bold.ttf</string>
+		<string>Outfit-Regular.ttf</string>
+		<string>Outfit-Bold.ttf</string>
+		<string>Inter-Regular.ttf</string>
+		<string>Inter-Bold.ttf</string>
+		<string>Manrope-Regular.ttf</string>
+		<string>Manrope-Bold.ttf</string>
+		<string>Sora-Regular.ttf</string>
+		<string>Sora-Bold.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
@@ -50,9 +71,7 @@
 				<dict>
 					<key>UISceneConfigurationName</key>
 					<string>Default Configuration</string>
-					<key>UISceneDelegateClassName</key>
-					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-				</dict>
+					</dict>
 			</array>
 		</dict>
 	</dict>

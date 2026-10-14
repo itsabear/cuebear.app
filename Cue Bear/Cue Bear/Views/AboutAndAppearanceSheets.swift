@@ -39,15 +39,15 @@ struct AboutSheet: View {
                             .shadow(radius: 10)
 
                         Text("Cue Bear")
-                            .font(.system(size: 36, weight: .bold))
+                            .font(.custom("Sora-Bold", size: 36))
 
                         VStack(spacing: 4) {
                             Text("Version \(appVersion) (\(buildNumber))")
-                                .font(.subheadline)
+                                .font(.custom("Sora-Regular", size: 15))
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
 
                             Text("Commit: \(gitCommitHash)")
-                                .font(.caption)
+                                .font(.custom("Sora-Regular", size: 12))
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.7))
                                 .fontDesign(.monospaced)
                         }
@@ -57,11 +57,11 @@ struct AboutSheet: View {
                     // Description
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Professional MIDI Cueing System")
-                            .font(.headline)
+                            .font(.custom("Sora-Bold", size: 17))
                             .frame(maxWidth: .infinity, alignment: .center)
 
                         Text("Cue Bear is a powerful iPad app designed for live performers, theatrical productions, and studio musicians. Trigger MIDI cues seamlessly with your Mac using USB or WiFi connection.")
-                            .font(.body)
+                            .font(.custom("Sora-Regular", size: 17))
                             .multilineTextAlignment(.center)
                             .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                             .padding(.horizontal, 20)
@@ -73,10 +73,10 @@ struct AboutSheet: View {
                     // Credits
                     VStack(spacing: 12) {
                         Text("Created by")
-                            .font(.headline)
+                            .font(.custom("Sora-Bold", size: 17))
 
                         Text("Omri Behr")
-                            .font(.title3.weight(.semibold))
+                            .font(.custom("Sora-Bold", size: 20))
                     }
 
                     // Links
@@ -100,7 +100,7 @@ struct AboutSheet: View {
 
                     // Copyright
                     Text("© 2024 Omri Behr. All rights reserved.")
-                        .font(.caption)
+                        .font(.custom("Sora-Regular", size: 12))
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                         .padding(.top, 20)
                         .padding(.bottom, 40)
@@ -109,17 +109,13 @@ struct AboutSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("About")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+                    CBSheetButton(title: "Done", bold: true) { dismiss() }
                 }
             }
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
+            .tint(selectedTheme.accentColor(for: colorScheme))
             .sheet(isPresented: $showingBugReport) {
                 BugReportView()
             }
@@ -137,7 +133,7 @@ struct AboutSheet: View {
                 Image(systemName: "ladybug.fill")
                     .frame(width: 24)
                 Text("Report a Bug")
-                    .font(.body.weight(.medium))
+                    .font(.custom("Sora-Bold", size: 17))
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
@@ -146,7 +142,7 @@ struct AboutSheet: View {
             .padding(.vertical, 14)
             .background(linkColor.opacity(0.1))
             .foregroundColor(linkColor)
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -171,14 +167,14 @@ struct AboutSheet: View {
                 Image(systemName: "arrow.counterclockwise")
                     .frame(width: 24)
                 Text("Reset Tutorials")
-                    .font(.body.weight(.medium))
+                    .font(.custom("Sora-Bold", size: 17))
                 Spacer()
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .background(linkColor.opacity(0.1))
             .foregroundColor(linkColor)
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -200,7 +196,7 @@ struct AboutSheet: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .frame(width: 24)
                 Text("🧪 Test Crash (Debug Only)")
-                    .font(.body.weight(.medium))
+                    .font(.custom("Sora-Bold", size: 17))
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
@@ -209,7 +205,7 @@ struct AboutSheet: View {
             .padding(.vertical, 14)
             .background(Color.red.opacity(0.1))
             .foregroundColor(.red)
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
     #endif
@@ -226,7 +222,7 @@ struct AboutSheet: View {
                 Image(systemName: icon)
                     .frame(width: 24)
                 Text(title)
-                    .font(.body.weight(.medium))
+                    .font(.custom("Sora-Bold", size: 17))
                 Spacer()
                 Image(systemName: "arrow.up.forward")
                     .font(.caption.weight(.semibold))
@@ -235,7 +231,7 @@ struct AboutSheet: View {
             .padding(.vertical, 14)
             .background(linkColor.opacity(0.1))
             .foregroundColor(linkColor)
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 }
@@ -263,10 +259,10 @@ struct AppearanceSheet: View {
                     // Header
                     VStack(spacing: 8) {
                         Text("Choose Your Vibe")
-                            .font(.system(size: 28, weight: .bold))
+                            .font(.custom("Sora-Bold", size: 28))
                             .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                         Text("Select a theme that matches your musical style")
-                            .font(.subheadline)
+                            .font(.custom("Sora-Regular", size: 15))
                             .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                             .multilineTextAlignment(.center)
                     }
@@ -293,21 +289,17 @@ struct AppearanceSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("Appearance")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .tint(selectedTheme.accentColor(for: colorScheme))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        // Restore original theme on cancel
+                    CBSheetButton(title: "Cancel") {
                         selectedThemeID = originalThemeID
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
+                    CBSheetButton(title: "Done", bold: true) { dismiss() }
                 }
             }
             .onAppear {
@@ -333,7 +325,7 @@ struct ThemePreviewCard: View {
         VStack(spacing: 12) {
             // Genre badge
             Text(theme.genre.uppercased())
-                .font(.system(size: 9, weight: .black))
+                .font(.custom("Sora-Bold", size: 9))
                 .foregroundColor(theme.accentColor(for: colorScheme))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -342,7 +334,7 @@ struct ThemePreviewCard: View {
 
             // Theme name
             Text(theme.name)
-                .font(.system(size: 17, weight: .bold))
+                .font(.custom("Sora-Bold", size: 17))
                 .foregroundColor(theme.primaryTextColor(for: colorScheme))
                 .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.8)
@@ -373,7 +365,7 @@ struct ThemePreviewCard: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(selectedTheme.successColor(for: colorScheme))
                 Text("ACTIVE")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.custom("Sora-Bold", size: 11))
                     .foregroundColor(selectedTheme.successColor(for: colorScheme))
             }
             .opacity(isSelected ? 1 : 0)
@@ -399,6 +391,8 @@ struct AppearanceSettingsSheet: View {
     @AppStorage("cueHeight") private var cueHeight: Double = 86
     @AppStorage("fontSize") private var fontSize: Double = 1.0
     @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
+    @AppStorage("autoAssignCueColors") private var autoAssignCueColors: Bool = true
+    @AppStorage("autoAssignControlColors") private var autoAssignControlColors: Bool = true
 
     @State private var showColorPicker = false
 
@@ -472,6 +466,21 @@ struct AppearanceSettingsSheet: View {
                 }
                 .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
+                // Auto Assign Colors Section
+                Section {
+                    Toggle("Auto Assign Cue Colors", isOn: $autoAssignCueColors)
+                        .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
+                    Toggle("Auto Assign Button & Fader Colors", isOn: $autoAssignControlColors)
+                        .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
+                } header: {
+                    Text("AUTO ASSIGN COLORS")
+                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                } footer: {
+                    Text("Randomly assigns a color from the palette when adding new cues or controls")
+                        .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
+                }
+                .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
+
                 // MIDI Data Display Section
                 Section {
                     Toggle("Show MIDI Data", isOn: $showMIDIData)
@@ -498,15 +507,15 @@ struct AppearanceSettingsSheet: View {
                         }
 
                         Slider(value: cueSize, in: 0.7...1.5, step: 0.05)
-                            .tint(selectedTheme.defaultCueColor(for: colorScheme))
+                            .tint(selectedTheme.accentColor(for: colorScheme))
 
                         HStack {
                             Text("70%")
-                                .font(.caption)
+                                .font(.custom("Sora-Regular", size: 12))
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                             Spacer()
                             Text("150%")
-                                .font(.caption)
+                                .font(.custom("Sora-Regular", size: 12))
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                         }
                     }
@@ -531,8 +540,8 @@ struct AppearanceSettingsSheet: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     } label: {
                         Text("Reset to Defaults")
-                            .font(.body.weight(.semibold))
-                            .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+                            .font(.custom("Sora-Bold", size: 17))
+                            .foregroundColor(selectedTheme.accentColor(for: colorScheme))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                     }
@@ -543,17 +552,13 @@ struct AppearanceSettingsSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("Appearance Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+                    CBSheetButton(title: "Done", bold: true) { dismiss() }
                 }
             }
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
+            .tint(selectedTheme.accentColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }

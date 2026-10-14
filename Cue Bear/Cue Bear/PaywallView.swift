@@ -43,10 +43,10 @@ struct PaywallView: View {
                         // Title
                         VStack(spacing: 12) {
                             Text("Unlock Cue Bear")
-                                .font(.system(size: 32, weight: .bold))
+                                .font(.custom("Sora-Bold", size: 32))
 
                             Text("Full-featured MIDI controller for your set list")
-                                .font(.system(size: 17))
+                                .font(.custom("Sora-Regular", size: 17))
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
@@ -64,11 +64,11 @@ struct PaywallView: View {
                         // Price
                         VStack(spacing: 8) {
                             Text("$4.99")
-                                .font(.system(size: 48, weight: .bold))
+                                .font(.custom("Sora-Bold", size: 48))
                                 .foregroundColor(.primary)
 
                             Text("One-time purchase")
-                                .font(.system(size: 15))
+                                .font(.custom("Sora-Regular", size: 15))
                                 .foregroundColor(.secondary)
                         }
                         .padding(.top, 20)
@@ -84,7 +84,7 @@ struct PaywallView: View {
                                         .scaleEffect(0.9)
                                 } else {
                                     Text("Buy Cue Bear")
-                                        .font(.system(size: 18, weight: .semibold))
+                                        .font(.custom("Sora-Bold", size: 18))
                                 }
                             }
                             .foregroundColor(.white)
@@ -107,7 +107,7 @@ struct PaywallView: View {
                                         .scaleEffect(0.8)
                                 }
                                 Text("Restore Purchases")
-                                    .font(.system(size: 15))
+                                    .font(.custom("Sora-Regular", size: 15))
                                     .foregroundColor(.blue)
                             }
                         }
@@ -116,7 +116,7 @@ struct PaywallView: View {
                         // Error Message
                         if let error = errorMessage {
                             Text(error)
-                                .font(.caption)
+                                .font(.custom("Sora-Regular", size: 12))
                                 .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 .padding(.horizontal, 40)
                                 .multilineTextAlignment(.center)

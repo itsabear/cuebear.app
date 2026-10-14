@@ -5,6 +5,7 @@ enum DarkModeBehavior: String, Codable {
     case standard  // Responds to system dark mode normally
     case inverted  // Dark in light mode, light in dark mode (future use)
     case fixed     // Ignores system dark mode, always uses light mode colors
+    case alwaysDark // Ignores system setting, always uses dark mode colors
 }
 
 // MARK: - Theme Models
@@ -47,6 +48,13 @@ struct AppTheme: Identifiable, Codable, Equatable {
         return Color(hex: hex)
     }
 
+    /// Returns black or white text color that contrasts well against the accent color
+    func accentContrastColor(for colorScheme: ColorScheme) -> Color {
+        let hex = shouldUseDarkMode(for: colorScheme) ? darkAccentColorHex : accentColorHex
+        let luminance = relativeLuminance(hex: hex)
+        return luminance > 0.5 ? Color.black : Color.white
+    }
+
     func backgroundColor(for colorScheme: ColorScheme) -> Color {
         let hex = shouldUseDarkMode(for: colorScheme) ? darkBackgroundColorHex : backgroundColorHex
         return Color(hex: hex)
@@ -71,6 +79,13 @@ struct AppTheme: Identifiable, Codable, Equatable {
     func defaultCueColor(for colorScheme: ColorScheme) -> Color {
         let hex = shouldUseDarkMode(for: colorScheme) ? darkDefaultCueColorHex : defaultCueColorHex
         return Color(hex: hex)
+    }
+
+    /// Returns black or white text color that contrasts well against the default cue color
+    func defaultCueContrastColor(for colorScheme: ColorScheme) -> Color {
+        let hex = shouldUseDarkMode(for: colorScheme) ? darkDefaultCueColorHex : defaultCueColorHex
+        let luminance = relativeLuminance(hex: hex)
+        return luminance > 0.5 ? Color.black : Color.white
     }
 
     func defaultCueColorHexValue(for colorScheme: ColorScheme) -> String {
@@ -133,6 +148,8 @@ struct AppTheme: Identifiable, Codable, Equatable {
             return false  // Always use light mode colors
         case .inverted:
             return colorScheme == .light  // Swap light/dark
+        case .alwaysDark:
+            return true  // Always use dark mode colors
         }
     }
 
@@ -253,13 +270,13 @@ struct AppTheme: Identifiable, Codable, Equatable {
 // MARK: - Available Themes
 extension AppTheme {
     static let allThemes: [AppTheme] = [
-        // Classic (Default)
+        // Classic (Default) — always dark to match new design
         AppTheme(
             id: "default",
             name: "Classic",
             genre: "Default",
-            fontName: "System",
-            darkModeBehavior: .standard,
+            fontName: "Sora-Regular",
+            darkModeBehavior: .alwaysDark,
             // Light mode (Optimized for WCAG AA: 4.5:1 minimum contrast)
             accentColorHex: "FFFFFF",  // White - maximum contrast with blue cues (10.1:1)
             backgroundColorHex: "F2F2F7",
@@ -271,7 +288,7 @@ extension AppTheme {
             successColorHex: "34C759",  // Standard iOS green
             // Dark mode
             darkAccentColorHex: "FFFFFF",  // White for consistency
-            darkBackgroundColorHex: "000000",
+            darkBackgroundColorHex: "1C1C1E",
             darkDefaultCueColorHex: "0A84FF",
             darkTitleBarColorHex: "1C1C1E",
             darkButtonBackgroundColorHex: "2C2C2E",

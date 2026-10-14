@@ -18,31 +18,30 @@ struct OnboardingView: View {
     }
 
     private var pages: [OnboardingPage] {
-        let themeAccent = selectedTheme.defaultCueColor(for: colorScheme)
         return [
             OnboardingPage(
                 title: "Welcome to Cue Bear",
                 description: "A MIDI controller built around your set list.",
                 systemIcon: "music.note.list",
-                accentColor: themeAccent
+                accentColor: .white
             ),
             OnboardingPage(
                 title: "Connect Your Mac",
                 description: "Go to cuebear.app/bridge to download our companion app and install it on your Mac to connect seamlessly to your iPad over USB or WiFi.",
                 systemIcon: "laptopcomputer",
-                accentColor: themeAccent
+                accentColor: .white
             ),
             OnboardingPage(
                 title: "Enable MIDI Device",
                 description: "Enable \"Bear Bridge\" virtual MIDI device in your DAW.",
                 systemIcon: "slider.horizontal.3",
-                accentColor: themeAccent
+                accentColor: .white
             ),
             OnboardingPage(
                 title: "We'd Love Your Feedback",
                 description: "This app is in beta. We'd love to hear your take on our app. Hit us up on info@cuebear.app",
                 systemIcon: "envelope.fill",
-                accentColor: themeAccent
+                accentColor: .white
             )
         ]
     }
@@ -61,7 +60,8 @@ struct OnboardingView: View {
                                 // Always mark onboarding as seen - user has completed the flow
                                 UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
                                 dismiss()
-                            }
+                            },
+                            contrastColor: .black
                         )
                         .tag(index)
                     }
@@ -75,9 +75,7 @@ struct OnboardingView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     if currentPage < pages.count - 1 {
-                        Button("Skip") {
-                            dismiss()
-                        }
+                        CBSheetButton(title: "Skip") { dismiss() }
                     }
                 }
             }
@@ -101,6 +99,7 @@ struct OnboardingPageView: View {
     let isLastPage: Bool
     @Binding var dontShowAgain: Bool
     let onGetStarted: () -> Void
+    var contrastColor: Color = .black
 
     var body: some View {
         VStack(spacing: 0) {
@@ -115,7 +114,7 @@ struct OnboardingPageView: View {
 
                 // Title - fixed height with padding
                 Text(page.title)
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.custom("Sora-Bold", size: 28))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
                     .frame(minHeight: 70)
@@ -123,7 +122,7 @@ struct OnboardingPageView: View {
 
                 // Description - fixed height with padding
                 Text(page.description)
-                    .font(.system(size: 17, weight: .regular))
+                    .font(.custom("Sora-Regular", size: 17))
                     .multilineTextAlignment(.center)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 50)
@@ -145,7 +144,7 @@ struct OnboardingPageView: View {
                                 .foregroundColor(dontShowAgain ? page.accentColor : .secondary)
                                 .font(.system(size: 22))
                             Text("Don't show again")
-                                .font(.system(size: 16))
+                                .font(.custom("Sora-Regular", size: 16))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -154,12 +153,12 @@ struct OnboardingPageView: View {
                     // Get Started button
                     Button(action: onGetStarted) {
                         Text("Get Started")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.white)
+                            .font(.custom("Sora-Bold", size: 17))
+                            .foregroundColor(contrastColor)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .background(page.accentColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                     .padding(.horizontal, 40)
                 }
@@ -202,11 +201,11 @@ struct OnboardingViewCompact: View {
                     // Title & Description
                     VStack(spacing: 16) {
                         Text(pageTitle)
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .font(.custom("Sora-Bold", size: 28))
                             .multilineTextAlignment(.center)
 
                         Text(pageDescription)
-                            .font(.system(size: 17, weight: .regular))
+                            .font(.custom("Sora-Regular", size: 17))
                             .multilineTextAlignment(.center)
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -232,23 +231,23 @@ struct OnboardingViewCompact: View {
                     if currentPage > 0 {
                         Button(action: previousPage) {
                             Text("Back")
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.custom("Sora-Bold", size: 17))
                                 .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 50)
                                 .background(selectedTheme.defaultCueColor(for: colorScheme).opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
 
                     Button(action: currentPage < totalPages - 1 ? nextPage : dismiss.callAsFunction) {
                         Text(currentPage < totalPages - 1 ? "Next" : "Get Started")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.white)
+                            .font(.custom("Sora-Bold", size: 17))
+                            .foregroundColor(selectedTheme.defaultCueContrastColor(for: colorScheme))
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .background(selectedTheme.defaultCueColor(for: colorScheme))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                 }
                 .padding(.horizontal, 32)
@@ -259,9 +258,7 @@ struct OnboardingViewCompact: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     if currentPage < totalPages - 1 {
-                        Button("Skip") {
-                            dismiss()
-                        }
+                        CBSheetButton(title: "Skip") { dismiss() }
                     }
                 }
             }

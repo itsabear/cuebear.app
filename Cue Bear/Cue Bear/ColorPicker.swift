@@ -1,122 +1,39 @@
 // ColorPicker.swift - Custom color picker with predefined colors
 import SwiftUI
 
+// Curated 24-color palette — pastels, vivids, rich deeps, darks
+// Shared across color pickers and auto-assign logic
+let curatedColorPalette: [String] = [
+    // Row 1: Lights — cream, pastel pink, sand, sage, sky, wheat
+    "#EFE8DF", "#FFB3BA", "#D8BA98", "#A8B5A2", "#96C0CE", "#C9B99A",
+    // Row 2: Vivids — red, blue, green, purple, cyan, yellow
+    "#FF1744", "#2979FF", "#00E676", "#D500F9", "#00E5FF", "#FFFF00",
+    // Row 3: Deeps — maroon, burnt orange, forest, deep teal, deep purple, deep rose
+    "#7F0303", "#E65100", "#4A6741", "#00796B", "#6A1B9A", "#AD1457",
+    // Row 4: Darks — espresso, midnight teal, navy, charcoal, near black, black
+    "#5D4037", "#0F414A", "#2C3E50", "#37474F", "#212121", "#1A1A1C",
+]
+
 // MARK: - Inline Color Picker (for DisclosureGroup)
 struct CBColorPickerInline: View {
     @Binding var selectedColorHex: String?
-    
-    // Color palettes from the reference image
-    private let pastelColors: [(String, String)] = [
-        ("#FFB3BA", "Pastel"),
-        ("#FFB3D9", "Pastel"),
-        ("#FFC785", "Pastel"),
-        ("#FFF9A8", "Pastel"),
-        ("#B3E5FC", "Pastel"),
-        ("#B3D9FF", "Pastel"),
-        ("#B3E0C3", "Pastel"),
-        ("#D4B3FF", "Pastel"),
-        ("#FFCCB3", "Pastel"),
-        ("#C3F0CA", "Pastel"),
-        ("#E0B3FF", "Pastel"),
-        ("#FFF4B3", "Pastel")
-    ]
 
-    private let neonColors: [(String, String)] = [
-        ("#FF1744", "Neon"),
-        ("#FF4081", "Neon"),
-        ("#FFFF00", "Neon"),
-        ("#00FF41", "Neon"),
-        ("#00E5FF", "Neon"),
-        ("#00B0FF", "Neon"),
-        ("#2979FF", "Neon"),
-        ("#D500F9", "Neon"),
-        ("#FF9100", "Neon"),
-        ("#FF3D00", "Neon"),
-        ("#76FF03", "Neon"),
-        ("#00E5FF", "Neon")
-    ]
-
-    private let basicColors: [(String, String)] = [
-        ("#F44336", "Basic"),
-        ("#9C27B0", "Basic"),
-        ("#3F51B5", "Basic"),
-        ("#03A9F4", "Basic"),
-        ("#009688", "Basic"),
-        ("#4CAF50", "Basic"),
-        ("#FFEB3B", "Basic"),
-        ("#FF9800", "Basic"),
-        ("#795548", "Basic"),
-        ("#FF5722", "Basic"),
-        ("#8BC34A", "Basic"),
-        ("#2196F3", "Basic")
-    ]
-
-    private let desaturatedColors: [(String, String)] = [
-        ("#5D4037", "Desaturated"),
-        ("#8D6E63", "Desaturated"),
-        ("#BCAAA4", "Desaturated"),
-        ("#78909C", "Desaturated"),
-        ("#90A4AE", "Desaturated"),
-        ("#607D8B", "Desaturated"),
-        ("#AED581", "Desaturated"),
-        ("#FFF176", "Desaturated"),
-        ("#D7CCC8", "Desaturated"),
-        ("#A1887F", "Desaturated"),
-        ("#BDBDBD", "Desaturated"),
-        ("#E0E0E0", "Desaturated")
-    ]
-
-    private let grayscaleColors: [(String, String)] = [
-        ("#000000", "Grayscale"),
-        ("#212121", "Grayscale"),
-        ("#424242", "Grayscale"),
-        ("#616161", "Grayscale"),
-        ("#757575", "Grayscale"),
-        ("#9E9E9E", "Grayscale"),
-        ("#BDBDBD", "Grayscale"),
-        ("#E0E0E0", "Grayscale"),
-        ("#EEEEEE", "Grayscale"),
-        ("#F5F5F5", "Grayscale"),
-        ("#FAFAFA", "Grayscale"),
-        ("#FFFFFF", "Grayscale")
-    ]
-
-    private let modernColors: [(String, String)] = [
-        ("#FF6B6B", "Modern"),
-        ("#FFAA85", "Modern"),
-        ("#FFD369", "Modern"),
-        ("#7FC8A9", "Modern"),
-        ("#5DADE2", "Modern"),
-        ("#6495ED", "Modern"),
-        ("#8E7CC3", "Modern"),
-        ("#C77EB5", "Modern"),
-        ("#FF7EB3", "Modern"),
-        ("#52B2CF", "Modern"),
-        ("#A8E6A3", "Modern")
-    ]
-
-    private var allColors: [(String?, String)] {
-        var colors: [(String?, String)] = [(nil, "Default")]
-        // Sorted alphabetically: Basic, Desaturated, Grayscale, Modern, Neon, Pastel
-        colors.append(contentsOf: basicColors)
-        colors.append(contentsOf: desaturatedColors)
-        colors.append(contentsOf: grayscaleColors)
-        colors.append(contentsOf: modernColors)
-        colors.append(contentsOf: neonColors)
-        colors.append(contentsOf: pastelColors)
+    private var allColors: [String?] {
+        var colors: [String?] = [nil]  // Default/None tile
+        colors.append(contentsOf: curatedColorPalette)
         return colors
     }
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 12), spacing: 8) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 8) {
             ForEach(allColors.indices, id: \.self) { index in
                 ColorTile(
-                    colorHex: allColors[index].0,
-                    isSelected: selectedColorHex == allColors[index].0
+                    colorHex: allColors[index],
+                    isSelected: selectedColorHex == allColors[index]
                 )
                 .onTapGesture {
-                    selectedColorHex = allColors[index].0
-                    debugPrint("🎨 ColorPicker: Selected color \(allColors[index].0 ?? "nil")")
+                    selectedColorHex = allColors[index]
+                    debugPrint("🎨 ColorPicker: Selected color \(allColors[index] ?? "nil")")
                 }
             }
         }
@@ -147,7 +64,7 @@ private struct ColorTile: View {
 
             if isSelected {
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(hex: "0A84FF"), lineWidth: 3)  // Default cue color
+                    .stroke(Color.white, lineWidth: 3)
             }
         }
     }

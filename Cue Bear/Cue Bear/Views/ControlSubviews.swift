@@ -57,7 +57,7 @@ struct CBPerformanceList: View {
     // Drag state for reordering
     @State private var draggedSong: Song? = nil
     @State private var hoveredIndex: Int? = nil
-    @State private var isDraggingFromHandle: Bool = false  // Track if drag started from handle
+    // isDraggingFromHandle removed — drag logic moved entirely into handle gesture callbacks
     @State private var dragOffset: CGSize = .zero  // Track drag offset for preview
     @State private var dragStartY: CGFloat = 0  // Track initial Y position of dragged item
     @State private var dragCurrentY: CGFloat = 0  // Track current Y position during drag
@@ -65,26 +65,12 @@ struct CBPerformanceList: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass  // Detect orientation
 
     var body: some View {
-        let isLandscape = verticalSizeClass == .compact
-        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-        // iPad: Padding must account for 1.08x scale effect that expands cues beyond layout bounds
-        // Scale effect adds ~4% expansion on each side, requiring significant extra padding
-        // Landscape: Need substantial padding to prevent scaled cues from reaching edges
-        // Portrait: Moderate padding with scale buffer
-        let horizontalPadding: CGFloat = {
-            if isPhone {
-                return 16
-            } else {
-                // Landscape: Base 120pt + 60pt scale buffer = 180pt
-                // Portrait: Base 32pt + 24pt scale buffer = 56pt
-                return isLandscape ? 180 : 56
-            }
-        }()
+        let horizontalPadding: CGFloat = 16
 
         return GeometryReader { geometry in
             ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: true) {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 10) {
                     // Empty state when no cues exist
                     if songs.isEmpty {
                         VStack(spacing: 16) {
@@ -178,8 +164,41 @@ struct CBPerformanceList: View {
                             onRename: { onRename(s) },
                             onDelete: { onDelete(s) },
                             onDuplicate: { onDuplicate(s) },
-                            onDragHandleStart: { isDraggingFromHandle = true },  // Track handle drag start
-                            onDragHandleEnd: { isDraggingFromHandle = false },  // Track handle drag end
+                            onDragHandleChanged: { value in
+                                if draggedSong == nil {
+                                    draggedSong = s
+                                    dragStartY = value.startLocation.y
+                                    dragCurrentY = value.startLocation.y
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                }
+                                dragOffset = value.translation
+                                dragCurrentY = value.location.y
+                                let cueHeightWithSpacing = CGFloat(cueHeight + 10)
+                                let indexOffset = Int(round(value.translation.height / cueHeightWithSpacing))
+                                let newIndex = max(0, min(songs.count - 1, index + indexOffset))
+                                if hoveredIndex != newIndex {
+                                    hoveredIndex = newIndex
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                }
+                            },
+                            onDragHandleEnded: { _ in
+                                if let draggedSong = draggedSong,
+                                   let fromIndex = songs.firstIndex(where: { $0.id == draggedSong.id }),
+                                   let toIndex = hoveredIndex,
+                                   fromIndex != toIndex {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        onMove(IndexSet(integer: fromIndex), toIndex > fromIndex ? toIndex + 1 : toIndex)
+                                    }
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                }
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    self.draggedSong = nil
+                                    self.hoveredIndex = nil
+                                    self.dragOffset = .zero
+                                    self.dragStartY = 0
+                                    self.dragCurrentY = 0
+                                }
+                            },
                             onToggleSelection: { onToggleSelection(s) }  // Toggle selection in batch mode
                         )
                         // Make dragged item semi-transparent in place
@@ -197,62 +216,8 @@ struct CBPerformanceList: View {
                                     .shadow(color: defaultCueColor.opacity(0.5), radius: 3, x: 0, y: 0)
                             }
                         }
-                        .simultaneousGesture(
-                            reorderMode ? DragGesture(minimumDistance: 5)
-                                .onChanged { value in
-                                    // Only process if drag started from handle
-                                    guard isDraggingFromHandle else { return }
-
-                                    if draggedSong == nil {
-                                        draggedSong = s
-                                        dragStartY = value.startLocation.y
-                                        dragCurrentY = value.startLocation.y
-                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    }
-
-                                    // Update drag offset and current location for preview
-                                    dragOffset = value.translation
-                                    dragCurrentY = value.location.y
-
-                                    // Calculate which index we're hovering over
-                                    let cueHeightWithSpacing = CGFloat(cueHeight + 12)
-                                    let offset = value.translation.height
-                                    let indexOffset = Int(round(offset / cueHeightWithSpacing))
-                                    let newIndex = max(0, min(songs.count - 1, index + indexOffset))
-
-                                    if hoveredIndex != newIndex {
-                                        hoveredIndex = newIndex
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    }
-                                }
-                                .onEnded { _ in
-                                    // Only process if drag started from handle
-                                    guard isDraggingFromHandle else { return }
-
-                                    // Perform the move
-                                    if let draggedSong = draggedSong,
-                                       let fromIndex = songs.firstIndex(where: { $0.id == draggedSong.id }),
-                                       let toIndex = hoveredIndex,
-                                       fromIndex != toIndex {
-
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                            onMove(IndexSet(integer: fromIndex), toIndex > fromIndex ? toIndex + 1 : toIndex)
-                                        }
-
-                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    }
-
-                                    // Reset drag state
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        self.draggedSong = nil
-                                        self.hoveredIndex = nil
-                                        self.dragOffset = .zero
-                                        self.dragStartY = 0
-                                        self.dragCurrentY = 0
-                                    }
-                                }
-                            : nil
-                        )
+                        // No row-level drag gesture — reorder is handled entirely
+                        // by the drag handle's gesture to avoid blocking ScrollView
                         .id(s.id)
                     }
                     Color.clear.frame(height: 8)
@@ -294,7 +259,7 @@ struct CBPerformanceList: View {
         if songs.contains(where: { $0.id == song.id }) {
             // Find the index of the dragged song to calculate its original position
             if let index = songs.firstIndex(where: { $0.id == song.id }) {
-                let cueHeightWithSpacing = CGFloat(cueHeight + 12)
+                let cueHeightWithSpacing = CGFloat(cueHeight + 10)
                 let topPadding: CGFloat = isEditing ? 170 : 80
 
                 // Calculate the center Y position of the original cue
@@ -329,8 +294,8 @@ struct CBPerformanceList: View {
                     onRename: {},
                     onDelete: {},
                     onDuplicate: {},
-                    onDragHandleStart: {},
-                    onDragHandleEnd: {},
+                    onDragHandleChanged: { _ in },
+                    onDragHandleEnded: { _ in },
                     onToggleSelection: {}
                 )
                 .frame(height: CGFloat(cueHeight))
@@ -371,8 +336,8 @@ struct CBPerformanceRow: View {
     var onRename: () -> Void
     var onDelete: () -> Void
     var onDuplicate: () -> Void
-    var onDragHandleStart: () -> Void  // Called when drag starts from handle
-    var onDragHandleEnd: () -> Void  // Called when drag ends from handle
+    var onDragHandleChanged: (DragGesture.Value) -> Void  // Called during handle drag
+    var onDragHandleEnded: (DragGesture.Value) -> Void  // Called when handle drag ends
     var onToggleSelection: () -> Void  // Called when selection radial is tapped
 
     @GestureState private var isPressed = false
@@ -380,7 +345,7 @@ struct CBPerformanceRow: View {
     @State private var flashOpacity: Double = 0.0
     @State private var playIconOpacity: Double = 1.0  // For blinking animation
     @Environment(\.colorScheme) private var colorScheme
-    private let corner: CGFloat = 20
+    private let corner: CGFloat = 8
 
     /// Adaptive text color based on cue background brightness
     /// Uses WCAG luminance calculation to ensure readable contrast
@@ -433,8 +398,8 @@ struct CBPerformanceRow: View {
         ZStack(alignment: .center) {
             RoundedRectangle(cornerRadius: corner)
                 .fill(baseColor)
-                .frame(maxWidth: .infinity, minHeight: (isCued && !isEditing) ? cueHeight * 1.4 : cueHeight)
-                .opacity((isCued && !isEditing) ? 1.0 : 0.90)  // Always use normal opacity, regardless of conflicts
+                .frame(maxWidth: .infinity, minHeight: cueHeight)
+                .opacity((isCued && !isEditing) ? 1.0 : 0.90)
                 .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isCued)
                 .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isEditing)
 
@@ -454,61 +419,48 @@ struct CBPerformanceRow: View {
                     .transition(.scale.combined(with: .opacity))
                 }
 
-                // Play icon - show on chosen cue or last played cue (hide in edit mode)
-                if !isEditing && (isCued || isLastPlayed) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 24 * fontSize, weight: .bold))
-                        .foregroundColor(adaptiveTextColor)
-                        .opacity(isCued && isCueMode ? playIconOpacity : 1.0)  // Blink if cued in Cue mode, steady otherwise
-                        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)  // Smooth size transition
-                        .id("\(song.id)-play-icon")  // Force clean transitions when switching cues
-                        .transition(.opacity)
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .center, spacing: 6) {
-                        // Show shortcut icon for alias cues or duplicated cues
-                        if song.aliasedCueID != nil {
-                            Image(systemName: "arrow.turn.down.right")
-                                .font(.system(size: 18 * fontSize, weight: .semibold))
-                                .foregroundColor(adaptiveTextColor.opacity(0.7))
-                        } else if let subtitle = song.subtitle, subtitle.hasPrefix("copy of ") {
-                            // Show shortcut icon for duplicated cues
-                            Image(systemName: "doc.on.doc")
-                                .font(.system(size: 18 * fontSize, weight: .semibold))
-                                .foregroundColor(adaptiveTextColor.opacity(0.7))
-                        }
-                        Text(song.name)
-                            .font(themeFont(22 * fontSize, .bold))
-                            .foregroundColor(adaptiveTextColor)
-                            .lineLimit(1)
-
-                        // Show "Copy of [cue name]" for alias cues
-                        if let aliasedID = song.aliasedCueID {
-                            if let originalCue = songLibrary.first(where: { $0.id == aliasedID }) {
-                                Text("Copy of \(originalCue.name)")
-                                    .font(themeFont(14 * fontSize, .regular))
-                                    .italic()
-                                    .foregroundColor(adaptiveTextColor.opacity(0.6))
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
+                // Left column: subtitle top, name large bottom (palette card style)
+                VStack(alignment: .leading, spacing: 0) {
+                    // Subtitle at top
                     if let sub = song.subtitle, !sub.isEmpty {
                         Text(sub)
-                            .font(themeFont(14 * fontSize, .medium))
-                            .italic()
-                            .foregroundColor(adaptiveTextColor.opacity(0.85))
+                            .font(.custom("Sora-Regular", size: 14 * fontSize))
+                            .foregroundColor(adaptiveTextColor.opacity(0.6))
                             .lineLimit(1)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
                     }
+                    // Alias info at top
+                    if let aliasedID = song.aliasedCueID {
+                        if let originalCue = songLibrary.first(where: { $0.id == aliasedID }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.turn.down.right")
+                                    .font(.system(size: 12 * fontSize, weight: .semibold))
+                                Text("Copy of \(originalCue.name)")
+                                    .font(.custom("Sora-Regular", size: 14 * fontSize))
+                            }
+                            .foregroundColor(adaptiveTextColor.opacity(0.6))
+                            .lineLimit(1)
+                        }
+                    } else if let subtitle = song.subtitle, subtitle.hasPrefix("copy of ") {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 12 * fontSize, weight: .semibold))
+                            .foregroundColor(adaptiveTextColor.opacity(0.6))
+                    }
+
+                    Spacer()
+
+                    // Name large at bottom
+                    Text(song.name)
+                        .font(.custom("Sora-Bold", size: 21 * fontSize))
+                        .foregroundColor(adaptiveTextColor)
+                        .lineLimit(1)
                 }
+
                 Spacer(minLength: 12)
 
+                // Right: MIDI data, vertically centered
                 if showMIDIData && song.midiEnabled {
                     VStack(alignment: .trailing, spacing: 4) {
-                        let subtitle: String = {
+                        let midiText: String = {
                             if song.kind == .cc {
                                 return "Ch \(song.channel)  •  CC \(song.cc)"
                             } else {
@@ -516,10 +468,9 @@ struct CBPerformanceRow: View {
                                 return "Ch \(song.channel)  •  \(noteName)"
                             }
                         }()
-                        Text(subtitle)
-                            .font(.caption2)
-                            .foregroundColor(adaptiveTextColor.opacity(0.9))
-                            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCued)
+                        Text(midiText)
+                            .font(.custom("Sora-Regular", size: 13 * fontSize))
+                            .foregroundColor(adaptiveTextColor.opacity(0.6))
 
                         // Show conflict warning below MIDI data
                         if let owner = takenBy {
@@ -537,22 +488,22 @@ struct CBPerformanceRow: View {
                         .font(.system(size: 20 * fontSize, weight: .semibold))
                         .foregroundColor(adaptiveTextColor.opacity(0.5))
                         .padding(.leading, 8)
-                        .padding(.vertical, 8)  // Increase touch target
-                        .padding(.trailing, -8)  // Compensate for added padding
-                        .contentShape(Rectangle())  // Make entire padded area tappable
+                        .padding(.vertical, 8)
+                        .padding(.trailing, -8)
+                        .contentShape(Rectangle())
                         .transition(.move(edge: .trailing).combined(with: .opacity))
-                        .highPriorityGesture(
+                        .gesture(
                             DragGesture(minimumDistance: 0)
-                                .onChanged { _ in
-                                    onDragHandleStart()
+                                .onChanged { value in
+                                    onDragHandleChanged(value)
                                 }
-                                .onEnded { _ in
-                                    onDragHandleEnd()
+                                .onEnded { value in
+                                    onDragHandleEnded(value)
                                 }
                         )
                 }
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, 20)
             .padding(.vertical, 16)
             .animation(.spring(response: 0.25, dampingFraction: 0.85), value: reorderMode)
 
@@ -562,51 +513,22 @@ struct CBPerformanceRow: View {
                 .allowsHitTesting(false)
         }
         .contentShape(Rectangle())
-        // Add extra padding when selected to push other cues aside (but not in edit mode)
-        .padding(.vertical, (isCued && !isEditing) ? 12 : 0)
-        .padding(.horizontal, (isCued && !isEditing) ? 6 : 0)
-        // Uniform scale: slightly bigger without stretching text (but not in edit mode)
-        .scaleEffect(
-            (isCued && !isEditing) ? 1.08 : (isPressed ? 0.985 : 1.0),
-            anchor: .center
+        // Selection stroke: black inner + white outer (palette card style)
+        .overlay(
+            Group {
+                if isCued && !isEditing {
+                    RoundedRectangle(cornerRadius: corner)
+                        .stroke(Color.black, lineWidth: 5)
+                    RoundedRectangle(cornerRadius: corner)
+                        .stroke(Color.white, lineWidth: 3)
+                }
+            }
         )
+        .scaleEffect(isPressed ? 0.985 : 1.0)
         .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isCued)
         .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isEditing)
         .animation(.spring(response: 0.10, dampingFraction: 0.85), value: isPressed)
-        // Shadow in light themes, colored glow in dark themes
-        .shadow(
-            color: {
-                if !isCued { return Color.clear }
-                // Use background luminance to detect dark theme
-                let bgLuminance = relativeLuminance(hex: backgroundColorHex)
-                if bgLuminance < 0.5 {
-                    // Dark background: use colored glow with cue color
-                    return baseColor.opacity(0.6)
-                } else {
-                    // Light background: use black shadow
-                    return Color.black.opacity(0.3)
-                }
-            }(),
-            radius: isCued ? 12 : 0,
-            x: 0,
-            y: {
-                if !isCued { return 0 }
-                let bgLuminance = relativeLuminance(hex: backgroundColorHex)
-                return bgLuminance < 0.5 ? 0 : 6  // No y-offset for glow, offset for shadow
-            }()
-        )
-        .scaleEffect(isPressed && !isCueMode ? 0.995 : 1.0)
-        .shadow(
-            color: isCued ? baseColor.opacity(0.6) : Color.black.opacity(isPressed && !isCueMode ? 0.18 : 0.2),
-            radius: isPressed && !isCueMode ? 7.5 : 8,
-            x: 0,
-            y: {
-                let bgLuminance = relativeLuminance(hex: song.colorHex ?? defaultCueColorHex)
-                return bgLuminance < 0.5 ? 0 : (isPressed && !isCueMode ? 5.5 : 6)
-            }()
-        )
-        .animation(.easeOut(duration: 0.05), value: isPressed)
-        .zIndex(isCued ? 1 : 0)  // Elevate selected cue above others
+        .zIndex(isCued ? 1 : 0)
         .contentShape(Rectangle())  // Ensure full row is tappable
         .onTapGesture(perform: handleTap)  // Tap detection - must come before drag gesture
         .contextMenu {
@@ -872,9 +794,9 @@ struct CBSetlistColumn: View {
                     Image(systemName: reorderMode ? "checkmark" : "list.dash")
                         .font(.system(size: 17))
                         .frame(width: 24, height: 24)
-                        .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.accentColor(for: colorScheme))
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.accentColor(for: colorScheme)))
 
                 Button {
                     withAnimation(.easeInOut) {
@@ -890,9 +812,9 @@ struct CBSetlistColumn: View {
                     Image(systemName: batchMode ? "xmark" : "checkmark.circle")
                         .font(.system(size: 17))
                         .frame(width: 24, height: 24)
-                        .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.accentColor(for: colorScheme))
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.accentColor(for: colorScheme)))
                 .padding(.trailing, 16)
             }
             .frame(height: 44) // Match library column header height
@@ -903,12 +825,12 @@ struct CBSetlistColumn: View {
                     Button("Select All") {
                         onSelectAll?()
                     }
-                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
+                    .foregroundColor(selectedTheme.accentColor(for: colorScheme))
 
                     Button("Clear") {
                         onClearSelection?()
                     }
-                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
+                    .foregroundColor(selectedTheme.accentColor(for: colorScheme))
 
                     Spacer()
 
@@ -1082,14 +1004,14 @@ struct CBLibraryColumn: View {
                     Picker("Sort", selection: $sortMode) {
                         ForEach(LibrarySortMode.allCases) { mode in Text(mode.label).tag(mode) }
                     }
-                    .tint(selectedTheme.defaultCueColor(for: colorScheme))
+                    .tint(selectedTheme.accentColor(for: colorScheme))
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
                         .font(.system(size: 17))
                         .frame(width: 24, height: 24)
-                        .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.accentColor(for: colorScheme))
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.accentColor(for: colorScheme)))
 
                 Button {
                     withAnimation(.easeInOut) { batchMode.toggle() }
@@ -1098,9 +1020,9 @@ struct CBLibraryColumn: View {
                     Image(systemName: batchMode ? "xmark" : "checkmark.circle")
                         .font(.system(size: 17))
                         .frame(width: 24, height: 24)
-                        .foregroundStyle(selectedTheme.defaultCueColor(for: colorScheme))
+                        .foregroundStyle(selectedTheme.accentColor(for: colorScheme))
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.defaultCueColor(for: colorScheme)))
+                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: selectedTheme.lightButtonBackgroundColor(for: colorScheme), strokeColor: selectedTheme.accentColor(for: colorScheme)))
                 .padding(.trailing, 16)
             }
             .frame(height: 44) // Match cue list column header height
@@ -1111,12 +1033,12 @@ struct CBLibraryColumn: View {
                     Button("Select All") {
                         onSelectAll?()
                     }
-                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
+                    .foregroundColor(selectedTheme.accentColor(for: colorScheme))
 
                     Button("Clear") {
                         onClearSelection?()
                     }
-                    .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
+                    .foregroundColor(selectedTheme.accentColor(for: colorScheme))
 
                     Spacer()
 
@@ -1124,7 +1046,7 @@ struct CBLibraryColumn: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         onBatchAddToSetlist?()
                     }
-                    .foregroundColor(selected.isEmpty ? .gray : Color(hex: "0A84FF"))  // Default cue color
+                    .foregroundColor(selected.isEmpty ? .gray : selectedTheme.accentColor(for: colorScheme))
                     .disabled(selected.isEmpty)
 
                     Button("Delete") {
@@ -1366,22 +1288,29 @@ struct CBBatchToolbar: View {
     var onAddToSetlist: () -> Void
     var onDelete: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 12) {
                 Button("Select All", action: onSelectAll)
                     .buttonStyle(WhiteCapsuleButtonStyle())
-                    .foregroundColor(.blue)
+                    .foregroundColor(selectedTheme.accentColor(for: colorScheme))
                 Button("Clear", action: onClear)
                     .buttonStyle(WhiteCapsuleButtonStyle())
-                    .foregroundColor(.blue)
+                    .foregroundColor(selectedTheme.accentColor(for: colorScheme))
                 Spacer()
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onAddToSetlist()
                 } label: { Label("Add to Setlist", systemImage: "plus.circle.fill") }
                 .buttonStyle(.borderedProminent)
+                .tint(selectedTheme.accentColor(for: colorScheme))
                 .disabled(selectedCount == 0)
 
                 Button(role: .destructive) {
@@ -1389,7 +1318,7 @@ struct CBBatchToolbar: View {
                     onDelete()
                 } label: { Label("Delete", systemImage: "trash") }
                 .buttonStyle(WhiteCapsuleButtonStyle())
-                .foregroundColor(.blue)
+                .foregroundColor(selectedTheme.accentColor(for: colorScheme))
                 .disabled(selectedCount == 0)
             }
             .padding(.horizontal, 16)
@@ -1413,7 +1342,9 @@ private struct BridgeDeviceCard: View {
         case usb, wifi
         
         var color: Color {
-            return Color(hex: "0A84FF")  // Default cue color
+            let themeID = UserDefaults.standard.string(forKey: "selectedThemeID") ?? "default"
+            let theme = AppTheme.allThemes.first { $0.id == themeID } ?? AppTheme.defaultTheme
+            return theme.accentColor(for: .dark)
         }
         
         var connectedColor: Color {
@@ -1550,24 +1481,30 @@ struct CBConnectionsSheet: View {
 
     var body: some View {
         NavigationView {
-            Group {
-                if isCheckingConnections {
-                    // Show loading state while checking for bridges
-                    loadingView
-                } else if noBridgeDetected {
-                    // Show special "Download Bridge" view when no bridges detected
-                    downloadBridgeView
-                } else {
-                    // Show normal connections form
-                    connectionsForm
+            VStack(spacing: 0) {
+                // Custom header — bypasses iOS 18+/26 toolbar glass capsule chrome
+                HStack {
+                    Spacer()
+                    CBSheetButton(title: "Done", bold: true) { dismiss() }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+                Group {
+                    if isCheckingConnections {
+                        // Show loading state while checking for bridges
+                        loadingView
+                    } else if noBridgeDetected {
+                        // Show special "Download Bridge" view when no bridges detected
+                        downloadBridgeView
+                    } else {
+                        // Show normal connections form
+                        connectionsForm
+                    }
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
         .onAppear {
@@ -1605,7 +1542,7 @@ struct CBConnectionsSheet: View {
         VStack(spacing: 20) {
             ProgressView()
                 .scaleEffect(1.5)
-                .tint(selectedTheme.defaultCueColor(for: colorScheme))
+                .tint(selectedTheme.accentColor(for: colorScheme))
 
             Text("Searching for bridges...")
                 .font(.headline)
@@ -1697,13 +1634,13 @@ struct CBConnectionsSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
+            .tint(selectedTheme.accentColor(for: colorScheme))
             .navigationTitle("Connections")
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var downloadBridgeView: some View {
-        let accentColor = selectedTheme.defaultCueColor(for: colorScheme)
+        let accentColor = selectedTheme.accentColor(for: colorScheme)
 
         return VStack(spacing: 0) {
             Spacer()
@@ -1774,7 +1711,7 @@ struct CBConnectionsSheet: View {
                         Image(systemName: "arrow.up.forward")
                             .font(.system(size: 14, weight: .semibold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(selectedTheme.accentContrastColor(for: colorScheme))
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(accentColor)
@@ -1866,7 +1803,7 @@ struct CBProjectsSheet: View {
                         Spacer()
                         if projectName == "Untitled" || isDirty {
                             Button(projectName) { onTapTitleWhenUnsaved() }
-                                .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+                                .foregroundColor(selectedTheme.accentColor(for: colorScheme))
                         } else {
                             Text(projectName)
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
@@ -1905,35 +1842,30 @@ struct CBProjectsSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("Projects")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                    .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
+                    CBSheetButton(title: "Close") { dismiss() }
                 }
             }
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
-            .alert("Delete Project", isPresented: Binding(get: { confirmDelete != nil }, set: { newVal in if !newVal { confirmDelete = nil } })) {
-                Button("Delete", role: .destructive) {
-                    debugPrint("🗑️ Delete confirmed for project: \(confirmDelete ?? "nil")")
-                    if let n = confirmDelete { 
-                        debugPrint("🗑️ Calling onDelete with: \(n)")
-                        onDelete(n) 
+            .tint(selectedTheme.accentColor(for: colorScheme))
+            .cbDialog("Delete Project", isPresented: Binding(get: { confirmDelete != nil }, set: { newVal in if !newVal { confirmDelete = nil } }), themeFont: selectedTheme.font,
+                message: "Are you sure you want to delete '\(confirmDelete ?? "")'? This action cannot be undone.",
+                buttons: [
+                    .init("Delete", role: .destructive) {
+                        debugPrint("🗑️ Delete confirmed for project: \(confirmDelete ?? "nil")")
+                        if let n = confirmDelete {
+                            debugPrint("🗑️ Calling onDelete with: \(n)")
+                            onDelete(n)
+                        }
+                        confirmDelete = nil
+                    },
+                    .init("Cancel", role: .cancel) {
+                        debugPrint("🗑️ Delete cancelled for project: \(confirmDelete ?? "nil")")
+                        confirmDelete = nil
                     }
-                    confirmDelete = nil
-                }
-                Button("Cancel", role: .cancel) {
-                    debugPrint("🗑️ Delete cancelled for project: \(confirmDelete ?? "nil")")
-                    confirmDelete = nil
-                }
-            } message: {
-                if let name = confirmDelete {
-                    Text("Are you sure you want to delete '\(name)'? This action cannot be undone.")
-                }
-            }
+                ]
+            )
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
@@ -1960,7 +1892,7 @@ struct CBAddEditCueSheet: View {
     // Global channel support
     let isGlobalChannel: Bool
     let globalChannel: Int
-    let midiFiltersEnabled: Bool
+    @AppStorage("midiFiltersEnabled") private var midiFiltersEnabled: Bool = true
     let midiFilter: Set<Int>
 
     @State private var name: String = ""
@@ -1981,13 +1913,18 @@ struct CBAddEditCueSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
+    @AppStorage("autoAssignMIDI") private var savedAutoAssign: Bool = true
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
     }
 
     var body: some View {
-        NavigationView {
+        VStack(spacing: 0) {
+            // Custom inline toolbar — outside NavigationView so it moves with the sheet
+            cueSheetToolbar
+
+            NavigationView {
             Form {
                     Section(header: Text("SONG").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
                         TextField("Name", text: $name, prompt: Text(defaultName).foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme)))
@@ -2041,7 +1978,10 @@ struct CBAddEditCueSheet: View {
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
 
                     if midiEnabled {
-                        Toggle(isOn: $autoAssign) {
+                        Toggle(isOn: Binding(
+                            get: { autoAssign },
+                            set: { newValue in savedAutoAssign = newValue; autoAssign = newValue }
+                        )) {
                             Text("Assign MIDI automatically")
                         }
                         .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
@@ -2085,103 +2025,46 @@ struct CBAddEditCueSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
-            .navigationTitle(editingSong == nil ? "Add Cue" : "Edit Cue")
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
-            .alert(editContext == .cueList ? "Remove Cue" : "Delete Cue", isPresented: $showDeleteAlert) {
-                if editContext == .cueList {
-                    // 3 options for cue list context
-                    Button("Remove from Cue List") {
-                        if let song = editingSong {
-                            onDelete?(song)
-                            lastEditingSongID = nil
-                        }
-                    }
-                    Button("Delete", role: .destructive) {
-                        if let song = editingSong {
-                            onDeleteFromLibrary?(song)
-                            lastEditingSongID = nil
-                        }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } else {
-                    // 2 options for library context
-                    Button("Delete", role: .destructive) {
-                        if let song = editingSong {
-                            onDelete?(song)
-                            lastEditingSongID = nil
-                        }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                }
-            } message: {
-                if editContext == .cueList {
-                    Text("What would you like to do with '\(name.isEmpty ? defaultName : name)'?")
-                } else {
-                    Text("Delete '\(name.isEmpty ? defaultName : name)' from the library? This will remove it from all cue lists.")
-                }
-            }
-            .alert("Maximum Controls Reached", isPresented: $showGlobalModeMaxReachedAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.")
-            }
-            .toolbar {
-                // Cancel button on the left
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { onCancel() }
-                }
-
-                // Right side buttons
-                ToolbarItem(placement: .confirmationAction) {
-                    let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && midiFiltersEnabled && isFilteredMIDI())
-                    HStack(spacing: 16) {
-                        // More menu (3 dots)
-                        Menu {
-                            if editingSong == nil {
-                                // Add mode: Save & Add Another option
-                                Button {
-                                    save(andAddAnother: true)
-                                } label: {
-                                    Label("Save & Add Another", systemImage: "plus")
-                                }
-                                .disabled(isDisabled)
-                            } else {
-                                // Edit mode: Duplicate and Delete options
-                                if onDuplicate != nil {
-                                    Button {
-                                        if let song = editingSong {
-                                            onDuplicate?(song)
-                                        }
-                                    } label: {
-                                        Label("Duplicate Cue", systemImage: "doc.on.doc")
-                                    }
-                                }
-
-                                if onDelete != nil {
-                                    Button(role: .destructive) {
-                                        showDeleteAlert = true
-                                    } label: {
-                                        Label(editContext == .cueList ? "Remove" : "Delete Cue", systemImage: "trash")
-                                    }
-                                }
+            .navigationBarHidden(true)
+            .tint(selectedTheme.accentColor(for: colorScheme))
+            .cbDialog(
+                editContext == .cueList ? "Remove Cue" : "Delete Cue",
+                isPresented: $showDeleteAlert, themeFont: selectedTheme.font,
+                message: editContext == .cueList
+                    ? "What would you like to do with '\(name.isEmpty ? defaultName : name)'?"
+                    : "Delete '\(name.isEmpty ? defaultName : name)' from the library? This will remove it from all cue lists.",
+                buttons: editContext == .cueList
+                    ? [
+                        .init("Remove from Cue List", role: .secondary) {
+                            if let song = editingSong {
+                                onDelete?(song)
+                                lastEditingSongID = nil
                             }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
-
-                        // Primary action button (checkmark)
-                        Button {
-                            save(andAddAnother: false)
-                        } label: {
-                            Image(systemName: "checkmark")
-                                .fontWeight(.semibold)
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .disabled(isDisabled)
-                    }
-                }
-            }
+                        },
+                        .init("Delete from Library", role: .destructive) {
+                            if let song = editingSong {
+                                onDeleteFromLibrary?(song)
+                                lastEditingSongID = nil
+                            }
+                        },
+                        .init("Cancel", role: .cancel) { }
+                    ]
+                    : [
+                        .init("Delete", role: .destructive) {
+                            if let song = editingSong {
+                                onDelete?(song)
+                                lastEditingSongID = nil
+                            }
+                        },
+                        .init("Cancel", role: .cancel) { }
+                    ]
+            )
+            .cbDialog("Maximum Controls Reached", isPresented: $showGlobalModeMaxReachedAlert, themeFont: selectedTheme.font,
+                message: "You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.",
+                buttons: [
+                    .init("OK", role: .primary) { }
+                ]
+            )
             .onAppear {
                 // Always call preset() to ensure form is properly initialized
                 // This handles: editing different songs, switching to/from add mode, and reopening add mode
@@ -2234,8 +2117,92 @@ struct CBAddEditCueSheet: View {
                     }
                 }
             }
-        }
+        } // NavigationView
+        } // VStack
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
+    }
+
+    // MARK: - Custom inline toolbar (replaces system .toolbar for synced sheet animation)
+    private var cueSheetToolbar: some View {
+        let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && midiFiltersEnabled && isFilteredMIDI())
+        return HStack {
+            Button("Cancel") { onCancel() }
+                .font(.custom("Sora-Regular", size: 15))
+                .foregroundColor(.white)
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            Spacer()
+
+            Text(editingSong == nil ? "Add Cue" : "Edit Cue")
+                .font(.custom("Sora-Bold", size: 17))
+                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                // More menu (3 dots)
+                Menu {
+                    if editingSong == nil {
+                        Button {
+                            save(andAddAnother: true)
+                        } label: {
+                            Label("Save & Add Another", systemImage: "plus")
+                        }
+                        .disabled(isDisabled)
+                    } else {
+                        if onDuplicate != nil {
+                            Button {
+                                if let song = editingSong {
+                                    onDuplicate?(song)
+                                }
+                            } label: {
+                                Label("Duplicate Cue", systemImage: "doc.on.doc")
+                            }
+                        }
+
+                        if onDelete != nil {
+                            Button(role: .destructive) {
+                                showDeleteAlert = true
+                            } label: {
+                                Label(editContext == .cueList ? "Remove" : "Delete Cue", systemImage: "trash")
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                // Primary action button (checkmark)
+                Button {
+                    save(andAddAnother: false)
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(isDisabled ? .white.opacity(0.3) : .white)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .disabled(isDisabled)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
+        .background(selectedTheme.backgroundColor(for: colorScheme))
     }
 
     private func preset() {
@@ -2249,8 +2216,7 @@ struct CBAddEditCueSheet: View {
             velocity = s.velocity
             colorHex = s.colorHex
             midiEnabled = s.midiEnabled
-            // For existing songs, disable auto-assign to allow manual editing
-            autoAssign = false
+            autoAssign = false  // editing an existing cue — preserve its MIDI, don't auto-assign
         } else {
             name = ""
             subtitle = ""
@@ -2259,19 +2225,19 @@ struct CBAddEditCueSheet: View {
             // FIX: Use global channel if enabled, otherwise default to 1
             channel = isGlobalChannel ? globalChannel : 1
             velocity = 127
-            // For new songs, enable auto-assign and find free MIDI
-            autoAssign = true
-            // Always start from 0 to find the lowest available (fill gaps first)
-            debugPrint("  🆕 [CUE] No editing state, finding lowest available \(kind) on ch\(channel)")
-            let result = autoAssignMIDI(for: kind, startChannel: channel, startNumber: 0)
-
-            if result.reachedLimit {
-                showGlobalModeMaxReachedAlert = true
-                autoAssign = false
-            } else {
-                channel = result.channel
-                number = result.number
-                debugPrint("  ✅ [CUE] preset() set channel=\(result.channel), number=\(result.number)")
+            autoAssign = savedAutoAssign
+            if savedAutoAssign {
+                // Always start from 0 to find the lowest available (fill gaps first)
+                debugPrint("  🆕 [CUE] No editing state, finding lowest available \(kind) on ch\(channel)")
+                let result = autoAssignMIDI(for: kind, startChannel: channel, startNumber: 0)
+                if result.reachedLimit {
+                    showGlobalModeMaxReachedAlert = true
+                    autoAssign = false
+                } else {
+                    channel = result.channel
+                    number = result.number
+                    debugPrint("  ✅ [CUE] preset() set channel=\(result.channel), number=\(result.number)")
+                }
             }
         }
     }
@@ -2292,8 +2258,8 @@ struct CBAddEditCueSheet: View {
         if isGlobalChannel {
             // Search only on the global channel
             for n in startNumber...127 {
-                // Skip filtered CC numbers (only for CC type, not notes)
-                if kind == .cc && midiFilter.contains(n) {
+                // Skip filtered CC numbers only when filters are enabled
+                if midiFiltersEnabled && kind == .cc && midiFilter.contains(n) {
                     debugPrint("  🚫 [CUE] CC \(n) is filtered, skipping")
                     continue
                 }
@@ -2324,8 +2290,8 @@ struct CBAddEditCueSheet: View {
         for _ in 0..<16 {
             // Search from currentNumber to 127 on current channel
             for n in currentNumber...127 {
-                // Skip filtered CC numbers (only for CC type, not notes)
-                if kind == .cc && midiFilter.contains(n) {
+                // Skip filtered CC numbers only when filters are enabled
+                if midiFiltersEnabled && kind == .cc && midiFilter.contains(n) {
                     debugPrint("  🚫 [CUE] CC \(n) is filtered, skipping")
                     continue
                 }
@@ -2408,7 +2374,7 @@ struct CBAddEditCueSheet: View {
     }
 
     private func isFilteredMIDI() -> Bool {
-        return !midiFilter.isEmpty && midiFilter.contains(number)
+        return midiFiltersEnabled && !midiFilter.isEmpty && midiFilter.contains(number)
     }
 
     private func ownerFor(kind: MIDIKind, number: Int, channel: Int) -> String? {
@@ -2471,21 +2437,26 @@ struct CBAddEditCueSheet: View {
             // This ensures next cue uses same MIDI type as the one just saved
             kind = savedKind
             velocity = 127
-            autoAssign = true
+            autoAssign = savedAutoAssign
             error = nil
 
-            // Find lowest available number (starting from 0 to fill gaps)
-            // Uses savedKind to find next available CC or Note number
-            let result = autoAssignMIDI(for: savedKind, startChannel: nextChannel, startNumber: 0)
-            if result.reachedLimit {
-                showGlobalModeMaxReachedAlert = true
-                autoAssign = false
+            if savedAutoAssign {
+                // Find lowest available number (starting from 0 to fill gaps)
+                // Uses savedKind to find next available CC or Note number
+                let result = autoAssignMIDI(for: savedKind, startChannel: nextChannel, startNumber: 0)
+                if result.reachedLimit {
+                    showGlobalModeMaxReachedAlert = true
+                    autoAssign = false
+                    channel = nextChannel
+                    number = 0
+                } else {
+                    channel = result.channel
+                    number = result.number
+                    debugPrint("  ✅ [CUE] Set channel=\(result.channel), number=\(result.number)")
+                }
+            } else {
                 channel = nextChannel
                 number = 0
-            } else {
-                channel = result.channel
-                number = result.number
-                debugPrint("  ✅ [CUE] Set channel=\(result.channel), number=\(result.number)")
             }
         }
     }
@@ -2537,18 +2508,18 @@ struct CBMIDIPickerSheet: View {
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle(title)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                        .foregroundColor(Color(hex: "0A84FF"))
+                    CBSheetButton(title: "Cancel") { onCancel() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { onSave(kind, number, channel, velocity) }
-                        .foregroundColor(Color(hex: "0A84FF"))
-                        .disabled(conflictOwner() != nil)
+                    CBSheetButton(title: "Save", bold: true, disabled: conflictOwner() != nil) {
+                        onSave(kind, number, channel, velocity)
+                    }
                 }
             }
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
+            .tint(selectedTheme.accentColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
@@ -2727,6 +2698,7 @@ struct SongLibraryPopover: View {
     @State private var sortOption: LibrarySortOption = .nameAZ
     @State private var selectedSongs: Set<UUID> = []
     @State private var batchSelectMode: Bool = false
+    @FocusState private var isSearchFocused: Bool
     @State private var songToDelete: Song? = nil
     @State private var showDeleteConfirmation: Bool = false
     @State private var showBatchDeleteConfirmation: Bool = false
@@ -2749,7 +2721,11 @@ struct SongLibraryPopover: View {
     }
 
     private var defaultCueColor: Color {
-        selectedTheme.defaultCueColor(for: colorScheme)
+        .white  // Popover chrome uses light accent (matches title bar/control area)
+    }
+
+    private var isPhone: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone
     }
 
     // Get IDs of songs already in active cue list
@@ -2825,126 +2801,78 @@ struct SongLibraryPopover: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
         }
-        .frame(width: 450, height: 500)
+        .frame(width: isPhone ? min(380, UIScreen.main.bounds.width - 16) : 400, height: 500)
         .background(backgroundColor)
-        .alert("Delete Song", isPresented: $showDeleteConfirmation, presenting: songToDelete) { song in
-            Button("Cancel", role: .cancel) {
-                songToDelete = nil
-            }
-            Button("Delete", role: .destructive) {
-                onDelete(song)
-                songToDelete = nil
-            }
-        } message: { song in
-            Text("Are you sure you want to delete \"\(song.name)\" from the library?")
-        }
-        .alert("Really delete \(selectedSongs.count) cues?", isPresented: $showBatchDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                // Delete all selected songs
-                let songsToDelete = library.filter { selectedSongs.contains($0.id) }
-                for song in songsToDelete {
-                    onDelete(song)
-                }
-                selectedSongs.removeAll()
-                batchSelectMode = false
-            }
-        }
+        .cbDialog("Delete \(selectedSongs.count) Cues", isPresented: $showBatchDeleteConfirmation, themeFont: selectedTheme.font,
+            message: "Are you sure you want to delete \(selectedSongs.count) cues from the library?",
+            buttons: [
+                .init("Delete", role: .destructive) {
+                    let songsToDelete = library.filter { selectedSongs.contains($0.id) }
+                    for song in songsToDelete {
+                        onDelete(song)
+                    }
+                    selectedSongs.removeAll()
+                    batchSelectMode = false
+                },
+                .init("Cancel", role: .cancel) { }
+            ]
+        )
     }
 
     private var headerView: some View {
         VStack(spacing: 12) {
-            // Sort and Select buttons
-            HStack(spacing: 12) {
-                Spacer()
+            // Single row: search bar (shrinks to icon in batch mode), sort, select/batch actions
+            HStack(spacing: 8) {
+                // Search bar — always present, animates between full width and circular icon
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: batchSelectMode ? 18 : 16))
+                        .foregroundColor(defaultCueColor)
 
-                // Select mode action buttons in shared capsule
-                if batchSelectMode {
-                    HStack(spacing: 0) {
-                        // Select All button
-                        Button(action: {
-                            selectedSongs = Set(filteredSongs.map { $0.id })
-                        }) {
-                            Text("Select All")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(defaultCueColor)
-                                .padding(.horizontal, 12)
-                                .frame(height: 44)
-                        }
-                        .buttonStyle(IOSPressButtonStyle())
+                    if !batchSelectMode {
+                        TextField("Search songs...", text: $searchQuery)
+                            .font(.system(size: 15))
+                            .foregroundColor(textColor)
+                            .focused($isSearchFocused)
 
-                        // Clear selection button
-                        Button(action: {
-                            selectedSongs.removeAll()
-                        }) {
-                            Text("Clear")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(defaultCueColor)
-                                .padding(.horizontal, 12)
-                                .frame(height: 44)
-                        }
-                        .buttonStyle(IOSPressButtonStyle())
-
-                        // Add selected button
-                        Button(action: {
-                            // Add all selected songs that are not already in cue list
-                            for songID in selectedSongs {
-                                if let song = library.first(where: { $0.id == songID }),
-                                   !activeSongIDs.contains(songID) {
-                                    onAddToCueList(song)
-                                }
+                        if !searchQuery.isEmpty {
+                            Button(action: { searchQuery = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(defaultCueColor.opacity(0.6))
                             }
-                            selectedSongs.removeAll()
-                            UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
-                        }) {
-                            Text("Add")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .green)
-                                .padding(.horizontal, 12)
-                                .frame(height: 44)
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(IOSPressButtonStyle())
-                        .disabled(selectedSongs.isEmpty)
-
-                        // Delete selected button
-                        Button(action: {
-                            if !selectedSongs.isEmpty {
-                                showBatchDeleteConfirmation = true
-                            }
-                        }) {
-                            Text("Delete")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .red)
-                                .padding(.horizontal, 12)
-                                .frame(height: 44)
-                        }
-                        .buttonStyle(IOSPressButtonStyle())
-                        .disabled(selectedSongs.isEmpty)
-
-                        Rectangle()
-                            .fill(defaultCueColor.opacity(0.2))
-                            .frame(width: 1, height: 24)
-                            .padding(.horizontal, 4)
-
-                        // X button to exit select mode
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                batchSelectMode = false
-                                selectedSongs.removeAll()
-                            }
-                        }) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(defaultCueColor)
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(IOSPressButtonStyle())
                     }
-                    .background(.regularMaterial)
-                    .clipShape(Capsule())
-                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-                } else {
-                    // Sort menu (icon only) - only shown when not in select mode
+                }
+                .padding(.horizontal, batchSelectMode ? 0 : 14)
+                .frame(width: batchSelectMode ? 44 : nil, height: 44)
+                .frame(maxWidth: batchSelectMode ? nil : .infinity)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                .onTapGesture {
+                    if batchSelectMode {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            batchSelectMode = false
+                            selectedSongs.removeAll()
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            isSearchFocused = true
+                        }
+                    } else {
+                        isSearchFocused = true
+                    }
+                }
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: batchSelectMode)
+
+                if batchSelectMode {
+                    Spacer()
+                }
+
+                // Sort menu - separate capsule (hidden in batch mode)
+                if !batchSelectMode {
                     Menu {
                         ForEach(LibrarySortOption.allCases) { option in
                             Button(action: { sortOption = option }) {
@@ -2959,63 +2887,116 @@ struct SongLibraryPopover: View {
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
                             .font(.system(size: 18))
-                            .foregroundColor(defaultCueColor)
+                            .foregroundColor(.white.opacity(0.9))
                             .frame(width: 44, height: 44)
                             .background(
-                                Capsule()
-                                    .fill(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.black.opacity(0.5))
                                     .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                             )
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                 }
 
-                // Select button (icon only) - only show when NOT in batch mode
-                if !batchSelectMode {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                            batchSelectMode = true
+                // Select capsule — grows into batch actions
+                HStack(spacing: 0) {
+                    if batchSelectMode {
+                        Button(action: {
+                            selectedSongs = Set(filteredSongs.map { $0.id })
+                        }) {
+                            Text("All")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .padding(.horizontal, 10)
+                                .frame(height: 44)
                         }
-                    }) {
-                        Image(systemName: "checklist")
-                            .font(.system(size: 18))
-                            .foregroundColor(defaultCueColor)
-                            .frame(width: 44, height: 44)
-                            .background(
-                                Capsule()
-                                    .fill(selectedTheme.lightButtonBackgroundColor(for: colorScheme))
-                                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
-                            )
+                        .buttonStyle(IOSPressButtonStyle())
+
+                        Button(action: {
+                            selectedSongs.removeAll()
+                        }) {
+                            Text("Clear")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .padding(.horizontal, 10)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(IOSPressButtonStyle())
+
+                        Button(action: {
+                            for songID in selectedSongs {
+                                if let song = library.first(where: { $0.id == songID }),
+                                   !activeSongIDs.contains(songID) {
+                                    onAddToCueList(song)
+                                }
+                            }
+                            selectedSongs.removeAll()
+                            UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
+                        }) {
+                            Text("Add")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .green)
+                                .padding(.horizontal, 10)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(IOSPressButtonStyle())
+                        .disabled(selectedSongs.isEmpty)
+
+                        Button(action: {
+                            if !selectedSongs.isEmpty {
+                                showBatchDeleteConfirmation = true
+                            }
+                        }) {
+                            Text("Delete")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .red)
+                                .padding(.horizontal, 10)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(IOSPressButtonStyle())
+                        .disabled(selectedSongs.isEmpty)
+
+                        Rectangle()
+                            .fill(defaultCueColor.opacity(0.2))
+                            .frame(width: 1, height: 24)
+                            .padding(.horizontal, 2)
+
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                batchSelectMode = false
+                                selectedSongs.removeAll()
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .frame(width: 36, height: 44)
+                        }
+                        .buttonStyle(IOSPressButtonStyle())
+                    } else {
+                        // Collapsed: just the checklist icon
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                batchSelectMode = true
+                            }
+                        }) {
+                            Image(systemName: "checklist")
+                                .font(.system(size: 18))
+                                .foregroundColor(defaultCueColor)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(IOSPressButtonStyle())
                     }
                 }
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: batchSelectMode)
             }
             .padding(.horizontal, 16)
-
-            // Search bar (moved below buttons) - Apple-like capsule style
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16))
-                    .foregroundColor(defaultCueColor)
-
-                TextField("Search songs...", text: $searchQuery)
-                    .font(.system(size: 15))
-                    .foregroundColor(textColor)
-
-                if !searchQuery.isEmpty {
-                    Button(action: { searchQuery = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(defaultCueColor.opacity(0.6))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 44)
-            .frame(maxWidth: .infinity)
-            .background(.regularMaterial)
-            .clipShape(Capsule())
-            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-            .padding(.horizontal, 16)
+            .padding(.top, 4)
         }
         .padding(.vertical, 12)
         .background(backgroundColor)
@@ -3124,8 +3105,7 @@ struct SongLibraryPopover: View {
                             }
 
                             Button(role: .destructive, action: {
-                                songToDelete = song
-                                showDeleteConfirmation = true
+                                onDelete(song)
                             }) {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -3161,14 +3141,13 @@ struct SongLibraryPopover: View {
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             // Delete action (swipe left)
             Button(role: .destructive) {
-                songToDelete = song
-                showDeleteConfirmation = true
+                onDelete(song)
             } label: {
                 Label("Delete", systemImage: "trash")
             }
         }
-        .frame(width: 450)
-        .fixedSize(horizontal: true, vertical: false)
+        .frame(maxWidth: .infinity)
+        .fixedSize(horizontal: false, vertical: false)
         .clipped()
     }
 }
@@ -3202,6 +3181,7 @@ struct CueListChooserPopover: View {
     @State private var sortOption: CueListSortOption = .nameAZ
     @State private var batchSelectMode = false
     @State private var selectedCueLists = Set<UUID>()
+    @FocusState private var isSearchFocused: Bool
     @State private var showDeleteConfirmation = false
     @State private var showBatchDeleteConfirmation = false
     @State private var cueListToDelete: CueList?
@@ -3223,7 +3203,15 @@ struct CueListChooserPopover: View {
     }
 
     private var defaultCueColor: Color {
-        theme.defaultCueColor(for: colorScheme)
+        .white  // Popover chrome uses light accent (matches title bar/control area)
+    }
+
+    private var isPhone: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone
+    }
+
+    private var popoverWidth: CGFloat {
+        isPhone ? min(380, UIScreen.main.bounds.width - 16) : 400
     }
 
     private var filteredCueLists: [CueList] {
@@ -3256,7 +3244,7 @@ struct CueListChooserPopover: View {
                 cueListsScrollView(lists)
             }
         }
-        .frame(width: 400)
+        .frame(width: popoverWidth)
         .background(backgroundColor)
     }
 
@@ -3292,136 +3280,132 @@ struct CueListChooserPopover: View {
                     )
                 }
             }
-            .frame(width: 400)
+            .frame(width: popoverWidth)
             .clipped()
         }
-        .frame(width: 400)
+        .frame(width: popoverWidth)
         .frame(maxHeight: 400)
         .clipped()
     }
 
     var body: some View {
         contentView
-            .alert("Delete Cue List", isPresented: $showDeleteConfirmation, presenting: cueListToDelete) { cueList in
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                onDelete(cueList.id)
-            }
-        } message: { cueList in
-            Text("Are you sure you want to delete \"\(cueList.name)\"?")
-        }
-        .alert("Delete \(selectedCueLists.count) Cue Lists", isPresented: $showBatchDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                // Delete all selected cue lists
-                for cueListID in selectedCueLists {
-                    onDelete(cueListID)
-                }
-                selectedCueLists.removeAll()
-                batchSelectMode = false
-            }
-        } message: {
-            Text("Are you sure you want to delete \(selectedCueLists.count) cue list\(selectedCueLists.count == 1 ? "" : "s")?")
-        }
+            .cbDialog("Delete Cue List", isPresented: $showDeleteConfirmation, themeFont: theme.font,
+                message: "Are you sure you want to delete \"\(cueListToDelete?.name ?? "")\"?",
+                buttons: [
+                    .init("Delete", role: .destructive) {
+                        if let cueList = cueListToDelete {
+                            onDelete(cueList.id)
+                        }
+                    },
+                    .init("Cancel", role: .cancel) { }
+                ]
+            )
+            .cbDialog("Delete \(selectedCueLists.count) Cue Lists", isPresented: $showBatchDeleteConfirmation, themeFont: theme.font,
+                message: "Are you sure you want to delete \(selectedCueLists.count) cue list\(selectedCueLists.count == 1 ? "" : "s")?",
+                buttons: [
+                    .init("Delete", role: .destructive) {
+                        for cueListID in selectedCueLists {
+                            onDelete(cueListID)
+                        }
+                        selectedCueLists.removeAll()
+                        batchSelectMode = false
+                    },
+                    .init("Cancel", role: .cancel) { }
+                ]
+            )
     }
 
     private var headerView: some View {
         VStack(spacing: 12) {
-            // Top row: + button, project name, sort, and select buttons OR batch action buttons
-            HStack(spacing: 12) {
-                // + button to create new cue list (hide in batch mode)
-                if !batchSelectMode {
-                    Button(action: onCreateNew) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(defaultCueColor)
-                            .frame(width: 44, height: 44)
-                            .background(
-                                Capsule()
-                                    .fill(theme.lightButtonBackgroundColor(for: colorScheme))
-                                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
-                            )
-                    }
+            // Top row: + button, project name
+            HStack(spacing: 8) {
+                Button(action: onCreateNew) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(width: 44, height: 44)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.black.opacity(0.5))
+                                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                        )
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
 
-                // Project name button (hide in batch mode)
-                if !batchSelectMode {
-                    Button(action: onRenameProject) {
-                        Text(projectName)
-                            .font(.system(size: 15, weight: .semibold))
+                Button(action: onRenameProject) {
+                    Text(projectName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(textColor)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 16)
+
+            // "CUE LISTS" label
+            Text("CUE LISTS")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(textColor.opacity(0.5))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+
+            // Search bar + sort + select row (same line, like song library)
+            HStack(spacing: 8) {
+                // Search bar — animates between full width and circular icon
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: batchSelectMode ? 18 : 16))
+                        .foregroundColor(defaultCueColor)
+
+                    if !batchSelectMode {
+                        TextField("Search cue lists...", text: $searchQuery)
+                            .font(.system(size: 15))
                             .foregroundColor(textColor)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                            .focused($isSearchFocused)
 
-                Spacer()
+                        if !searchQuery.isEmpty {
+                            Button(action: { searchQuery = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(defaultCueColor.opacity(0.6))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, batchSelectMode ? 0 : 14)
+                .frame(width: batchSelectMode ? 44 : nil, height: 44)
+                .frame(maxWidth: batchSelectMode ? nil : .infinity)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                .onTapGesture {
+                    if batchSelectMode {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            batchSelectMode = false
+                            selectedCueLists.removeAll()
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            isSearchFocused = true
+                        }
+                    } else {
+                        isSearchFocused = true
+                    }
+                }
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: batchSelectMode)
 
                 if batchSelectMode {
-                    // Batch mode action buttons in shared capsule
-                    HStack(spacing: 0) {
-                        Button(action: {
-                            selectedCueLists = Set(filteredCueLists.map { $0.id })
-                        }) {
-                            Text("Select All")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(defaultCueColor)
-                                .padding(.horizontal, 12)
-                                .frame(height: 44)
-                        }
-                        .buttonStyle(IOSPressButtonStyle())
+                    Spacer()
+                }
 
-                        Button(action: {
-                            selectedCueLists.removeAll()
-                        }) {
-                            Text("Clear")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(defaultCueColor)
-                                .padding(.horizontal, 12)
-                                .frame(height: 44)
-                        }
-                        .buttonStyle(IOSPressButtonStyle())
-
-                        Button(action: {
-                            if !selectedCueLists.isEmpty {
-                                showBatchDeleteConfirmation = true
-                            }
-                        }) {
-                            Text("Delete")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(selectedCueLists.isEmpty ? textColor.opacity(0.3) : .red)
-                                .padding(.horizontal, 12)
-                                .frame(height: 44)
-                        }
-                        .buttonStyle(IOSPressButtonStyle())
-                        .disabled(selectedCueLists.isEmpty)
-
-                        Rectangle()
-                            .fill(defaultCueColor.opacity(0.2))
-                            .frame(width: 1, height: 24)
-                            .padding(.horizontal, 4)
-
-                        // X button to exit select mode
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                batchSelectMode = false
-                                selectedCueLists.removeAll()
-                            }
-                        }) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(defaultCueColor)
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(IOSPressButtonStyle())
-                    }
-                    .background(.regularMaterial)
-                    .clipShape(Capsule())
-                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-                } else {
-                    // Sort menu (icon only) - only show when NOT in batch mode
+                // Sort menu - separate capsule (hidden in batch mode)
+                if !batchSelectMode {
                     Menu {
                         ForEach(CueListSortOption.allCases) { option in
                             Button(action: { sortOption = option }) {
@@ -3435,72 +3419,99 @@ struct CueListChooserPopover: View {
                         }
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(defaultCueColor)
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.9))
                             .frame(width: 44, height: 44)
                             .background(
-                                Capsule()
-                                    .fill(theme.lightButtonBackgroundColor(for: colorScheme))
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.black.opacity(0.5))
                                     .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                             )
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                 }
 
-                // Select button - only show when NOT in batch mode
-                if !batchSelectMode {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                            batchSelectMode = true
+                // Select capsule — grows into batch actions
+                HStack(spacing: 0) {
+                    if batchSelectMode {
+                        Button(action: {
+                            selectedCueLists = Set(filteredCueLists.map { $0.id })
+                        }) {
+                            Text("All")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .padding(.horizontal, 10)
+                                .frame(height: 44)
                         }
-                    }) {
-                        Image(systemName: "checklist")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(defaultCueColor)
-                            .frame(width: 44, height: 44)
-                            .background(
-                                Capsule()
-                                    .fill(theme.lightButtonBackgroundColor(for: colorScheme))
-                                    .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
-                            )
+                        .buttonStyle(IOSPressButtonStyle())
+
+                        Button(action: {
+                            selectedCueLists.removeAll()
+                        }) {
+                            Text("Clear")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .padding(.horizontal, 10)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(IOSPressButtonStyle())
+
+                        Button(action: {
+                            if !selectedCueLists.isEmpty {
+                                showBatchDeleteConfirmation = true
+                            }
+                        }) {
+                            Text("Delete")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(selectedCueLists.isEmpty ? textColor.opacity(0.3) : .red)
+                                .padding(.horizontal, 10)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(IOSPressButtonStyle())
+                        .disabled(selectedCueLists.isEmpty)
+
+                        Rectangle()
+                            .fill(defaultCueColor.opacity(0.2))
+                            .frame(width: 1, height: 24)
+                            .padding(.horizontal, 2)
+
+                        // X button to exit select mode
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                batchSelectMode = false
+                                selectedCueLists.removeAll()
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(defaultCueColor)
+                                .frame(width: 36, height: 44)
+                        }
+                        .buttonStyle(IOSPressButtonStyle())
+                    } else {
+                        // Collapsed: just the checklist icon
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                batchSelectMode = true
+                            }
+                        }) {
+                            Image(systemName: "checklist")
+                                .font(.system(size: 18))
+                                .foregroundColor(defaultCueColor)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(IOSPressButtonStyle())
                     }
                 }
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: batchSelectMode)
             }
             .padding(.horizontal, 16)
-
-            // "CUE LISTS" label
-            Text("CUE LISTS")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(textColor.opacity(0.5))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-
-            // Search bar - Apple-like capsule style
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16))
-                    .foregroundColor(defaultCueColor)
-
-                TextField("Search cue lists...", text: $searchQuery)
-                    .font(.system(size: 15))
-                    .foregroundColor(textColor)
-
-                if !searchQuery.isEmpty {
-                    Button(action: { searchQuery = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(defaultCueColor.opacity(0.6))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 44)
-            .frame(maxWidth: .infinity)
-            .background(.regularMaterial)
-            .clipShape(Capsule())
-            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-            .padding(.horizontal, 16)
+            .padding(.top, 4)
         }
         .padding(.vertical, 12)
         .background(backgroundColor)
@@ -3520,7 +3531,7 @@ struct CueListChooserPopover: View {
                 }) {
                     Image(systemName: selectedCueLists.contains(cueList.id) ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 22))
-                        .foregroundColor(selectedCueLists.contains(cueList.id) ? .blue : textColor.opacity(0.3))
+                        .foregroundColor(selectedCueLists.contains(cueList.id) ? .white : textColor.opacity(0.3))
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
                 }
@@ -3603,6 +3614,12 @@ struct SwipeableCueListRow: View {
     let onDuplicate: () -> Void
     let onRename: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+    private var selectedTheme: AppTheme {
+        AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
     @State private var offset: CGFloat = 0
     @State private var isDragging = false
     @State private var showMenu = false
@@ -3612,7 +3629,8 @@ struct SwipeableCueListRow: View {
 
     var body: some View {
         Color.clear
-            .frame(width: 400, height: 60)
+            .frame(maxWidth: .infinity)
+            .frame(height: 60)
             .overlay(
                 ZStack(alignment: .trailing) {
                     // Delete button background
@@ -3652,7 +3670,7 @@ struct SwipeableCueListRow: View {
                                     if isActive {
                                         Image(systemName: "checkmark.circle.fill")
                                             .font(.system(size: 14))
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(selectedTheme.accentColor(for: colorScheme))
                                     }
                                 }
 

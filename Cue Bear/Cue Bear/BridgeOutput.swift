@@ -279,9 +279,9 @@ final class BridgeOutput: ObservableObject {
     @objc private func appWillEnterForeground() {
         debugPrint("📡 BridgeOutput: App entering foreground - ending background task")
         endBackgroundTask()
-        
-        // Check connection health when returning to foreground
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+
+        // Check connection health immediately when returning to foreground
+        DispatchQueue.main.async { [weak self] in
             self?.checkWiFiConnectionAfterWake()
         }
     }
@@ -300,25 +300,30 @@ final class BridgeOutput: ObservableObject {
         // If we were connected before sleep, verify the connection is still alive
         if isConnected && connection != nil {
             debugPrint("📡 BridgeOutput: WiFi connection was active - verifying it's still healthy")
-            
-            // Send a test message to verify connection
+
+            // Send an immediate heartbeat — if the socket is dead, keepalive will surface the
+            // failure via NWConnection state, triggering our reconnect path.
             let testMessage: [String: Any] = [
-                "type": "connection_test",
+                "type": "heartbeat",
                 "timestamp": Date().timeIntervalSince1970
             ]
-            sendJSON(testMessage)
-            
-            // If connection is lost, update state
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            sendJSONImmediate(testMessage)
+
+            // Check again quickly; if NWConnection hasn't flipped to .failed yet, force a reconnect.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self = self else { return }
-                
+
                 if self.isConnected && self.connection != nil {
                     debugPrint("📡 BridgeOutput: WiFi connection verified healthy after wake")
                 } else {
-                    debugPrint("📡 BridgeOutput: WiFi connection lost during sleep - updating state")
+                    debugPrint("📡 BridgeOutput: WiFi connection lost during sleep - attempting immediate reconnect")
+                    let last = self.current
                     self.isConnected = false
-                    self.current = nil
+                    self.connection = nil
                     self.connectionQuality = .disconnected
+                    if let last = last {
+                        self.connect(to: last)
+                    }
                 }
             }
         }
@@ -387,10 +392,13 @@ final class BridgeOutput: ObservableObject {
             // Update connection quality
             self.updateConnectionQuality()
 
-            // Note: We do NOT disconnect based on idle time. NWConnection state monitoring
-            // handles actual connection failures. Users may legitimately have long idle periods
-            // between songs during a performance, and disconnecting after inactivity would be
-            // disruptive. The connection quality indicator will show if the connection is poor.
+            // Heartbeat: keeps router NAT entries alive, keeps WiFi radio from power-saving,
+            // and lets TCP keepalive + NWConnection detect a dead socket on our next send.
+            let heartbeat: [String: Any] = [
+                "type": "heartbeat",
+                "timestamp": Date().timeIntervalSince1970
+            ]
+            self.sendJSONImmediate(heartbeat)
         }
     }
     
@@ -424,7 +432,15 @@ final class BridgeOutput: ObservableObject {
         let endpoint = item.endpoint
         debugPrint("BridgeOutput: Using WiFi connection to \(item.endpoint)")
 
-        let conn = NWConnection(to: endpoint, using: .tcp)
+        // TCP keepalive: detect dead sockets within ~25s (router NAT drops, WiFi radio sleep, etc.)
+        let tcp = NWProtocolTCP.Options()
+        tcp.noDelay = true
+        tcp.enableKeepalive = true
+        tcp.keepaliveIdle = 10
+        tcp.keepaliveInterval = 5
+        tcp.keepaliveCount = 3
+        let params = NWParameters(tls: nil, tcp: tcp)
+        let conn = NWConnection(to: endpoint, using: params)
         connection = conn
         current = item
         debugPrint("🔌 DEBUG: NWConnection created, starting connection...")

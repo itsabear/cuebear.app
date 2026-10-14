@@ -12,6 +12,22 @@
 		4B7021CA8FF44BD58F85C42B /* Oswald-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A9E4A56FAF8549C38763FD75 /* Oswald-Regular.ttf */; };
 		68A090B4DB5647DD878CF90A /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A02A5B62A15E4491A6E0F731 /* SpaceGrotesk-Medium.ttf */; };
 		AF9747708AB943C39B682FA3 /* FredokaOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B73DB1B32D4D432A848D043E /* FredokaOne-Regular.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F1A2 /* Satoshi-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* Satoshi-Regular.otf */; };
+		B1C2D3E4F5A6B7C8D9E0F1A3 /* Satoshi-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* Satoshi-Bold.otf */; };
+		B1C2D3E4F5A6B7C8D9E0F1A4 /* GeneralSans-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F4 /* GeneralSans-Regular.otf */; };
+		B1C2D3E4F5A6B7C8D9E0F1A5 /* GeneralSans-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F5 /* GeneralSans-Bold.otf */; };
+		B1C2D3E4F5A6B7C8D9E0F1A6 /* SpaceGrotesk-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F6 /* SpaceGrotesk-Regular.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F1A7 /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F7 /* SpaceGrotesk-Bold.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F1A8 /* PlusJakartaSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F8 /* PlusJakartaSans-Regular.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F1A9 /* PlusJakartaSans-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F9 /* PlusJakartaSans-Bold.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F2A0 /* Outfit-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F0 /* Outfit-Regular.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F2A1 /* Outfit-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F1 /* Outfit-Bold.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F2A2 /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F2 /* Inter-Regular.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F2A3 /* Inter-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F3 /* Inter-Bold.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F2A4 /* Manrope-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F4 /* Manrope-Regular.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F2A5 /* Manrope-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F5 /* Manrope-Bold.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F2A6 /* Sora-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F6 /* Sora-Regular.ttf */; };
+		B1C2D3E4F5A6B7C8D9E0F2A7 /* Sora-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F7 /* Sora-Bold.ttf */; };
 		C7AC6E304534475791674BB4 /* CormorantGaramond-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5C39010D092941898D6AEB9F /* CormorantGaramond-Italic.ttf */; };
 		D6A18A6F12A44AF0BCAF3821 /* PlayfairDisplay-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C5D3285D55234465A9156631 /* PlayfairDisplay-Regular.ttf */; };
 		D6CDA721E14E40F78F621DC0 /* Montserrat-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 74B5560052C643E280EC4D5B /* Montserrat-Bold.ttf */; };
@@ -47,6 +63,22 @@
 		9E6AA9F42E50EE4B00F22798 /* Cue BearTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cue BearTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E6AA9FE2E50EE4B00F22798 /* Cue BearUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cue BearUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A02A5B62A15E4491A6E0F731 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "SpaceGrotesk-Medium.ttf"; path = "Fonts/SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* Satoshi-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Satoshi-Regular.otf"; path = "Fonts/Satoshi-Regular.otf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F3 /* Satoshi-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Satoshi-Bold.otf"; path = "Fonts/Satoshi-Bold.otf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F4 /* GeneralSans-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "GeneralSans-Regular.otf"; path = "Fonts/GeneralSans-Regular.otf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F5 /* GeneralSans-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "GeneralSans-Bold.otf"; path = "Fonts/GeneralSans-Bold.otf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F6 /* SpaceGrotesk-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "SpaceGrotesk-Regular.ttf"; path = "Fonts/SpaceGrotesk-Regular.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F7 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "SpaceGrotesk-Bold.ttf"; path = "Fonts/SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F8 /* PlusJakartaSans-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "PlusJakartaSans-Regular.ttf"; path = "Fonts/PlusJakartaSans-Regular.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F9 /* PlusJakartaSans-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "PlusJakartaSans-Bold.ttf"; path = "Fonts/PlusJakartaSans-Bold.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E2F0 /* Outfit-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Outfit-Regular.ttf"; path = "Fonts/Outfit-Regular.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E2F1 /* Outfit-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Outfit-Bold.ttf"; path = "Fonts/Outfit-Bold.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E2F2 /* Inter-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Inter-Regular.ttf"; path = "Fonts/Inter-Regular.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E2F3 /* Inter-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Inter-Bold.ttf"; path = "Fonts/Inter-Bold.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E2F4 /* Manrope-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Manrope-Regular.ttf"; path = "Fonts/Manrope-Regular.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E2F5 /* Manrope-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Manrope-Bold.ttf"; path = "Fonts/Manrope-Bold.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E2F6 /* Sora-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Sora-Regular.ttf"; path = "Fonts/Sora-Regular.ttf"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E2F7 /* Sora-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Sora-Bold.ttf"; path = "Fonts/Sora-Bold.ttf"; sourceTree = "<group>"; };
 		A9E4A56FAF8549C38763FD75 /* Oswald-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Oswald-Regular.ttf"; path = "Fonts/Oswald-Regular.ttf"; sourceTree = "<group>"; };
 		B354EF2E6F234BBD930BC3B4 /* NunitoSans-Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "NunitoSans-Black.ttf"; path = "Fonts/NunitoSans-Black.ttf"; sourceTree = "<group>"; };
 		B73DB1B32D4D432A848D043E /* FredokaOne-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; name = "FredokaOne-Regular.ttf"; path = "Fonts/FredokaOne-Regular.ttf"; sourceTree = "<group>"; };
@@ -133,6 +165,22 @@
 				B354EF2E6F234BBD930BC3B4 /* NunitoSans-Black.ttf */,
 				5C39010D092941898D6AEB9F /* CormorantGaramond-Italic.ttf */,
 				A02A5B62A15E4491A6E0F731 /* SpaceGrotesk-Medium.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* Satoshi-Regular.otf */,
+				A1B2C3D4E5F6A7B8C9D0E1F3 /* Satoshi-Bold.otf */,
+				A1B2C3D4E5F6A7B8C9D0E1F4 /* GeneralSans-Regular.otf */,
+				A1B2C3D4E5F6A7B8C9D0E1F5 /* GeneralSans-Bold.otf */,
+				A1B2C3D4E5F6A7B8C9D0E1F6 /* SpaceGrotesk-Regular.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E1F7 /* SpaceGrotesk-Bold.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E1F8 /* PlusJakartaSans-Regular.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E1F9 /* PlusJakartaSans-Bold.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E2F0 /* Outfit-Regular.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E2F1 /* Outfit-Bold.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E2F2 /* Inter-Regular.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E2F3 /* Inter-Bold.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E2F4 /* Manrope-Regular.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E2F5 /* Manrope-Bold.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E2F6 /* Sora-Regular.ttf */,
+				A1B2C3D4E5F6A7B8C9D0E2F7 /* Sora-Bold.ttf */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -256,6 +304,22 @@
 				F707A5ADB7EE4CCEB6676DCD /* NunitoSans-Black.ttf in Resources */,
 				C7AC6E304534475791674BB4 /* CormorantGaramond-Italic.ttf in Resources */,
 				68A090B4DB5647DD878CF90A /* SpaceGrotesk-Medium.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F1A2 /* Satoshi-Regular.otf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F1A3 /* Satoshi-Bold.otf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F1A4 /* GeneralSans-Regular.otf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F1A5 /* GeneralSans-Bold.otf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F1A6 /* SpaceGrotesk-Regular.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F1A7 /* SpaceGrotesk-Bold.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F1A8 /* PlusJakartaSans-Regular.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F1A9 /* PlusJakartaSans-Bold.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F2A0 /* Outfit-Regular.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F2A1 /* Outfit-Bold.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F2A2 /* Inter-Regular.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F2A3 /* Inter-Bold.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F2A4 /* Manrope-Regular.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F2A5 /* Manrope-Bold.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F2A6 /* Sora-Regular.ttf in Resources */,
+				B1C2D3E4F5A6B7C8D9E0F2A7 /* Sora-Bold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -274,6 +338,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		9EGITHASH2E50EE4A00F22799 /* Update Git Hash */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Update Git Hash";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/../scripts/update_git_info.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9E6AA9E02E50EE4A00F22798 /* Sources */ = {
@@ -298,27 +383,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		9EGITHASH2E50EE4A00F22799 /* Update Git Hash */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Update Git Hash";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/../scripts/update_git_info.sh\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		9E6AA9F62E50EE4B00F22798 /* PBXTargetDependency */ = {
@@ -469,11 +533,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Cue-Bear-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "";
-				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cue Bear needs to find your Mac computer on the local network to send MIDI commands during your performance. This connection stays completely private between your iPad and Mac.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
@@ -507,11 +570,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Cue-Bear-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "";
-				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Cue Bear needs to find your Mac computer on the local network to send MIDI commands during your performance. This connection stays completely private between your iPad and Mac.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;

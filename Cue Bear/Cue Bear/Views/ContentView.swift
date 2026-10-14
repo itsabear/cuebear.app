@@ -349,7 +349,7 @@ private struct ControlAreaScrollbar: View {
     }
 
     private var trackWidth: CGFloat {
-        visibleWidth - trackInset * 2
+        max(0, visibleWidth - trackInset * 2)
     }
 
     private var maxScrollOffset: CGFloat {
@@ -367,36 +367,36 @@ private struct ControlAreaScrollbar: View {
     }
 
     var body: some View {
-        if needsScrollbar {
-            ZStack(alignment: .leading) {
-                // Track
-                Capsule()
-                    .fill(Color.primary.opacity(0.08))
-                    .frame(width: trackWidth, height: trackHeight)
+        ZStack(alignment: .leading) {
+            // Track
+            Capsule()
+                .fill(Color.primary.opacity(0.08))
+                .frame(width: trackWidth, height: trackHeight)
 
-                // Round draggable handle
-                Circle()
-                    .fill(Color.primary.opacity(0.3))
-                    .frame(width: handleSize, height: handleSize)
-                    .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
-                    .offset(x: handleCenterX - handleSize / 2)
-            }
-            .frame(height: handleSize)
-            .padding(.horizontal, trackInset)
-            .padding(.bottom, 4)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        let trackUsable = trackWidth - handleSize
-                        guard trackUsable > 0 else { return }
-                        // Map drag X position to scroll fraction
-                        let localX = value.location.x - handleSize / 2
-                        let fraction = min(1, max(0, localX / trackUsable))
-                        scrollOffset = fraction * maxScrollOffset
-                    }
-            )
+            // Round draggable handle
+            Circle()
+                .fill(Color.primary.opacity(0.3))
+                .frame(width: handleSize, height: handleSize)
+                .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
+                .offset(x: handleCenterX - handleSize / 2)
         }
+        .frame(height: handleSize)
+        .padding(.horizontal, trackInset)
+        .padding(.bottom, 4)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    let trackUsable = trackWidth - handleSize
+                    guard trackUsable > 0 else { return }
+                    // Map drag X position to scroll fraction
+                    let localX = value.location.x - handleSize / 2
+                    let fraction = min(1, max(0, localX / trackUsable))
+                    scrollOffset = fraction * maxScrollOffset
+                }
+        )
+        .opacity(needsScrollbar ? 1 : 0)
+        .allowsHitTesting(needsScrollbar)
     }
 }
 
@@ -434,7 +434,7 @@ class CueEditorDraft: ObservableObject {
         } else {
             number = song.cc
         }
-        autoAssign = false
+        autoAssign = true
     }
 }
 
@@ -476,7 +476,7 @@ class ControlEditorDraft: ObservableObject {
         number = control.number
         channel = control.channel
         velocity = control.velocity
-        autoAssign = false
+        autoAssign = true
         isToggle = control.isToggle ?? false
         isSmall = control.isSmall ?? false
         isFader = control.isFader == true
@@ -497,7 +497,7 @@ struct PrimaryWideButton: View {
         Button(action: action) {
             Text(title)
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(.black)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
         }
@@ -516,7 +516,7 @@ struct PrimaryWideButtonStyle: ButtonStyle {
                     .fill(
                         isDisabled
                             ? Color.gray.opacity(0.4)
-                            : (configuration.isPressed ? Color(hex: "0A84FF").opacity(0.7) : Color(hex: "0A84FF"))
+                            : (configuration.isPressed ? Color.white.opacity(0.7) : Color.white)
                     )
             )
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
@@ -536,7 +536,7 @@ struct SecondaryWideButton: View {
                 .foregroundColor(
                     isDisabled
                         ? Color.gray.opacity(0.5)
-                        : Color(hex: "0A84FF")
+                        : Color.white
                 )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -556,7 +556,7 @@ struct SecondaryWideButtonStyle: ButtonStyle {
                     .fill(
                         isDisabled
                             ? Color.gray.opacity(0.1)
-                            : (configuration.isPressed ? Color(hex: "0A84FF").opacity(0.2) : Color(hex: "0A84FF").opacity(0.1))
+                            : (configuration.isPressed ? Color.white.opacity(0.2) : Color.white.opacity(0.1))
                     )
             )
             .overlay(
@@ -564,7 +564,7 @@ struct SecondaryWideButtonStyle: ButtonStyle {
                     .stroke(
                         isDisabled
                             ? Color.gray.opacity(0.3)
-                            : Color(hex: "0A84FF").opacity(0.5),
+                            : Color.white.opacity(0.5),
                         lineWidth: 1
                     )
             )
@@ -607,43 +607,53 @@ struct DestructiveWideButtonStyle: ButtonStyle {
 class WobbleAnimator: ObservableObject {
     static let shared = WobbleAnimator()
 
-    // Track which controls are wobbling and their parameters
-    @Published private(set) var wobbles: [UUID: WobbleConfig] = [:]
+    // Not @Published — coalesced via scheduleNotification() so N simultaneous updates = 1 re-render
+    private(set) var wobbles: [UUID: WobbleConfig] = [:]
+    private var notificationScheduled = false
 
     struct WobbleConfig: Equatable {
         let amplitude: Double
         let scaleDelta: Double
-        let phaseOffset: Double  // Randomized phase for organic look
+        let phaseOffset: Double
     }
 
     private init() {}
 
-    func startWobbling(for id: UUID, amplitude: Double, scaleDelta: Double, interval: Double, initialPhase: Bool? = nil) {
-        // Randomize phase offset (0 to 2π) for organic out-of-sync wobbling
-        let phaseOffset = Double.random(in: 0...(2 * .pi))
-        wobbles[id] = WobbleConfig(
-            amplitude: amplitude,
-            scaleDelta: scaleDelta,
-            phaseOffset: phaseOffset
-        )
+    private func scheduleNotification() {
+        guard !notificationScheduled else { return }
+        notificationScheduled = true
+        // Defer to next run loop tick so all synchronous mutations in the same cycle are batched
+        DispatchQueue.main.async { [weak self] in
+            self?.notificationScheduled = false
+            self?.objectWillChange.send()
+        }
+    }
+
+    func startWobbling(for id: UUID, amplitude: Double, scaleDelta: Double) {
+        wobbles[id] = WobbleConfig(amplitude: amplitude, scaleDelta: scaleDelta, phaseOffset: Double.random(in: 0...(2 * .pi)))
+        scheduleNotification()
     }
 
     func stopWobbling(for id: UUID) {
-        wobbles.removeValue(forKey: id)
+        guard wobbles.removeValue(forKey: id) != nil else { return }
+        scheduleNotification()
     }
 
     func resetWobble(for id: UUID) {
-        wobbles.removeValue(forKey: id)
+        stopWobbling(for: id)
     }
 
-    // Calculate wobble transforms for a given time and config
-    func calculateWobble(time: TimeInterval, config: WobbleConfig) -> (rotation: Double, scale: Double) {
-        // Frequency: 3.0 Hz (slightly quicker than iPhone - about 3 wobbles per second)
-        let frequency = 18.8  // 3.0 * 2π ≈ 18.8 radians per second
-        let angle = time * frequency + config.phaseOffset
+    func stopAll() {
+        guard !wobbles.isEmpty else { return }
+        wobbles.removeAll()
+        scheduleNotification()
+    }
 
+    func calculateWobble(time: TimeInterval, config: WobbleConfig) -> (rotation: Double, scale: Double) {
+        let frequency = 18.8  // 3 Hz × 2π
+        let angle = time * frequency + config.phaseOffset
         let rotation = sin(angle) * config.amplitude
-        let scale = 1.0 + sin(angle + .pi / 2) * config.scaleDelta  // 90° phase shift for scale
+        let scale = 1.0 + sin(angle + .pi / 2) * config.scaleDelta
 
         return (rotation, scale)
     }
@@ -657,7 +667,6 @@ struct TimeBasedWobbleModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         if let config = wobbleAnimator.wobbles[wobbleID] {
-            // Debug print removed - was causing 60fps console spam during wobble animation
             TimelineView(.animation) { timeline in
                 let time = timeline.date.timeIntervalSinceReferenceDate
                 let wobble = wobbleAnimator.calculateWobble(time: time, config: config)
@@ -667,7 +676,6 @@ struct TimeBasedWobbleModifier: ViewModifier {
                     .scaleEffect(wobble.scale)
             }
         } else {
-            // When wobble is stopped, animate back to normal with spring
             content
                 .rotationEffect(.degrees(0))
                 .scaleEffect(1.0)
@@ -846,8 +854,9 @@ struct MIDINumberPicker: View {
     let channel: Int
     var currentOwnerName: ((MIDIKey) -> String?)?
     var editingControl: ControlButton?
-    var editingSong: Song?  // Added to filter cue conflicts
-    var midiFilter: Set<Int> = []  // Added to show filtered MIDI warning
+    var editingSong: Song?
+    @AppStorage("midiFiltersEnabled") private var midiFiltersEnabled: Bool = true
+    var midiFilter: Set<Int> = []
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @State private var textValue: String = ""
@@ -900,7 +909,7 @@ struct MIDINumberPicker: View {
                     .cornerRadius(6)
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(isFocused ? selectedTheme.defaultCueColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
+                            .stroke(isFocused ? selectedTheme.accentColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
                     )
                     .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                     .disabled(disabled)
@@ -915,6 +924,11 @@ struct MIDINumberPicker: View {
                     }
                     .onSubmit {
                         validateAndUpdate()
+                    }
+                    .onChange(of: textValue) { _, newText in
+                        if let value = Int(newText), value >= 0, value <= 127 {
+                            number = value
+                        }
                     }
                     .onChange(of: isFocused) { _, focused in
                         if !focused {
@@ -950,8 +964,8 @@ struct MIDINumberPicker: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Show filtered MIDI warning (only for CC, notes are never filtered)
-            if !midiFilter.isEmpty && kind == .cc && midiFilter.contains(number) {
+            // Show filtered MIDI warning only when filters are active
+            if midiFiltersEnabled && !midiFilter.isEmpty && kind == .cc && midiFilter.contains(number) {
                 Text("⚠️ This CC is filtered. Turn off filter to use it.")
                     .font(.caption)
                     .foregroundColor(selectedTheme.warningColor(for: colorScheme))
@@ -1124,7 +1138,7 @@ struct IconGridView: View {
                             .frame(height: 60)
                             .background(
                                 symbol.isEmpty
-                                    ? selectedTheme.defaultCueColor(for: colorScheme)
+                                    ? selectedTheme.accentColor(for: colorScheme)
                                     : selectedTheme.titleBarColor(for: colorScheme)
                             )
                             .foregroundColor(
@@ -1134,7 +1148,7 @@ struct IconGridView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(
-                                        symbol.isEmpty ? selectedTheme.defaultCueColor(for: colorScheme) : Color.clear,
+                                        symbol.isEmpty ? selectedTheme.accentColor(for: colorScheme) : Color.clear,
                                         lineWidth: 2
                                     )
                             )
@@ -1155,7 +1169,7 @@ struct IconGridView: View {
                                     .frame(height: 60)
                                     .background(
                                         isSelected
-                                            ? selectedTheme.defaultCueColor(for: colorScheme)
+                                            ? selectedTheme.accentColor(for: colorScheme)
                                             : selectedTheme.titleBarColor(for: colorScheme)
                                     )
                                     .foregroundColor(
@@ -1165,7 +1179,7 @@ struct IconGridView: View {
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
                                             .stroke(
-                                                isSelected ? selectedTheme.defaultCueColor(for: colorScheme) : Color.clear,
+                                                isSelected ? selectedTheme.accentColor(for: colorScheme) : Color.clear,
                                                 lineWidth: 2
                                             )
                                     )
@@ -1243,7 +1257,7 @@ struct VelocityPicker: View {
                 .cornerRadius(6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(isFocused ? selectedTheme.defaultCueColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
+                        .stroke(isFocused ? selectedTheme.accentColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
                 )
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                 .disabled(disabled)
@@ -1258,6 +1272,11 @@ struct VelocityPicker: View {
                 }
                 .onSubmit {
                     validateAndUpdate()
+                }
+                .onChange(of: textValue) { _, newText in
+                    if let value = Int(newText), value >= 0, value <= 127 {
+                        velocity = value
+                    }
                 }
                 .onChange(of: isFocused) { _, focused in
                     if !focused {
@@ -1344,7 +1363,7 @@ struct ChannelPicker: View {
                 .cornerRadius(6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(isFocused ? selectedTheme.defaultCueColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
+                        .stroke(isFocused ? selectedTheme.accentColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
                 )
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                 .disabled(disabled)
@@ -1359,6 +1378,11 @@ struct ChannelPicker: View {
                 }
                 .onSubmit {
                     validateAndUpdate()
+                }
+                .onChange(of: textValue) { _, newText in
+                    if let value = Int(newText), value >= 1, value <= 16 {
+                        channel = value
+                    }
                 }
                 .onChange(of: isFocused) { _, focused in
                     if !focused {
@@ -1445,7 +1469,7 @@ struct CCNumberPicker: View {
                 .cornerRadius(6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(isFocused ? selectedTheme.defaultCueColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
+                        .stroke(isFocused ? selectedTheme.accentColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
                 )
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                 .disabled(disabled)
@@ -1505,7 +1529,7 @@ struct CBControlEditorSheet: View {
     @Binding var pendingIsFader: Bool?
     let isGlobalChannel: Bool
     let globalChannel: Int
-    let midiFiltersEnabled: Bool
+    @AppStorage("midiFiltersEnabled") private var midiFiltersEnabled: Bool = true
     let midiFilter: Set<Int>
     var onSave: (ControlButton, Bool) -> Void  // Added Bool parameter for andAddAnother
     var onCancel: () -> Void
@@ -1538,6 +1562,7 @@ struct CBControlEditorSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
+    @AppStorage("autoAssignMIDI") private var savedAutoAssign: Bool = true
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -1693,7 +1718,48 @@ struct CBControlEditorSheet: View {
 
     var body: some View {
         NavigationView {
-            Form {
+            VStack(spacing: 0) {
+                // Custom header — bypasses iOS 18+/26 toolbar chrome and gesture caching
+                ZStack {
+                    Text(titleForSheet())
+                        .font(.custom("Sora-Bold", size: 17))
+                        .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+
+                    HStack(spacing: 8) {
+                        CBSheetButton(title: "Cancel") {
+                            draft.clear()
+                            onCancel()
+                        }
+                        Spacer()
+                        let isDisabled = isOutOfRoom || (midiFiltersEnabled && conflictOwner() != nil) || (midiFiltersEnabled && isFilteredMIDI())
+                        CBSheetIconMenu(systemName: "ellipsis") {
+                            if !isEditMode {
+                                Button {
+                                    saveControl(andAddAnother: true)
+                                } label: {
+                                    Label("Save & Add Another", systemImage: "plus")
+                                }
+                                .disabled(isDisabled)
+                            } else {
+                                if onDelete != nil {
+                                    Button(role: .destructive) {
+                                        showDeleteAlert = true
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        }
+                        CBSheetIconButton(systemName: "checkmark", disabled: isDisabled) {
+                            saveControl(andAddAnother: false)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+                Form {
                     // Out of room warning - shown at top for maximum visibility
                     if isOutOfRoom {
                         Section {
@@ -1852,7 +1918,10 @@ struct CBControlEditorSheet: View {
                             .foregroundColor(.secondary)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
-                    Toggle(isOn: $draft.autoAssign) {
+                    Toggle(isOn: Binding(
+                        get: { draft.autoAssign },
+                        set: { newValue in savedAutoAssign = newValue; draft.autoAssign = newValue }
+                    )) {
                         Text("Assign MIDI automatically")
                     }
                     .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
@@ -1897,76 +1966,28 @@ struct CBControlEditorSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
-            .navigationTitle(titleForSheet())
+            }
+            .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationBarBackButtonHidden(true)
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
-            .alert("Delete Control", isPresented: $showDeleteAlert) {
-                Button("Delete", role: .destructive) {
-                    if let control = editing {
-                        onDelete?(control)
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                let controlTypeName = controlType == .fader ? "fader" : (buttonType == .small ? "small button" : "button")
-                Text("Are you sure you want to delete this \(controlTypeName)? This action cannot be undone.")
-            }
-            .alert("Maximum Controls Reached", isPresented: $showGlobalModeMaxReachedAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.")
-            }
-            .toolbar {
-                // Cancel button on the left
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        // v1.0.8: Clear draft state on Cancel
-                        draft.clear()
-                        onCancel()
-                    }
-                }
-
-                // Right side buttons
-                ToolbarItem(placement: .confirmationAction) {
-                    let isDisabled = isOutOfRoom || (midiFiltersEnabled && conflictOwner() != nil) || (midiFiltersEnabled && isFilteredMIDI())
-                    HStack(spacing: 16) {
-                        // More menu (3 dots)
-                        Menu {
-                            if !isEditMode {
-                                // Add mode: Save & Add Another option
-                                Button {
-                                    saveControl(andAddAnother: true)
-                                } label: {
-                                    Label("Save & Add Another", systemImage: "plus")
-                                }
-                                .disabled(isDisabled)
-                            } else {
-                                // Edit mode: Delete option
-                                if onDelete != nil {
-                                    Button(role: .destructive) {
-                                        showDeleteAlert = true
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
+            .toolbar(.hidden, for: .navigationBar)
+            .tint(selectedTheme.accentColor(for: colorScheme))
+            .cbDialog("Delete Control", isPresented: $showDeleteAlert, themeFont: selectedTheme.font,
+                message: "Are you sure you want to delete this \(controlType == .fader ? "fader" : (buttonType == .small ? "small button" : "button"))? This action cannot be undone.",
+                buttons: [
+                    .init("Delete", role: .destructive) {
+                        if let control = editing {
+                            onDelete?(control)
                         }
-
-                        // Primary action button (checkmark)
-                        Button {
-                            saveControl(andAddAnother: false)
-                        } label: {
-                            Image(systemName: "checkmark")
-                                .fontWeight(.semibold)
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .disabled(isDisabled)
-                    }
-                }
-            }
+                    },
+                    .init("Cancel", role: .cancel) { }
+                ]
+            )
+            .cbDialog("Maximum Controls Reached", isPresented: $showGlobalModeMaxReachedAlert, themeFont: selectedTheme.font,
+                message: "You've reached the maximum of 127 controls in Global MIDI Channel mode. Turn off Global MIDI Channel mode to continue auto-assigning on additional channels.",
+                buttons: [
+                    .init("OK", role: .primary) { }
+                ]
+            )
             .onAppear {
                 preset()
                 // Validate space for add mode on sheet open
@@ -2076,23 +2097,23 @@ struct CBControlEditorSheet: View {
                 buttonType = (b.isSmall == true) ? .small : .regular
             }
 
-            // v1.0.8: For ADD mode, always enable auto-assign (find free CC)
-            // For EDIT mode, disable auto-assign to preserve manual choices
             if isEditMode {
-                draft.autoAssign = false
+                draft.autoAssign = false  // editing existing control — preserve its MIDI, don't auto-assign
             } else {
-                // ADD mode: enable auto-assign (but only if draft was just loaded from template)
+                // ADD mode: auto-assign only if draft was just loaded from template
                 if draftMatchesOriginal || draft.title.isEmpty {
-                    draft.autoAssign = true
-                    let nextChannel = isGlobalChannel ? globalChannel : draft.channel
-                    let result = autoAssignMIDI(for: draft.kind, startChannel: nextChannel, startNumber: 0)
-                    if result.reachedLimit {
-                        showGlobalModeMaxReachedAlert = true
-                        draft.autoAssign = false
-                    } else {
-                        draft.channel = result.channel
-                        draft.number = result.number
-                        debugPrint("  ✅ [CONTROL] ADD mode - set autoAssign=true, channel=\(result.channel), number=\(result.number)")
+                    draft.autoAssign = savedAutoAssign
+                    if savedAutoAssign {
+                        let nextChannel = isGlobalChannel ? globalChannel : draft.channel
+                        let result = autoAssignMIDI(for: draft.kind, startChannel: nextChannel, startNumber: 0)
+                        if result.reachedLimit {
+                            showGlobalModeMaxReachedAlert = true
+                            draft.autoAssign = false
+                        } else {
+                            draft.channel = result.channel
+                            draft.number = result.number
+                            debugPrint("  ✅ [CONTROL] ADD mode - set autoAssign=\(savedAutoAssign), channel=\(result.channel), number=\(result.number)")
+                        }
                     }
                 } else {
                     debugPrint("  ✅ [CONTROL] ADD mode - preserving draft autoAssign=\(draft.autoAssign)")
@@ -2104,25 +2125,27 @@ struct CBControlEditorSheet: View {
             if draft.number > 0 {
                 // "Add Another" already set the correct number - DON'T recalculate!
                 debugPrint("  🎯 [CONTROL] Number already set by 'Add Another': \(draft.number), skipping recalculation")
-                // autoAssign is already set to true above
-                // All other values are already reset correctly
                 return
             }
 
             // This is a fresh "Add Control" (not "Add Another")
             draft.clear()
-            draft.autoAssign = true
+            draft.autoAssign = savedAutoAssign
             // FIX: Use global channel if enabled, otherwise default to 1
             let nextChannel = isGlobalChannel ? globalChannel : 1
             debugPrint("  🆕 [CONTROL] No editing state, finding free number for \(draft.kind) ch\(nextChannel)")
-            let result = autoAssignMIDI(for: draft.kind, startChannel: nextChannel, startNumber: 0)
-            if result.reachedLimit {
-                showGlobalModeMaxReachedAlert = true
-                draft.autoAssign = false
+            if savedAutoAssign {
+                let result = autoAssignMIDI(for: draft.kind, startChannel: nextChannel, startNumber: 0)
+                if result.reachedLimit {
+                    showGlobalModeMaxReachedAlert = true
+                    draft.autoAssign = false
+                } else {
+                    draft.channel = result.channel
+                    draft.number = result.number
+                    debugPrint("  ✅ [CONTROL] preset() set channel=\(result.channel), number=\(result.number)")
+                }
             } else {
-                draft.channel = result.channel
-                draft.number = result.number
-                debugPrint("  ✅ [CONTROL] preset() set channel=\(result.channel), number=\(result.number)")
+                draft.channel = nextChannel
             }
         }
     }
@@ -2213,7 +2236,7 @@ struct CBControlEditorSheet: View {
     }
 
     private func isFilteredMIDI() -> Bool {
-        return !midiFilter.isEmpty && draft.kind == .cc && midiFilter.contains(draft.number)
+        return midiFiltersEnabled && !midiFilter.isEmpty && draft.kind == .cc && midiFilter.contains(draft.number)
     }
 
     private func assignFreeNumber() {
@@ -2235,8 +2258,8 @@ struct CBControlEditorSheet: View {
         if isGlobalChannel {
             // Search only on the global channel
             for n in startNumber...127 {
-                // Skip filtered CC numbers (only for CC type, not notes)
-                if kind == .cc && midiFilter.contains(n) {
+                // Skip filtered CC numbers only when filters are enabled
+                if midiFiltersEnabled && kind == .cc && midiFilter.contains(n) {
                     debugPrint("  🚫 [CONTROL] CC \(n) is filtered, skipping")
                     continue
                 }
@@ -2270,8 +2293,8 @@ struct CBControlEditorSheet: View {
         for _ in 0..<16 {
             // Search from currentNumber to 127 on current channel
             for n in currentNumber...127 {
-                // Skip filtered CC numbers (only for CC type, not notes)
-                if kind == .cc && midiFilter.contains(n) {
+                // Skip filtered CC numbers only when filters are enabled
+                if midiFiltersEnabled && kind == .cc && midiFilter.contains(n) {
                     debugPrint("  🚫 [CONTROL] CC \(n) is filtered, skipping")
                     continue
                 }
@@ -2440,19 +2463,23 @@ struct CBControlEditorSheet: View {
             }
 
             // Set channel and find next free number (with channel increment if needed)
-            draft.autoAssign = true
-            // FIX: After saving, find next free number starting from the one we just saved + 1
-            // Uses savedKind to find next available CC or Note number
-            let result = autoAssignMIDI(for: savedKind, startChannel: nextChannel, startNumber: savedNumber + 1)
-            if result.reachedLimit {
-                showGlobalModeMaxReachedAlert = true
-                draft.autoAssign = false
+            draft.autoAssign = savedAutoAssign
+            if savedAutoAssign {
+                // FIX: After saving, find next free number starting from the one we just saved + 1
+                let result = autoAssignMIDI(for: savedKind, startChannel: nextChannel, startNumber: savedNumber + 1)
+                if result.reachedLimit {
+                    showGlobalModeMaxReachedAlert = true
+                    draft.autoAssign = false
+                    draft.channel = nextChannel
+                    draft.number = 0
+                } else {
+                    draft.channel = result.channel
+                    draft.number = result.number
+                    debugPrint("  ✅ [CONTROL] Set kind=\(savedKind), channel=\(result.channel), number=\(result.number)")
+                }
+            } else {
                 draft.channel = nextChannel
                 draft.number = 0
-            } else {
-                draft.channel = result.channel
-                draft.number = result.number
-                debugPrint("  ✅ [CONTROL] Set kind=\(savedKind), channel=\(result.channel), number=\(result.number)")
             }
 
             // NOW set editing to nil (triggers .onChange which calls preset())
@@ -2461,6 +2488,12 @@ struct CBControlEditorSheet: View {
 
             // Recalculate space validation after reset
             isOutOfRoom = !validateSpaceForAddMode()
+        } else {
+            // Why: shared draft persists across sheet presentations. Without clearing,
+            // a subsequent edit of a different control sees a non-empty, non-matching
+            // draft and preset() chooses to preserve it — so button B opens showing
+            // button A's title/MIDI. The next save then writes A's data into B's slot.
+            draft.clear()
         }
     }
 
@@ -2486,12 +2519,13 @@ struct CBEditControlSheet: View {
     var onCancel: () -> Void
     var onDelete: ((ControlButton) -> Void)? = nil
     let icons: [String]
-    let midiFiltersEnabled: Bool
+    @AppStorage("midiFiltersEnabled") private var midiFiltersEnabled: Bool = true
     let midiFilter: Set<Int>
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
     @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
+    @AppStorage("autoAssignMIDI") private var savedAutoAssign: Bool = true
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -2641,7 +2675,10 @@ struct CBEditControlSheet: View {
                             .foregroundColor(.secondary)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
-                    Toggle(isOn: $autoAssign) {
+                    Toggle(isOn: Binding(
+                        get: { autoAssign },
+                        set: { newValue in savedAutoAssign = newValue; autoAssign = newValue }
+                    )) {
                         Text("Assign MIDI automatically")
                     }
                     .toggleStyle(SwitchToggleStyle(tint: selectedTheme.successColor(for: colorScheme)))
@@ -2690,18 +2727,18 @@ struct CBEditControlSheet: View {
             .navigationBarBackButtonHidden(true)
             .scrollContentBackground(.hidden)
             .background(selectedTheme.backgroundColor(for: colorScheme))
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
-            .alert("Delete Control", isPresented: $showDeleteAlert) {
-                Button("Delete", role: .destructive) {
-                    if let control = editing {
-                        onDelete?(control)
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                let controlTypeName = isFaderUI ? "fader" : "button"
-                Text("Are you sure you want to delete this \(controlTypeName)? This action cannot be undone.")
-            }
+            .tint(selectedTheme.accentColor(for: colorScheme))
+            .cbDialog("Delete Control", isPresented: $showDeleteAlert, themeFont: selectedTheme.font,
+                message: "Are you sure you want to delete this \(isFaderUI ? "fader" : "button")? This action cannot be undone.",
+                buttons: [
+                    .init("Delete", role: .destructive) {
+                        if let control = editing {
+                            onDelete?(control)
+                        }
+                    },
+                    .init("Cancel", role: .cancel) { }
+                ]
+            )
             .navigationBarItems(
                 leading: Button("Cancel") {
                     userDismissedExplicitly = true  // v1.0.8: Mark as explicit dismissal
@@ -2753,7 +2790,7 @@ struct CBEditControlSheet: View {
             userDismissedExplicitly = true  // v1.0.8: Mark as explicit dismissal
             saveEdit()
         }
-        .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color(hex: "0A84FF"))
+        .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : selectedTheme.accentColor(for: colorScheme))
         .disabled(isDisabled)
     }
 
@@ -2783,8 +2820,7 @@ struct CBEditControlSheet: View {
 
     private func preset() {
         guard let b = editing else {
-            // For new buttons, enable auto-assign by default
-            autoAssign = true
+            autoAssign = savedAutoAssign
             return
         }
         title = b.title
@@ -2793,7 +2829,7 @@ struct CBEditControlSheet: View {
         number = b.number
         channel = b.channel
         velocity = b.velocity
-        autoAssign = false  // For editing existing buttons, allow manual assignment
+        autoAssign = savedAutoAssign
         isToggle = b.isToggle ?? false
         isFaderUI = b.isFader ?? false
         isSmall = b.isSmall ?? false  // Load small button state for preview
@@ -2816,7 +2852,7 @@ struct CBEditControlSheet: View {
     }
 
     private func isFilteredMIDI() -> Bool {
-        return !midiFilter.isEmpty && kind == .cc && midiFilter.contains(number)
+        return midiFiltersEnabled && !midiFilter.isEmpty && kind == .cc && midiFilter.contains(number)
     }
 
     private func ownerFor(kind: MIDIKind, number: Int, channel: Int) -> String? {
@@ -2859,6 +2895,10 @@ struct CBEditControlSheet: View {
 
     private func firstFreeNumber(for kind: MIDIKind, channel: Int) -> Int {
         for n in 0...127 {
+            // Skip filtered CC numbers when filters are enabled
+            if kind == .cc && midiFiltersEnabled && midiFilter.contains(n) {
+                continue
+            }
             let key = MIDIKey(kind: kind, channel: channel, number: n)
             if currentOwnerName(key) != nil {
                 // Skip if occupied by a different control
@@ -2915,45 +2955,46 @@ struct ControlButtonPreview: View {
         let columnSpacing: CGFloat = 12
         let frameWidth: CGFloat = isSmall ? previewCellSize : (2 * previewCellSize + columnSpacing)
         let frameHeight: CGFloat = previewCellSize
-        let corner: CGFloat = 14
+        let corner: CGFloat = 8
 
-        return VStack(spacing: 6) {
+        let textColor: Color = buttonColor.needsDarkText() ? .black : .white
+
+        return VStack(spacing: 4) {
+            Spacer(minLength: 0)
             if symbol.isEmpty {
-                // Text only - matches real button
+                // Text only
                 Text(title.isEmpty ? "Custom" : title)
-                    .font(.title3.weight(.semibold))
+                    .font(.custom("Sora-Bold", size: 14))
+                    .foregroundColor(textColor)
                 Text(midiLabel)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .font(.custom("Sora-Regular", size: 9))
+                    .foregroundColor(textColor.opacity(0.5))
             } else if title.isEmpty {
-                // Icon only - center it vertically with MIDI label at bottom, matches real button
-                VStack {
-                    Spacer()
-                    Image(systemName: symbol)
-                        .font(.system(size: 32, weight: .semibold))
-                        .foregroundColor(buttonColor)
-                    Spacer()
-                    Text(midiLabel)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .padding(.bottom, 4)
-                }
-            } else {
-                // Icon + text - matches real button
+                // Icon only
                 Image(systemName: symbol)
                     .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(buttonColor)
-                Text(title).font(.footnote.weight(.semibold))
+                    .foregroundColor(textColor)
                 Text(midiLabel)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .font(.custom("Sora-Regular", size: 9))
+                    .foregroundColor(textColor.opacity(0.5))
+            } else {
+                // Icon + text
+                Image(systemName: symbol)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(textColor)
+                Text(title)
+                    .font(.custom("Sora-Bold", size: 12))
+                    .foregroundColor(textColor)
+                Text(midiLabel)
+                    .font(.custom("Sora-Regular", size: 9))
+                    .foregroundColor(textColor.opacity(0.5))
             }
+            Spacer(minLength: 0)
         }
         .frame(width: frameWidth, height: frameHeight)
         .background(
             RoundedRectangle(cornerRadius: corner)
-                .stroke(buttonColor, lineWidth: 2)
-                .background(RoundedRectangle(cornerRadius: corner).fill(Color.clear))
+                .fill(buttonColor.opacity(0.9))
         )
     }
 }
@@ -2986,74 +3027,80 @@ struct ControlFaderPreview: View {
         return selectedTheme.defaultCueColor(for: colorScheme)
     }
 
+    private var textColor: Color {
+        faderColor.needsDarkText() ? .black : .white
+    }
+
     var body: some View {
         let isHorizontal = (orientation == "horizontal")
         let previewValue: Double = 0.66  // Preview at 66% position
 
         if isHorizontal {
-            // HORIZONTAL FADER PREVIEW
-            // Fill alignment: "right" fills from left, "left" fills from right
-            // The alignment handles the directional flip, so we use the same value for both
+            // HORIZONTAL FADER PREVIEW — filled style with 8pt corners
             let fillAlignment: Alignment = (direction == "right") ? .leading : .trailing
-            let headWidth: CGFloat = 18
-            let trackWidth: CGFloat = 140 - headWidth
 
-            VStack(spacing: 6) {
-                Text(title.isEmpty ? "Fader" : title)
-                    .font(.footnote.weight(.semibold))
-                ZStack(alignment: fillAlignment) {
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(faderColor, lineWidth: 2)
-                    // Fill based on preview value - alignment handles the direction
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(faderColor.opacity(0.2))
-                        .frame(width: trackWidth * previewValue)
-                        .padding(3)
-                    // Head positioned based on value - conditional offset for direction
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(faderColor)
-                        .frame(width: headWidth)
-                        .offset(x: (direction == "right") ? (trackWidth * previewValue) : -(trackWidth * previewValue))
-                        .padding(.vertical, 6)
+            ZStack(alignment: fillAlignment) {
+                // Track background
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(faderColor.opacity(0.2))
+
+                // Fill level
+                GeometryReader { geo in
+                    HStack {
+                        if direction != "right" { Spacer() }
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(faderColor.opacity(0.85))
+                            .frame(width: geo.size.width * previewValue)
+                        if direction == "right" { Spacer() }
+                    }
                 }
-                .frame(width: 140, height: 60)
-                Text("\(channel)•\(cc)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+
+                // Labels overlay
+                HStack {
+                    Text(title.isEmpty ? "Fader" : title)
+                        .font(.custom("Sora-Bold", size: 11))
+                        .foregroundColor(textColor)
+                        .padding(.leading, 8)
+                    Spacer()
+                    Text("\(channel)•\(cc)")
+                        .font(.custom("Sora-Regular", size: 9))
+                        .foregroundColor(textColor.opacity(0.5))
+                        .padding(.trailing, 8)
+                }
             }
-            .frame(width: 160, height: 120)
+            .frame(width: 156, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         } else {
-            // VERTICAL FADER PREVIEW
-            // Fill alignment: "up" fills from bottom, "down" fills from top
-            // The alignment handles the directional flip, so we use the same value for both
-            let fillAlignment: Alignment = (direction == "up") ? .bottom : .top
-            let headHeight: CGFloat = 18
-            let trackHeight: CGFloat = 120 - headHeight
+            // VERTICAL FADER PREVIEW — filled style with 8pt corners
+            ZStack(alignment: .bottom) {
+                // Track background
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(faderColor.opacity(0.2))
 
-            VStack(spacing: 6) {
-                Text(title.isEmpty ? "Fader" : title)
-                    .font(.footnote.weight(.semibold))
-                ZStack(alignment: fillAlignment) {
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(faderColor, lineWidth: 2)
-                    // Fill based on preview value - alignment handles the direction
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(faderColor.opacity(0.2))
-                        .frame(height: trackHeight * previewValue)
-                        .padding(4)
-                    // Head positioned based on value - conditional offset for direction
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(faderColor)
-                        .frame(height: headHeight)
-                        .padding(.horizontal, 6)
-                        .offset(y: (direction == "up") ? -(trackHeight * previewValue) : (trackHeight * previewValue))
+                // Fill level
+                GeometryReader { geo in
+                    VStack {
+                        if direction == "up" { Spacer() }
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(faderColor.opacity(0.85))
+                            .frame(height: geo.size.height * previewValue)
+                        if direction != "up" { Spacer() }
+                    }
                 }
-                .frame(width: 60, height: 120)
-                Text("\(channel)•\(cc)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+
+                // Labels overlay
+                VStack(spacing: 2) {
+                    Text(title.isEmpty ? "Fader" : title)
+                        .font(.custom("Sora-Bold", size: 11))
+                        .foregroundColor(textColor)
+                    Text("\(channel)•\(cc)")
+                        .font(.custom("Sora-Regular", size: 9))
+                        .foregroundColor(textColor.opacity(0.5))
+                }
+                .padding(.bottom, 8)
             }
-            .frame(width: 120, height: 140)
+            .frame(width: 72, height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
 }
@@ -3187,6 +3234,7 @@ internal struct ContentView: View {
     @State private var libraryQueryDebounced: String = ""
     @State private var setlistQuery: String = ""
     @State private var setlistQueryDebounced: String = ""
+    @FocusState private var isSetlistSearchFocused: Bool
 
     // Splash Screen - v1.0.8: Use AppStorage to persist across view recreations
     @AppStorage("hasCompletedInitialLaunch") private var hasCompletedInitialLaunch = false
@@ -3351,10 +3399,10 @@ internal struct ContentView: View {
     // Flag to prevent backup/restore during project loading
     @State private var isLoadingProject: Bool = false
 
-    // MIDI Filter - Default filters for common MIDI messages
-    @State private var midiFiltersEnabled: Bool = true  // Master toggle for MIDI filters
+    // MIDI Filter - persisted globally via UserDefaults (not per-project)
+    @AppStorage("midiFiltersEnabled") private var midiFiltersEnabled: Bool = true
     @State private var midiFilter: Set<Int> = [1, 7, 10, 11, 64, 120, 121, 122, 123, 124, 125, 126, 127]
-    @State private var customMidiFilters: [(Int, String)] = []  // User-added custom filters
+    @State private var customMidiFilters: [(Int, String)] = []
 
     // Undo/Redo
     @State private var setlistUndoStack: [[Song]] = []
@@ -3401,11 +3449,13 @@ internal struct ContentView: View {
 
     // Appearance Settings
     @AppStorage("showMIDIData") private var showMIDIData: Bool = true
-    @AppStorage("cueHeight") private var cueHeight: Double = 86
+    @AppStorage("cueHeight") private var cueHeight: Double = 110
     @AppStorage("navigationPillSize") private var navigationPillSize: Double = 0.85
     @AppStorage("cueCapsuleSize") private var cueCapsuleSize: Double = 0.85
     @AppStorage("fontSize") private var fontSize: Double = 1.0
     @AppStorage("customDefaultCueColor") private var customDefaultCueColorStorage: String = ""
+    @AppStorage("autoAssignCueColors") private var autoAssignCueColors: Bool = true
+    @AppStorage("autoAssignControlColors") private var autoAssignControlColors: Bool = true
 
     // Performance caches
     @State private var cachedConflictLookup: [MIDIKey: String] = [:]
@@ -3448,10 +3498,10 @@ internal struct ContentView: View {
                 connectionTint: connectionTint,
                 connectionCoordinator: connectionCoordinator,
                 titleBarColor: currentTheme.titleBarColor(for: colorScheme),
-                buttonColor: currentTheme.defaultCueColor(for: colorScheme),
-                textColor: currentTheme.primaryTextColor(for: colorScheme),
+                buttonColor: .white,
+                textColor: .white,
                 lightButtonBackgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme),
-                themeFont: currentTheme.font,
+                themeFont: { size, weight in .custom("Sora-Regular", size: size) },
                 // Core actions
                 onConnections: {
                     if isEditing { isEditing = false }
@@ -3593,10 +3643,8 @@ internal struct ContentView: View {
         }
     }
 
-    private func buildMiddleSectionView() -> some View {
-        // Debug print removed - was causing console spam on every render
-        return AnyView(
-            ZStack {
+    @ViewBuilder private func buildMiddleSectionView() -> some View {
+        ZStack {
                 // Background - same in all modes
 
                 VStack(spacing: 0) {
@@ -3689,7 +3737,7 @@ internal struct ContentView: View {
                             themeColor: currentTheme.titleBarColor(for: colorScheme),
                             onTutorialDismiss: { resumeInterruptedTutorial() }
                         )
-                        .offset(x: isEditing ? UIScreen.main.bounds.width : 0)
+                        .offset(x: isEditing ? globalCachedPortraitWidth : 0)
                         .animation(.easeInOut(duration: 0.3), value: isEditing)
                         .zIndex(100)
                     }
@@ -3717,7 +3765,7 @@ internal struct ContentView: View {
                             themeColor: currentTheme.titleBarColor(for: colorScheme),
                             onTutorialDismiss: { resumeInterruptedTutorial() }
                         )
-                        .offset(x: isEditing ? UIScreen.main.bounds.width : 0)
+                        .offset(x: isEditing ? globalCachedPortraitWidth : 0)
                         .animation(.easeInOut(duration: 0.3), value: isEditing)
                         .zIndex(100)
                     }
@@ -3747,121 +3795,157 @@ internal struct ContentView: View {
                 .overlay(alignment: .top) {
                     // Search and action capsules overlay (only in edit mode) - cues scroll underneath
                     if isEditing {
-                        HStack(spacing: 12) {
-                            // Search capsule - Apple-like capsule style
+                        HStack(spacing: 8) {
+                            // Search bar — always present, animates between full width and circular icon
                             HStack(spacing: 8) {
                                 Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                    .font(.system(size: setlistBatchMode ? 18 : 16))
+                                    .foregroundColor(.white)
 
-                                TextField("Search cues...", text: $setlistQuery)
-                                    .textFieldStyle(.plain)
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(currentTheme.primaryTextColor(for: colorScheme))
+                                if !setlistBatchMode {
+                                    TextField("Search cues...", text: $setlistQuery)
+                                        .font(.system(size: 15))
+                                        .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
+                                        .focused($isSetlistSearchFocused)
 
-                                if !setlistQuery.isEmpty {
-                                    Button(action: { setlistQuery = "" }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.system(size: 16))
-                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme).opacity(0.6))
+                                    if !setlistQuery.isEmpty {
+                                        Button(action: { setlistQuery = "" }) {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.system(size: 16))
+                                                .foregroundColor(.white.opacity(0.6))
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
-                            .padding(.horizontal, 14)
-                            .frame(height: 44)
-                            .background(.regularMaterial)
-                            .clipShape(Capsule())
-                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-
-                            // Select/Reorder capsule with action buttons - Apple-like capsule style
-                            HStack(spacing: 0) {
+                            .padding(.horizontal, setlistBatchMode ? 0 : 14)
+                            .frame(width: setlistBatchMode ? 44 : nil, height: 44)
+                            .frame(maxWidth: setlistBatchMode ? nil : .infinity)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                            .onTapGesture {
                                 if setlistBatchMode {
-                                    // Select mode: action buttons on left, X on right
-                                    Button("Clear") {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                        setlistBatchMode = false
                                         setlistSelected.removeAll()
                                     }
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                    .padding(.horizontal, 8)
-                                    .transition(.scale.combined(with: .opacity))
-
-                                    Button("Select All") {
-                                        setlistSelected = Set(filteredActiveSongs.map { $0.id })
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                        isSetlistSearchFocused = true
                                     }
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                    .padding(.horizontal, 8)
-                                    .transition(.scale.combined(with: .opacity))
+                                } else {
+                                    isSetlistSearchFocused = true
+                                }
+                            }
+                            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: setlistBatchMode)
 
-                                    Button("Remove") {
-                                        // Remove all selected cues
+                            if setlistBatchMode {
+                                Spacer()
+                            }
+
+                            // Reorder button - separate capsule (hidden in batch mode)
+                            if !setlistBatchMode {
+                                Button(action: {
+                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                                        reorderMode.toggle()
+                                    }
+                                }) {
+                                    Image(systemName: reorderMode ? "checkmark" : "list.bullet")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.white)
+                                        .frame(width: 44, height: 44)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(Color.black.opacity(0.5))
+                                                .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                                        )
+                                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                }
+                                .buttonStyle(IOSPressButtonStyle())
+                            }
+
+                            // Select capsule — grows into batch actions
+                            HStack(spacing: 0) {
+                                if setlistBatchMode {
+                                    Button(action: {
+                                        setlistSelected = Set(filteredActiveSongs.map { $0.id })
+                                    }) {
+                                        Text("All")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 10)
+                                            .frame(height: 44)
+                                    }
+                                    .buttonStyle(IOSPressButtonStyle())
+
+                                    Button(action: {
+                                        setlistSelected.removeAll()
+                                    }) {
+                                        Text("Clear")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 10)
+                                            .frame(height: 44)
+                                    }
+                                    .buttonStyle(IOSPressButtonStyle())
+
+                                    Button(action: {
                                         pushSetlistUndo()
                                         store.updateActiveSongs { songs in
                                             songs.removeAll(where: { setlistSelected.contains($0.id) })
                                         }
                                         setlistSelected.removeAll()
                                         isDirty = true
+                                    }) {
+                                        Text("Remove")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(setlistSelected.isEmpty ? currentTheme.primaryTextColor(for: colorScheme).opacity(0.3) : .red)
+                                            .padding(.horizontal, 10)
+                                            .frame(height: 44)
                                     }
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundStyle(.red)
+                                    .buttonStyle(IOSPressButtonStyle())
                                     .disabled(setlistSelected.isEmpty)
-                                    .opacity(setlistSelected.isEmpty ? 0.5 : 1.0)
-                                    .padding(.horizontal, 8)
-                                    .transition(.scale.combined(with: .opacity))
 
                                     Rectangle()
-                                        .fill(currentTheme.defaultCueColor(for: colorScheme).opacity(0.2))
+                                        .fill(Color.white.opacity(0.2))
                                         .frame(width: 1, height: 24)
-                                        .padding(.horizontal, 8)
-                                        .transition(.scale.combined(with: .opacity))
+                                        .padding(.horizontal, 2)
 
-                                    // X button on the right
                                     Button(action: {
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                                             setlistBatchMode = false
                                             setlistSelected.removeAll()
                                         }
                                     }) {
                                         Image(systemName: "xmark")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                            .frame(width: 44, height: 44)
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.white)
+                                            .frame(width: 36, height: 44)
                                     }
                                     .buttonStyle(IOSPressButtonStyle())
                                 } else {
-                                    // Normal mode: select and reorder buttons (select on left, reorder on right)
+                                    // Collapsed: just the checklist icon
                                     Button(action: {
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                                             setlistBatchMode = true
                                             reorderMode = false
                                         }
                                     }) {
                                         Image(systemName: "checklist")
                                             .font(.system(size: 18))
-                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
-                                            .frame(width: 44, height: 44)
-                                    }
-                                    .buttonStyle(IOSPressButtonStyle())
-                                    .transition(.scale.combined(with: .opacity))
-
-                                    Button(action: {
-                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                                            reorderMode.toggle()
-                                        }
-                                    }) {
-                                        Image(systemName: reorderMode ? "checkmark" : "list.bullet")
-                                            .font(.system(size: 18))
-                                            .foregroundStyle(currentTheme.defaultCueColor(for: colorScheme))
+                                            .foregroundColor(.white)
                                             .frame(width: 44, height: 44)
                                     }
                                     .buttonStyle(IOSPressButtonStyle())
                                 }
                             }
-                            .frame(height: 44)
-                            .background(.regularMaterial)
-                            .clipShape(Capsule())
-                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: setlistBatchMode)
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 68)  // Position below the top bar
@@ -3876,7 +3960,6 @@ internal struct ContentView: View {
                 }
                     }
                 }
-            )
     }
 
     private var effectivelyCollapsedForOverlay: Bool {
@@ -3887,16 +3970,17 @@ internal struct ContentView: View {
     @State private var controlsCapsulePressed: Bool = false
 
     private var collapsedControlCapsule: some View {
-        // Larger floating action button (Gmail-style)
+        // Floating action button with rounded rectangle to match app button style
         Image(systemName: "slider.horizontal.3")
             .font(.system(size: 24, weight: .medium))
-            .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
+            .foregroundColor(.white)
             .frame(width: 56, height: 56)
-            .background(.regularMaterial)
-            .clipShape(Circle())
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.8)))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.2), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
             .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 4)
             .opacity(controlsCapsulePressed ? 0.5 : 1.0)
-            .contentShape(Circle())
+            .contentShape(RoundedRectangle(cornerRadius: 14))
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
@@ -3978,7 +4062,7 @@ internal struct ContentView: View {
             buttonBackgroundColor: currentTheme.buttonBackgroundColor(for: colorScheme, customAccentHex: customDefaultCueColorStorage),
             lightButtonBackgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme),
             defaultCueColor: Color(hex: effectiveDefaultCueColorHex),
-            standardButtonColor: currentTheme.defaultCueColor(for: colorScheme),
+            standardButtonColor: currentTheme.accentColor(for: colorScheme),
             textColor: currentTheme.primaryTextColor(for: colorScheme),
             markDirty: markDirty,
             cueListEditMode: isEditing
@@ -4103,12 +4187,13 @@ internal struct ContentView: View {
                             HStack {
                                 if store.mode == .regular {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
+                                        .foregroundColor(currentTheme.accentColor(for: colorScheme))
                                         .frame(width: 20)
                                 } else {
                                     Color.clear.frame(width: 20)
                                 }
                                 Text("Regular")
+                                    .font(currentTheme.font(size: 15, weight: .regular))
                                     .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                                 Spacer()
                             }
@@ -4130,12 +4215,13 @@ internal struct ContentView: View {
                             HStack {
                                 if store.mode == .regularPlusRemote {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
+                                        .foregroundColor(currentTheme.accentColor(for: colorScheme))
                                         .frame(width: 20)
                                 } else {
                                     Color.clear.frame(width: 20)
                                 }
                                 Text("Navigator")
+                                    .font(currentTheme.font(size: 15, weight: .regular))
                                     .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                                 Spacer()
                             }
@@ -4157,12 +4243,13 @@ internal struct ContentView: View {
                             HStack {
                                 if store.mode == .cue {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
+                                        .foregroundColor(currentTheme.accentColor(for: colorScheme))
                                         .frame(width: 20)
                                 } else {
                                     Color.clear.frame(width: 20)
                                 }
                                 Text("Cue Mode")
+                                    .font(currentTheme.font(size: 15, weight: .regular))
                                     .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                                 Spacer()
                             }
@@ -4246,8 +4333,9 @@ internal struct ContentView: View {
                         HStack(spacing: 12) {
                             Image(systemName: "info.circle")
                                 .frame(width: 24)
-                                .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
+                                .foregroundColor(currentTheme.accentColor(for: colorScheme))
                             Text("About Cue Bear")
+                                .font(currentTheme.font(size: 15, weight: .regular))
                                 .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                             Spacer()
                         }
@@ -4307,7 +4395,7 @@ internal struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             if let title = title {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(currentTheme.font(size: 11, weight: .semibold))
                     .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                     .textCase(.uppercase)
                     .padding(.horizontal, 24)
@@ -4323,8 +4411,9 @@ internal struct ContentView: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .frame(width: 24)
-                    .foregroundColor(currentTheme.defaultCueColor(for: colorScheme))
+                    .foregroundColor(currentTheme.accentColor(for: colorScheme))
                 Text(title)
+                    .font(currentTheme.font(size: 15, weight: .regular))
                     .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                 Spacer()
             }
@@ -4351,7 +4440,7 @@ internal struct ContentView: View {
                 // Main content (without top bar - it will overlay)
                 ZStack(alignment: .bottom) {
                     VStack(spacing: 0) {
-                        AnyView(buildMiddleSectionView())
+                        buildMiddleSectionView()
                     }
                     .disabled(showSideMenu)
                     .blur(radius: showSideMenu ? 3 : 0)
@@ -4391,23 +4480,28 @@ internal struct ContentView: View {
                                 .id("expandedNonEdit")
                         }
                     }
-                    // Smooth slide animation for control area transitions
-                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showCollapsedCapsule)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showExpandedArea)
+                    // NOTE: No blanket .animation() here — using explicit withAnimation in onChange
+                    // to prevent parent spring from infecting child view properties (e.g. chevron opacity)
                     .onChange(of: effectivelyCollapsedForOverlay) { _, isCollapsed in
                         // Mark as animating - prevents GeometryReader from updating height during animation
                         isAnimatingControlArea = true
 
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            if isCollapsed {
+                                // Collapsing: hide expanded area and show collapsed capsule simultaneously
+                                showExpandedArea = false
+                                showCollapsedCapsule = true
+                            } else {
+                                // Expanding: hide collapsed capsule and show expanded area simultaneously
+                                showCollapsedCapsule = false
+                                showExpandedArea = true
+                            }
+                        }
+
                         if isCollapsed {
-                            // Collapsing: hide expanded area and show collapsed capsule simultaneously
-                            showExpandedArea = false
-                            showCollapsedCapsule = true
                             // Set collapsed height immediately
                             controlAreaHeight = 56
                         } else {
-                            // Expanding: hide collapsed capsule and show expanded area simultaneously
-                            showCollapsedCapsule = false
-                            showExpandedArea = true
                             // Set expanded height immediately from bounds or use fixed estimate
                             // IMPORTANT: Do NOT access UIScreen.main.bounds here - causes freeze
                             if let actualHeight = capsuleBounds["controlArea.main"]?.height, actualHeight > 56 {
@@ -4438,7 +4532,7 @@ internal struct ContentView: View {
                             } else {
                                 // Use fixed estimate - UIScreen.main.bounds access during layout causes freeze
                                 let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-                                let maxHeight = isPhone ? globalCachedPortraitWidth * 0.8 : 200
+                                                let maxHeight = isPhone ? globalCachedPortraitWidth * 0.8 : 200
                                 controlAreaHeight = maxHeight
                             }
                         }
@@ -4539,9 +4633,17 @@ internal struct ContentView: View {
     }
     private func addControl() {
         // Legacy helper kept if needed elsewhere: directly append a default control
-        let conflicts = conflictLookup()
-        let freeCC = (0...127).first { conflicts[MIDIKey(kind: .cc, channel: 1, number: $0)] == nil } ?? 0
-        let new = ControlButton(title: "Custom", symbol: "square.grid.2x2.fill", kind: .cc, number: freeCC, channel: 1, velocity: 127)
+        let ch = isGlobalChannel ? globalChannel : 1
+        let freeCC = (0...127).first { n in
+            !(midiFiltersEnabled && midiFilter.contains(n)) &&
+            ownerName(for: MIDIKey(kind: .cc, channel: ch, number: n)) == nil
+        } ?? 0
+        var new = ControlButton(title: "Custom", symbol: "square.grid.2x2.fill", kind: .cc, number: freeCC, channel: 1, velocity: 127)
+        if autoAssignControlColors {
+            let usedColors = Set(controlButtons.compactMap { $0.colorHex })
+            let available = curatedColorPalette.filter { !usedColors.contains($0) }
+            new.colorHex = available.randomElement() ?? curatedColorPalette.randomElement()
+        }
         controlButtons.append(new)
         invalidateConflictCache()
         markDirty()
@@ -4549,8 +4651,11 @@ internal struct ContentView: View {
 
     private func beginAddControl() {
         // Prepare a default control for editing (do not append yet)
-        let conflicts = conflictLookup()
-        let freeCC = (0...127).first { conflicts[MIDIKey(kind: .cc, channel: 1, number: $0)] == nil } ?? 0
+        let ch = isGlobalChannel ? globalChannel : 1
+        let freeCC = (0...127).first { n in
+            !(midiFiltersEnabled && midiFilter.contains(n)) &&
+            ownerName(for: MIDIKey(kind: .cc, channel: ch, number: n)) == nil
+        } ?? 0
         let draft = ControlButton(title: "", symbol: "square.grid.2x2.fill", kind: .cc, number: freeCC, channel: 1, velocity: 127, isToggle: nil)
         editingControl = draft
         pendingAddIsFader = false
@@ -4560,21 +4665,25 @@ internal struct ContentView: View {
     private enum AddKind { case button, fader }
     private func beginAddControlOfType(_ kind: AddKind) {
         debugPrint("🎹 [ADD CONTROL] beginAddControlOfType called with kind: \(kind)")
-        // Always compute fresh conflicts to ensure we have the latest control buttons
-        let conflicts = computeConflictLookup()
-        // FIX: Start from 1 instead of 0 to avoid assigning CC# 0 by default
-        let freeCC = (1...127).first { conflicts[MIDIKey(kind: .cc, channel: 1, number: $0)] == nil } ?? 1
-        debugPrint("🎹 beginAddControlOfType: Found free CC = \(freeCC), total conflicts = \(conflicts.count)")
+        // FIX: Skip filtered CC numbers and MIDI already taken by cues or controls
+        let ch = isGlobalChannel ? globalChannel : 1
+        let freeCC = (0...127).first { n in
+            !(midiFiltersEnabled && midiFilter.contains(n)) &&
+            ownerName(for: MIDIKey(kind: .cc, channel: ch, number: n)) == nil
+        } ?? 0
+        debugPrint("🎹 beginAddControlOfType: Found free CC = \(freeCC)")
         var draft = ControlButton(title: "", symbol: "square.grid.2x2.fill", kind: .cc, number: freeCC, channel: 1, velocity: 127, isToggle: nil, page: currentControlPage)
         switch kind {
         case .button:
             draft.isFader = false
             draft.isSmall = false
+            draft.title = nextDefaultControlName("Button")
             debugPrint("🎹 [ADD CONTROL] Creating button draft on page \(currentControlPage)")
         case .fader:
             draft.isFader = true
             draft.isSmall = false
             draft.symbol = "" // no icon for fader
+            draft.title = nextDefaultControlName("Fader")
             debugPrint("🎹 [ADD CONTROL] Creating fader draft on page \(currentControlPage)")
         }
         editingControl = draft
@@ -4594,9 +4703,7 @@ internal struct ContentView: View {
 
     @ViewBuilder
     private var contentView: some View {
-        if showSplash {
-            SplashScreen().transition(.opacity)
-        } else {
+        ZStack {
             mainStack()
                 .ignoresSafeArea(.keyboard, edges: .bottom)
                 .focusable()  // Required to receive keyboard input from Bluetooth pedals
@@ -4774,11 +4881,18 @@ internal struct ContentView: View {
                         }
                     }
                 }
+
+            if showSplash {
+                SplashScreen()
+                    .transition(.opacity)
+                    .ignoresSafeArea()
+                    .zIndex(1)
+            }
         }
     }
 
     var body: some View {
-        applyLifecycle(
+        applyObservers(applyLifecycle(
             applyAlerts(
                 applySheets(
                     contentView
@@ -4910,27 +5024,14 @@ internal struct ContentView: View {
                                 // Save project when app goes to background
                                 if isDirty && !isUntitledProject(projectName) {
                                     debugPrint("💾 App going to background, saving project: \(projectName)")
-                                    do {
-                                        try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID, appMode: store.mode, midiFiltersEnabled: midiFiltersEnabled, midiFilter: midiFilter, customMidiFilters: customMidiFilters)
-                                        isDirty = false
-                                        debugPrint("✅ Background save completed: \(projectName)")
-                                    } catch {
-                                        debugPrint("❌ Background save failed: \(error)")
-                                    }
+                                    snapshotAndSave(as: projectName, overwrite: true)
                                 }
                             }
                         }
                         .onChange(of: store.mode) { _, newMode in
-                            // Immediately save mode changes to ensure they persist even on force-quit
                             if !isUntitledProject(projectName) && !isLoadingProject {
                                 debugPrint("🔄 Mode changed to \(newMode), saving project: \(projectName)")
-                                do {
-                                    try ProjectIO.save(name: projectName, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID, appMode: store.mode, midiFiltersEnabled: midiFiltersEnabled, midiFilter: midiFilter, customMidiFilters: customMidiFilters)
-                                    isDirty = false
-                                    debugPrint("✅ Mode change saved: \(newMode)")
-                                } catch {
-                                    debugPrint("❌ Mode change save failed: \(error)")
-                                }
+                                snapshotAndSave(as: projectName, overwrite: true)
                             }
 
                             // Tutorial interruption: When switching to Navigator or Cue mode, pause current tutorial
@@ -4957,7 +5058,8 @@ internal struct ContentView: View {
                         }
                 )
             )
-        )
+        ))
+        .preferredColorScheme(currentTheme.preferredColorScheme(for: colorScheme))
     }
 
     // MARK: - View Modifiers (extracted to fix compiler type-checking timeout)
@@ -5085,7 +5187,6 @@ internal struct ContentView: View {
                 editContext: isEditing ? .cueList : .library,
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
-                midiFiltersEnabled: midiFiltersEnabled,
                 midiFilter: midiFilter
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
@@ -5123,7 +5224,6 @@ internal struct ContentView: View {
                 pendingIsFader: $pendingAddIsFader,
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
-                midiFiltersEnabled: midiFiltersEnabled,
                 midiFilter: midiFilter,
                 onSave: { updated, andAddAnother in
                     if let idx = controlButtons.firstIndex(where: { $0.id == updated.id }) {
@@ -5185,6 +5285,16 @@ internal struct ContentView: View {
                                 debugPrint("🔧 No space found, placing new control at (0, 0) on page \(newControl.page)")
                             }
                         }
+                        // Auto-assign random color for new controls if enabled and no color set
+                        if autoAssignControlColors && newControl.colorHex == nil {
+                            let usedColors = Set(controlButtons.compactMap { $0.colorHex })
+                            let available = curatedColorPalette.filter { !usedColors.contains($0) }
+                            if let random = available.randomElement() {
+                                newControl.colorHex = random
+                            } else {
+                                newControl.colorHex = curatedColorPalette.randomElement()
+                            }
+                        }
                         controlButtons.append(newControl)
                     }
                     invalidateConflictCache()
@@ -5229,7 +5339,6 @@ internal struct ContentView: View {
                 pendingIsFader: $pendingAddIsFader,
                 isGlobalChannel: isGlobalChannel,
                 globalChannel: globalChannel,
-                midiFiltersEnabled: midiFiltersEnabled,
                 midiFilter: midiFilter,
                 onSave: { updated, andAddAnother in
                     if let idx = controlButtons.firstIndex(where: { $0.id == updated.id }) {
@@ -5349,153 +5458,153 @@ internal struct ContentView: View {
     @ViewBuilder
     private func applyAlerts<V: View>(_ view: V) -> some View {
         view
-        .alert("Project Name", isPresented: $showNamePrompt, actions: {
-            TextField("Name", text: $tempName)
-            Button("Cancel", role: .cancel) {
-                shouldSaveAfterNaming = false
-            }
-            Button("OK") {
-                let final = tempName.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !final.isEmpty else { return }
-                projectName = final
-
-                // Save only if this was triggered from Save/Save As action
-                if shouldSaveAfterNaming {
-                    snapshotAndSave(as: final, overwrite: false)
+        .cbDialog("Project Name", isPresented: $showNamePrompt, themeFont: currentTheme.font,
+            message: "Enter a name for your project.",
+            textField: $tempName, textFieldPlaceholder: "Name",
+            buttons: [
+                .init("OK", role: .primary) {
+                    let final = tempName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !final.isEmpty else { return }
+                    projectName = final
+                    if shouldSaveAfterNaming {
+                        snapshotAndSave(as: final, overwrite: false)
+                        shouldSaveAfterNaming = false
+                    }
+                    showProjects = false
+                },
+                .init("Cancel", role: .cancel) {
                     shouldSaveAfterNaming = false
                 }
-
-                showProjects = false
-            }
-        }, message: { Text("Enter a name for your project.") })
-        .alert("Rename Cue List", isPresented: $showCueListRenamePrompt, actions: {
-            TextField("Name", text: $tempCueListName)
-            Button("Cancel", role: .cancel) {
-                cueListToRename = nil
-            }
-            Button("Save") {
-                let final = tempCueListName.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !final.isEmpty, let cueListID = cueListToRename else { return }
-
-                // Check if name already exists (excluding current cue list being renamed)
-                if store.cueListNameExists(final, excluding: cueListID) {
-                    duplicateRenameNewName = final
-                    showDuplicateRenameAlert = true
-                } else {
-                    store.renameCueList(cueListID, to: final)
-                    isDirty = true
+            ]
+        )
+        .cbDialog("Rename Cue List", isPresented: $showCueListRenamePrompt, themeFont: currentTheme.font,
+            message: "Enter a new name for this cue list.",
+            textField: $tempCueListName, textFieldPlaceholder: "Name",
+            buttons: [
+                .init("Save", role: .primary) {
+                    let final = tempCueListName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !final.isEmpty, let cueListID = cueListToRename else { return }
+                    if store.cueListNameExists(final, excluding: cueListID) {
+                        duplicateRenameNewName = final
+                        showDuplicateRenameAlert = true
+                    } else {
+                        store.renameCueList(cueListID, to: final)
+                        isDirty = true
+                        cueListToRename = nil
+                    }
+                },
+                .init("Cancel", role: .cancel) {
                     cueListToRename = nil
                 }
-            }
-        }, message: { Text("Enter a new name for this cue list.") })
-        .alert("Duplicate Name", isPresented: $showDuplicateRenameAlert, actions: {
-            Button("Cancel", role: .cancel) {
-                // Keep rename dialog open by not clearing cueListToRename
-            }
-            Button("Use Anyway") {
-                guard let cueListID = cueListToRename else { return }
-                store.renameCueList(cueListID, to: duplicateRenameNewName)
-                isDirty = true
-                cueListToRename = nil
-            }
-        }, message: {
-            Text("A cue list named \"\(duplicateRenameNewName)\" already exists. Do you want to use this name anyway?")
-        })
-        .alert("New Cue List", isPresented: $showNewCueListPrompt, actions: {
-            TextField("Name", text: $newCueListName)
-            Button("Cancel", role: .cancel) { }
-            Button("Create") {
-                let final = newCueListName.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !final.isEmpty else { return }
-
-                // Check if name already exists
-                if store.cueListNameExists(final) {
-                    duplicateCueListName = final
-                    showDuplicateCueListAlert = true
-                } else {
-                    let newID = store.createCueList(name: final)
+            ]
+        )
+        .cbDialog("Duplicate Name", isPresented: $showDuplicateRenameAlert, themeFont: currentTheme.font,
+            message: "A cue list named \"\(duplicateRenameNewName)\" already exists. Do you want to use this name anyway?",
+            buttons: [
+                .init("Use Anyway", role: .primary) {
+                    guard let cueListID = cueListToRename else { return }
+                    store.renameCueList(cueListID, to: duplicateRenameNewName)
+                    isDirty = true
+                    cueListToRename = nil
+                },
+                .init("Cancel", role: .cancel) { }
+            ]
+        )
+        .cbDialog("New Cue List", isPresented: $showNewCueListPrompt, themeFont: currentTheme.font,
+            message: "Enter a name for the new cue list.",
+            textField: $newCueListName, textFieldPlaceholder: "Name",
+            buttons: [
+                .init("Create", role: .primary) {
+                    let final = newCueListName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !final.isEmpty else { return }
+                    if store.cueListNameExists(final) {
+                        duplicateCueListName = final
+                        showDuplicateCueListAlert = true
+                    } else {
+                        let newID = store.createCueList(name: final)
+                        store.switchToCueList(newID)
+                        isDirty = true
+                    }
+                },
+                .init("Cancel", role: .cancel) { }
+            ]
+        )
+        .cbDialog("Duplicate Name", isPresented: $showDuplicateCueListAlert, themeFont: currentTheme.font,
+            message: "A cue list named \"\(duplicateCueListName)\" already exists in your song library.",
+            buttons: [
+                .init("Create A Copy", role: .primary) {
+                    let newID = store.createCueList(name: duplicateCueListName, forceNumbered: true)
                     store.switchToCueList(newID)
                     isDirty = true
-                }
-            }
-        }, message: { Text("Enter a name for the new cue list.") })
-        .alert("Duplicate Name", isPresented: $showDuplicateCueListAlert, actions: {
-            Button("Cancel", role: .cancel) { }
-            Button("Create A Copy") {
-                let newID = store.createCueList(name: duplicateCueListName, forceNumbered: true)
-                store.switchToCueList(newID)
-                isDirty = true
-            }
-        }, message: {
-            Text("A cue list named \"\(duplicateCueListName)\" already exists in your song library.")
-        })
-        .alert("Duplicate Name", isPresented: $showDuplicateCueNameAlert, actions: {
-            Button("Cancel", role: .cancel) {
-                pendingDuplicateCue = nil
-            }
-            Button("Rename to \"\(duplicateCueSuggestedName)\"") {
-                if var cue = pendingDuplicateCue {
-                    let addAnother = pendingDuplicateCueAddAnother
-                    cue.name = duplicateCueSuggestedName
-                    saveSong(cue)
-                    pendingDuplicateCue = nil
-
-                    if addAnother {
-                        // "Save & Add Another" flow — close and reopen the sheet
-                        withAnimation(.linear(duration: 0.15)) {
+                },
+                .init("Cancel", role: .cancel) { }
+            ]
+        )
+        .cbDialog("Duplicate Name", isPresented: $showDuplicateCueNameAlert, themeFont: currentTheme.font,
+            message: "A cue named \"\(duplicateCueName)\" already exists in your library.",
+            buttons: [
+                .init("Rename to \"\(duplicateCueSuggestedName)\"", role: .primary) {
+                    if var cue = pendingDuplicateCue {
+                        let addAnother = pendingDuplicateCueAddAnother
+                        cue.name = duplicateCueSuggestedName
+                        saveSong(cue)
+                        pendingDuplicateCue = nil
+                        if addAnother {
+                            withAnimation(.linear(duration: 0.15)) {
+                                showAddEdit = false
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                showAddEdit = true
+                            }
+                        } else {
                             showAddEdit = false
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            showAddEdit = true
-                        }
-                    } else {
-                        showAddEdit = false
                     }
+                },
+                .init("Cancel", role: .cancel) {
+                    pendingDuplicateCue = nil
                 }
-            }
-        }, message: {
-            Text("A cue named \"\(duplicateCueName)\" already exists in your library.")
-        })
-        .alert("Save Changes", isPresented: $showSaveChangesAlert, actions: {
-            Button("Save", role: .none) {
-                saveCurrentProject(overwrite: true)
-                pendingAction?()
-                pendingAction = nil
-            }
-            Button("Don't Save", role: .destructive) {
-                pendingAction?()
-                pendingAction = nil
-            }
-            Button("Cancel", role: .cancel) {
-                pendingAction = nil
-            }
-        }, message: {
-            Text("You have unsaved changes. Do you want to save them before continuing?")
-        })
-        .alert("Error Loading Project", isPresented: $showDocumentLoadError, actions: {
-            Button("OK", role: .cancel) {
-                documentLoadErrorMessage = ""
-            }
-        }, message: {
-            Text(documentLoadErrorMessage)
-        })
-        .alert("Delete Song", isPresented: $showDeleteConfirmation, actions: {
-            Button("Cancel", role: .cancel) { 
-                songToDelete = nil
-            }
-            Button("Delete from Both", role: .destructive) {
-                if let song = songToDelete {
-                    performDeleteFromLibrary(song)
+            ]
+        )
+        .cbDialog("Save Changes", isPresented: $showSaveChangesAlert, themeFont: currentTheme.font,
+            message: "You have unsaved changes. Do you want to save them before continuing?",
+            buttons: [
+                .init("Save", role: .primary) {
+                    saveCurrentProject(overwrite: true)
+                    pendingAction?()
+                    pendingAction = nil
+                },
+                .init("Don't Save", role: .destructive) {
+                    pendingAction?()
+                    pendingAction = nil
+                },
+                .init("Cancel", role: .cancel) {
+                    pendingAction = nil
                 }
-                songToDelete = nil
-            }
-        }, message: { 
-            if let song = songToDelete {
-                Text("Remove \"\(song.name)\" from song library and cue list?")
-            } else {
-                Text("")
-            }
-        })
+            ]
+        )
+        .cbDialog("Error Loading Project", isPresented: $showDocumentLoadError, themeFont: currentTheme.font,
+            message: documentLoadErrorMessage,
+            buttons: [
+                .init("OK", role: .primary) {
+                    documentLoadErrorMessage = ""
+                }
+            ]
+        )
+        .cbDialog("Delete Song", isPresented: $showDeleteConfirmation, themeFont: currentTheme.font,
+            message: "Remove \"\(songToDelete?.name ?? "")\" from song library and cue list?",
+            buttons: [
+                .init("Delete from Both", role: .destructive) {
+                    if let song = songToDelete {
+                        performDeleteFromLibrary(song)
+                    }
+                    songToDelete = nil
+                },
+                .init("Cancel", role: .cancel) {
+                    songToDelete = nil
+                }
+            ]
+        )
     }
 
     @ViewBuilder
@@ -5505,63 +5614,19 @@ internal struct ContentView: View {
         // FIX #1: Setup notification subscriptions on appear
         .onAppear {
             setupNotificationSubscriptions()
-            // FIX: Initialize conflict cache immediately to prevent freeze during first render
-            // This prevents conflictLookup() from returning empty cache during mode switch
             cachedConflictLookup = computeConflictLookup()
+            loadMidiFiltersFromUserDefaults()
         }
         .task {
-            // v1.0.8 FIX: Skip splash screen if app has launched before
-            // Only show splash on very first launch, not when returning from background
-            if hasCompletedInitialLaunch {
-                debugPrint("🚀 App returning from background - skipping splash screen")
-                showSplash = false
+            let loadStart = Date()
+            debugPrint("🚀 App launch: hasCompletedInitialLaunch=\(hasCompletedInitialLaunch)")
 
-                // Still rebuild conflict cache for UI consistency
-                cachedConflictLookup = computeConflictLookup()
-                debugPrint("🔄 Conflict cache rebuilt with \(cachedConflictLookup.count) entries")
-
-                // Reload projects list in case files changed
-                projectsList = ProjectIO.list()
-
-                // CRITICAL FIX: If view was recreated by iOS, data might be empty
-                // Reload the current project if library is empty but project has a name
-                if songLibrary.isEmpty && !isUntitledProject(projectName) && !projectName.isEmpty {
-                    debugPrint("⚠️ Library is empty but project is '\(projectName)' - reloading from disk")
-                    autoOpenLastProject()
-                } else if songLibrary.isEmpty && isUntitledProject(projectName) {
-                    // For "Untitled Project" projects, try to restore from autosave
-                    if let saved = ProjectIO.loadLibraryAutosave() {
-                        songLibrary = saved
-                        debugPrint("📂 Restored library from autosave for Untitled project")
-                    }
-                }
-
-                // NEW: Check onboarding even for returning users (for testing/debugging)
-                let hasSeenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
-                debugPrint("📖 Onboarding check: hasSeenOnboarding=\(hasSeenOnboarding), crashAlertActive=\(crashAlertActive)")
-                if !hasSeenOnboarding && !crashAlertActive {
-                    debugPrint("📖 Onboarding not seen yet - showing after short delay")
-                    // Use DispatchQueue instead of Task.sleep to ensure UI update completes
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        debugPrint("📖 Setting showOnboarding = true")
-                        showOnboarding = true
-                    }
-                } else {
-                    debugPrint("📖 Skipping onboarding: hasSeenOnboarding=\(hasSeenOnboarding), crashAlertActive=\(crashAlertActive)")
-                }
-
-                return
-            }
-
-            debugPrint("🚀 App initialization starting...")
-
-            // FIX: Build initial conflict cache BEFORE any data loads to prevent false "Taken by:" flashes
+            // Build initial conflict cache
             cachedConflictLookup = computeConflictLookup()
-            debugPrint("🔄 Initial conflict cache built with \(cachedConflictLookup.count) entries")
 
-            // Clear any existing data for shipping - start completely blank (only on first launch)
-            if !hasInitialized {
-                debugPrint("🔄 First launch - clearing all data")
+            // On very first ever launch, clear any stale state
+            if !hasInitialized && !hasCompletedInitialLaunch {
+                debugPrint("🔄 First launch — clearing all data")
                 store.updateActiveSongs { $0.removeAll() }
                 songLibrary.removeAll()
                 controlButtons.removeAll()
@@ -5569,46 +5634,50 @@ internal struct ContentView: View {
                 hasInitialized = true
             }
 
-            debugPrint("📁 Loading projects list...")
-            projectsList = ProjectIO.list()
-            debugPrint("📁 Found \(projectsList.count) projects: \(projectsList)")
+            // Load project list from disk
+            projectsList = await Task.detached(priority: .userInitiated) { ProjectIO.list() }.value
+            debugPrint("📁 Found \(projectsList.count) projects")
 
-            // Auto-open last project if available
-            debugPrint("🔄 Attempting to auto-open last project...")
-            autoOpenLastProject()
+            // Load project data into memory if needed
+            if songLibrary.isEmpty && !isUntitledProject(projectName) && !projectName.isEmpty {
+                debugPrint("🔄 Loading project: \(projectName)")
+                await autoOpenLastProject()
+            } else if songLibrary.isEmpty && isUntitledProject(projectName) {
+                if let saved = await Task.detached(priority: .userInitiated, operation: { ProjectIO.loadLibraryAutosave() }).value {
+                    songLibrary = saved
+                    debugPrint("📂 Restored \(saved.count) songs from autosave")
+                }
+            }
 
-            // FIX: Rebuild conflict cache SYNCHRONOUSLY after loading project (no 500ms delay)
+            // Rebuild cache after data load
             cachedConflictLookup = computeConflictLookup()
-            debugPrint("🔄 Conflict cache rebuilt after project load with \(cachedConflictLookup.count) entries")
+            debugPrint("🔄 Conflict cache: \(cachedConflictLookup.count) entries")
 
-            // Connections are now managed by ConnectionCoordinator
-            debugPrint("🔌 Connections managed by ConnectionCoordinator")
+            // Splash shows for minimum 1.5s (first launch: 2.5s) — loading runs concurrently
+            let minDuration: Double = hasCompletedInitialLaunch ? 1.5 : 2.5
+            let elapsed = Date().timeIntervalSince(loadStart)
+            let remaining = max(0.0, minDuration - elapsed)
+            if remaining > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+            }
 
-            // Show splash screen for 2.5 seconds (only on first launch)
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
-            withAnimation(.easeInOut(duration: 0.6)) {
+            withAnimation(.easeInOut(duration: 0.5)) {
                 debugPrint("🎬 Hiding splash screen")
                 showSplash = false
             }
 
-            // Show onboarding after splash screen if user hasn't seen it and crash alert is not active
+            hasCompletedInitialLaunch = true
+
+            // Show onboarding if not yet seen
             let hasSeenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
-            debugPrint("📖 Onboarding check (first launch): hasSeenOnboarding=\(hasSeenOnboarding), crashAlertActive=\(crashAlertActive)")
+            debugPrint("📖 Onboarding: hasSeenOnboarding=\(hasSeenOnboarding), crashAlertActive=\(crashAlertActive)")
             if !hasSeenOnboarding && !crashAlertActive {
-                debugPrint("📖 First launch - showing onboarding after splash")
-                // Use DispatchQueue instead of Task.sleep to ensure UI update completes
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    debugPrint("📖 Setting showOnboarding = true (first launch)")
                     showOnboarding = true
                 }
-            } else {
-                debugPrint("📖 Skipping onboarding: hasSeenOnboarding=\(hasSeenOnboarding), crashAlertActive=\(crashAlertActive)")
             }
 
             debugPrint("✅ App initialization complete")
-
-            // Mark that initial launch is complete
-            hasCompletedInitialLaunch = true
         }
         .onDisappear {
             // FIX #1: Clean up notification subscriptions to prevent memory leaks
@@ -5662,9 +5731,19 @@ internal struct ContentView: View {
                 markDirty()
             }
         }
-        .onChange(of: [midiFiltersEnabled ? 1 : 0, midiFilter.count, customMidiFilters.count]) { _, _ in
+        .onChange(of: midiFiltersEnabled) { _, _ in
+            if !isLoadingProject { markDirty() }
+        }
+        .onChange(of: midiFilter) { _, newValue in
             if !isLoadingProject {
                 markDirty()
+                UserDefaults.standard.set(Array(newValue), forKey: "midiFilterCCs")
+            }
+        }
+        .onChange(of: customMidiFilters.count) { _, _ in
+            if !isLoadingProject {
+                markDirty()
+                saveMidiCustomFiltersToUserDefaults()
             }
         }
         .task(id: controlButtons) {
@@ -5673,8 +5752,11 @@ internal struct ContentView: View {
                 markDirty()
             }
         }
+    }
+
+    @ViewBuilder private func applyObservers<V: View>(_ view: V) -> some View {
+        view
             .onChange(of: isDirty) { _, newValue in
-                // FIX #4: Use DispatchWorkItem instead of .task to prevent task churn
                 guard newValue, !isUntitledProject(projectName) else { return }
                 autosaveWorkItem?.cancel()
                 let currentProjectName = projectName
@@ -5685,9 +5767,9 @@ internal struct ContentView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
             }
             .onChange(of: songLibrary) { _, newLibrary in
-                // Always autosave library, even for "Untitled" projects
-                // This ensures library persists across app restarts
-                ProjectIO.saveLibraryAutosave(newLibrary)
+                DispatchQueue.global(qos: .utility).async {
+                    ProjectIO.saveLibraryAutosave(newLibrary)
+                }
             }
             .onChange(of: isEditing) { _, newValue in
                 if !newValue {
@@ -5696,15 +5778,13 @@ internal struct ContentView: View {
                     setlistBatchMode = false
                     setlistSelected.removeAll()
                     reorderMode = false
+                    WobbleAnimator.shared.stopAll()
                 }
             }
             .onChange(of: libraryQuery) { _, newQuery in
-                // Set typing state for performance optimization
                 isTyping = !newQuery.isEmpty
-
-                // Debounce search to improve text field performance
                 Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000) // 300ms delay
+                    try? await Task.sleep(nanoseconds: 300_000_000)
                     if libraryQuery == newQuery {
                         libraryQueryDebounced = newQuery
                         isTyping = false
@@ -5712,9 +5792,8 @@ internal struct ContentView: View {
                 }
             }
             .onChange(of: setlistQuery) { _, newQuery in
-                // Debounce setlist search with the same 300ms delay
                 Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000) // 300ms delay
+                    try? await Task.sleep(nanoseconds: 300_000_000)
                     if setlistQuery == newQuery {
                         setlistQueryDebounced = newQuery
                     }
@@ -6137,6 +6216,17 @@ internal struct ContentView: View {
         return "Cue \(maxN + 1)"
     }
 
+    private func nextDefaultControlName(_ prefix: String) -> String {
+        var maxN = 0
+        for b in controlButtons {
+            if b.title.hasPrefix(prefix + " ") {
+                let rest = b.title.dropFirst(prefix.count + 1)
+                if let n = Int(rest) { maxN = max(maxN, n) }
+            }
+        }
+        return "\(prefix) \(maxN + 1)"
+    }
+
     private func cueNameExists(_ name: String, excluding id: UUID? = nil) -> Bool {
         songLibrary.contains { $0.id != id && $0.name.lowercased() == name.lowercased() }
     }
@@ -6151,15 +6241,39 @@ internal struct ContentView: View {
 
     /// Handles saving a cue with duplicate name check. Shows alert if name exists, otherwise saves directly.
     private func saveCueWithDuplicateCheck(_ song: Song, andAddAnother: Bool, dismissSheet: @escaping () -> Void) {
-        // For existing cues being edited, check against all OTHER cues
-        let excludeID: UUID? = songLibrary.contains(where: { $0.id == song.id }) ? song.id : nil
+        // Skip duplicate check for aliased (duplicated) cues — duplicate names are their purpose
+        if song.aliasedCueID != nil {
+            saveSong(song)
+            dismissSheet()
+            return
+        }
+
+        // If editing an existing cue whose name is unchanged, skip the check entirely.
+        // Check both library and setlist since a cue might be in the setlist but not the library.
+        let existingCue = songLibrary.first(where: { $0.id == song.id })
+                       ?? store.activeSongs.first(where: { $0.id == song.id })
+        if let existingCue, existingCue.name.lowercased() == song.name.lowercased() {
+            saveSong(song)
+            dismissSheet()
+            return
+        }
+
+        // For existing cues being renamed, exclude their own ID from the check.
+        // Also check setlist in case a cue exists there but not yet in the library.
+        let isKnownCue = songLibrary.contains(where: { $0.id == song.id })
+                      || store.activeSongs.contains(where: { $0.id == song.id })
+        let excludeID: UUID? = isKnownCue ? song.id : nil
 
         if cueNameExists(song.name, excluding: excludeID) {
             pendingDuplicateCue = song
             pendingDuplicateCueAddAnother = andAddAnother
             duplicateCueName = song.name
             duplicateCueSuggestedName = uniqueCueName(baseName: song.name, excluding: excludeID)
-            showDuplicateCueNameAlert = true
+            // Dismiss the edit sheet first, then show the alert — prevents alert appearing behind the open sheet
+            dismissSheet()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                showDuplicateCueNameAlert = true
+            }
         } else {
             saveSong(song)
             dismissSheet()
@@ -6331,6 +6445,9 @@ internal struct ContentView: View {
     }
 
     private func deleteFromLibrary(_ s: Song) {
+        // Dismiss library popover so it doesn't cover the confirmation dialog
+        showLibraryPopover = false
+
         // Check if song is in ANY cue list
         let isInAnyCueList = store.cueLists.contains { cueList in
             cueList.songs.contains(where: { $0.id == s.id })
@@ -6424,7 +6541,20 @@ internal struct ContentView: View {
         pushSetlistUndo()
         pushLibraryUndo()
 
+        var song = song
+
         let isNewSong = !songLibrary.contains(where: { $0.id == song.id })
+
+        // Auto-assign random color for new cues if enabled and no color set
+        if isNewSong && autoAssignCueColors && song.colorHex == nil {
+            let usedColors = Set(songLibrary.compactMap { $0.colorHex })
+            let available = curatedColorPalette.filter { !usedColors.contains($0) }
+            if let random = available.randomElement() {
+                song.colorHex = random
+            } else {
+                song.colorHex = curatedColorPalette.randomElement()
+            }
+        }
 
         // Update existing song in setlist if it's there
         store.updateActiveSongs { songs in
@@ -6453,17 +6583,47 @@ internal struct ContentView: View {
 
     private func markDirty() {
         isDirty = true
-        // Autosave disabled - user must explicitly choose to save via Save/Save As
-        // startAutosave()
+    }
+
+    private func loadMidiFiltersFromUserDefaults() {
+        if let saved = UserDefaults.standard.array(forKey: "midiFilterCCs") as? [Int] {
+            midiFilter = Set(saved)
+        }
+        let ccs = UserDefaults.standard.array(forKey: "midiCustomFilterCCs") as? [Int] ?? []
+        let names = UserDefaults.standard.array(forKey: "midiCustomFilterNames") as? [String] ?? []
+        if ccs.count == names.count && !ccs.isEmpty {
+            customMidiFilters = zip(ccs, names).map { ($0, $1) }
+        }
+    }
+
+    private func saveMidiCustomFiltersToUserDefaults() {
+        UserDefaults.standard.set(customMidiFilters.map { $0.0 }, forKey: "midiCustomFilterCCs")
+        UserDefaults.standard.set(customMidiFilters.map { $0.1 }, forKey: "midiCustomFilterNames")
     }
 
     private func snapshotAndSave(as name: String, overwrite: Bool) {
-        do {
-            try ProjectIO.save(name: name, cueLists: store.cueLists, activeCueListID: store.activeCueListID, library: songLibrary, controls: controlButtons, isGlobalChannel: isGlobalChannel, globalChannel: globalChannel, theme: selectedThemeID, appMode: store.mode, midiFiltersEnabled: midiFiltersEnabled, midiFilter: midiFilter, customMidiFilters: customMidiFilters)
-            projectName = name
-            isDirty = false
-            projectsList = ProjectIO.list()
-        } catch { debugPrint("Save failed: \(error)") }
+        let cueLists = store.cueLists
+        let activeCueListID = store.activeCueListID
+        let library = songLibrary
+        let controls = controlButtons
+        let isGlobalCh = isGlobalChannel
+        let globalCh = globalChannel
+        let theme = selectedThemeID
+        let appMode = store.mode
+        let filtersEnabled = midiFiltersEnabled
+        let filter = midiFilter
+        let customFilters = customMidiFilters
+        DispatchQueue.global(qos: .utility).async {
+            do {
+                try ProjectIO.save(name: name, cueLists: cueLists, activeCueListID: activeCueListID, library: library, controls: controls, isGlobalChannel: isGlobalCh, globalChannel: globalCh, theme: theme, appMode: appMode, midiFiltersEnabled: filtersEnabled, midiFilter: filter, customMidiFilters: customFilters)
+                let projects = ProjectIO.list()
+                DispatchQueue.main.async {
+                    projectName = name
+                    isDirty = false
+                    projectsList = projects
+                }
+            } catch { debugPrint("Save failed: \(error)") }
+        }
     }
 
     /// Generate a unique project name by appending (1), (2), etc. if name already exists
@@ -6487,6 +6647,7 @@ internal struct ContentView: View {
     // MARK: - Undo/Redo helpers
     private func pushSetlistUndo() {
         setlistUndoStack.append(store.activeSongs)
+        if setlistUndoStack.count > 30 { setlistUndoStack.removeFirst() }
         setlistRedoStack.removeAll()
     }
     private func undoSetlist() {
@@ -6504,6 +6665,7 @@ internal struct ContentView: View {
     
     private func pushLibraryUndo() {
         libraryUndoStack.append(songLibrary)
+        if libraryUndoStack.count > 30 { libraryUndoStack.removeFirst() }
         libraryRedoStack.removeAll()
     }
     private func undoLibrary() {
@@ -6631,21 +6793,10 @@ internal struct ContentView: View {
                 debugPrint("✅ Restored app mode: \(savedMode)")
             }
 
-            // Restore MIDI filter settings if saved
-            if let savedMidiFiltersEnabled = payload.midiFiltersEnabled {
-                midiFiltersEnabled = savedMidiFiltersEnabled
-                debugPrint("✅ Restored MIDI filters enabled: \(savedMidiFiltersEnabled)")
-            }
-            if let savedMidiFilter = payload.midiFilter {
-                midiFilter = Set(savedMidiFilter)
-                debugPrint("✅ Restored MIDI filter: \(savedMidiFilter.count) filters")
-            }
-            if let savedCustomFilters = payload.customMidiFilters {
-                customMidiFilters = savedCustomFilters.map { ($0.cc, $0.name) }
-                debugPrint("✅ Restored custom MIDI filters: \(savedCustomFilters.count) filters")
-            }
+            // MIDI filter settings are global preferences (UserDefaults), not per-project.
+            // Do not restore from project file — loadMidiFiltersFromUserDefaults() on onAppear handles this.
 
-            // Reset loading flag after a brief delay to allow onChange to process
+            // Reset loading flag after a brief delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.isLoadingProject = false
             }
@@ -6834,7 +6985,7 @@ internal struct ContentView: View {
     }
     
     /// Automatically open the last project on app launch
-    private func autoOpenLastProject() {
+    @MainActor private func autoOpenLastProject() async {
         debugPrint("🔍 Auto-open check - projectName: '\(projectName)'")
         debugPrint("🔍 UserDefaults lastProjectName: '\(UserDefaults.standard.string(forKey: "lastProjectName") ?? "nil")'")
         debugPrint("🔍 hasCompletedInitialLaunch: \(hasCompletedInitialLaunch)")
@@ -6850,16 +7001,17 @@ internal struct ContentView: View {
         guard !isUntitledProject(projectName) && !projectName.isEmpty else {
             debugPrint("⏭️ Skipping auto-open - projectName is 'Untitled Project' or empty")
             // For "Untitled Project" projects, try to restore library from autosave
-            if let saved = ProjectIO.loadLibraryAutosave() {
+            if let saved = await Task.detached(priority: .userInitiated, operation: { ProjectIO.loadLibraryAutosave() }).value {
                 songLibrary = saved
                 debugPrint("📂 Restored library from autosave for Untitled project (\(saved.count) songs)")
             }
             return
         }
-        
+
         // Check if the project file exists
         do {
-            let payload = try ProjectIO.load(name: projectName)
+            let name = projectName
+            let payload = try await Task.detached(priority: .userInitiated) { try ProjectIO.load(name: name) }.value
             debugPrint("🔄 Auto-opening last project: \(projectName)")
             debugPrint("📦 Auto-open payload - cueLists: \(payload.cueLists?.count ?? 0), library: \(payload.library.count) songs, controls: \(payload.controls.count) buttons")
 
@@ -6883,18 +7035,8 @@ internal struct ContentView: View {
             globalChannel = payload.globalChannel ?? 1
 
             // Restore MIDI filter settings if saved
-            if let savedMidiFiltersEnabled = payload.midiFiltersEnabled {
-                midiFiltersEnabled = savedMidiFiltersEnabled
-                debugPrint("✅ Restored MIDI filters enabled: \(savedMidiFiltersEnabled)")
-            }
-            if let savedMidiFilter = payload.midiFilter {
-                midiFilter = Set(savedMidiFilter)
-                debugPrint("✅ Restored MIDI filter: \(savedMidiFilter.count) filters")
-            }
-            if let savedCustomFilters = payload.customMidiFilters {
-                customMidiFilters = savedCustomFilters.map { ($0.cc, $0.name) }
-                debugPrint("✅ Restored custom MIDI filters: \(savedCustomFilters.count) filters")
-            }
+            // MIDI filter settings are global preferences (UserDefaults), not per-project.
+            // Do not restore from project file — loadMidiFiltersFromUserDefaults() on onAppear handles this.
 
             // Reset loading flag after a brief delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -7153,11 +7295,11 @@ private struct SplashScreen: View {
                 // App name
                 Text("Cue Bear")
                     .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(uiColor: .systemBackground))
+                    .foregroundColor(.white)
 
                 // Subtle loading indicator
                 ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: Color(uiColor: .systemBackground)))
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     .scaleEffect(1.2)
                     .padding(.top, 20)
             }
@@ -7243,18 +7385,17 @@ private struct CBTopBar: View {
                 HStack(spacing: 8) {
                     // Hamburger menu capsule
                     mainMenuButton
-                        .frame(width: 44, height: 44)
-                        .background(.regularMaterial)
-                        .clipShape(Capsule())
-                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
 
                     // Cue list name capsule
                     projectNameButton
-                        .padding(.horizontal, 14)
-                        .frame(height: 44)
-                        .background(.regularMaterial)
-                        .clipShape(Capsule())
-                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                         .background(
                             GeometryReader { geo in
                                 Color.clear.preference(
@@ -7311,9 +7452,11 @@ private struct CBTopBar: View {
                         }
                         .padding(.horizontal, 14)
                         .frame(height: 44)
-                        .background(.regularMaterial)
-                        .clipShape(Capsule())
-                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                     }
                     .buttonStyle(IOSPressButtonStyle())
                     .transition(.opacity.combined(with: .scale))
@@ -7321,11 +7464,13 @@ private struct CBTopBar: View {
 
                 // Edit controls capsule
                 rightCapsuleControls
-                .padding(.horizontal, 14)
+                .padding(.horizontal, isEditing ? 4 : 0)
                 .frame(height: 44)
-                .background(.regularMaterial)
-                .clipShape(Capsule())
-                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                 .background(
                     GeometryReader { geo in
                         Color.clear.preference(
@@ -7357,14 +7502,17 @@ private struct CBTopBar: View {
             HStack(spacing: 6) {
                 Text(activeCueList?.name ?? "Untitled")
                     .font(themeFont(17, .semibold))
-                    .foregroundStyle(textColor)
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 Image(systemName: showCueListChooser ? "chevron.up" : "chevron.down")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(textColor.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.7))
             }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .contentShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(IOSPressButtonStyle())
         .popover(isPresented: $showCueListChooser, arrowEdge: .top) {
@@ -7388,6 +7536,7 @@ private struct CBTopBar: View {
             )
             .presentationCompactAdaptation(.popover)
             .presentationBackground(selectedTheme.sheetBackgroundColor(for: colorScheme))
+            .tint(.white)
         }
     }
 
@@ -7399,18 +7548,19 @@ private struct CBTopBar: View {
     private var mainMenuButton: some View {
         Button(action: onMenuToggle) {
             Image(systemName: showSideMenu ? "xmark" : "line.3.horizontal")
-                .imageScale(.large)
-                .foregroundStyle(buttonColor)
-                .frame(width: 20, height: 20)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
                 .rotationEffect(.degrees(showSideMenu ? 90 : 0))
                 .contentTransition(.symbolEffect(.replace))
+                .contentShape(RoundedRectangle(cornerRadius: 10))
         }
-        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+        .buttonStyle(IOSPressButtonStyle())
     }
 
     // Unified right capsule that morphs between performance and edit modes
     private var rightCapsuleControls: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 4) {
             // Edit mode controls (show when editing)
             if isEditing {
                 // Library button - opens song library popover
@@ -7419,8 +7569,10 @@ private struct CBTopBar: View {
                 }) {
                     Image(systemName: "book")
                         .imageScale(.large)
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(width: 44, height: 44)
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                .buttonStyle(IOSPressButtonStyle())
                 .transition(.opacity.combined(with: .scale))
                 .id("libraryButton")
                 .background(
@@ -7456,29 +7608,38 @@ private struct CBTopBar: View {
                     )
                     .presentationCompactAdaptation(.popover)
                     .presentationBackground(selectedTheme.sheetBackgroundColor(for: colorScheme))
+                    .tint(.white)
                 }
 
                 Button(action: onUndo) {
                     Image(systemName: "arrow.uturn.backward")
                         .imageScale(.large)
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(width: 44, height: 44)
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                .buttonStyle(IOSPressButtonStyle())
                 .disabled(!canUndo)
+                .opacity(canUndo ? 1.0 : 0.4)
                 .transition(.opacity.combined(with: .scale))
 
                 Button(action: onRedo) {
                     Image(systemName: "arrow.uturn.forward")
                         .imageScale(.large)
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(width: 44, height: 44)
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                .buttonStyle(IOSPressButtonStyle())
                 .disabled(!canRedo)
+                .opacity(canRedo ? 1.0 : 0.4)
                 .transition(.opacity.combined(with: .scale))
 
                 Button(action: onAdd) {
                     Image(systemName: "plus")
                         .imageScale(.large)
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(width: 44, height: 44)
                 }
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+                .buttonStyle(IOSPressButtonStyle())
                 .transition(.opacity.combined(with: .scale))
                 .background(
                     GeometryReader { geo in
@@ -7490,20 +7651,17 @@ private struct CBTopBar: View {
                 )
             }
 
-            // Edit/Done button (morphs between states)
-            Group {
-                if isEditing {
-                    Button("Done", action: onEditToggle)
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-                        .transition(.opacity.combined(with: .scale))
-                        .id("doneButton")
-                } else {
-                    Button("Edit", action: onEditToggle)
-                        .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
-                        .transition(.opacity.combined(with: .scale))
-                        .id("editButton")
-                }
+            // Edit/Done button (morphs between states) - pencil/checkmark icon like CueRowDesignPreview
+            Button(action: onEditToggle) {
+                Image(systemName: isEditing ? "checkmark" : "pencil")
+                    .imageScale(.large)
+                    .foregroundColor(buttonColor)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(IOSPressButtonStyle())
+            .transition(.opacity.combined(with: .scale))
+            .id(isEditing ? "doneButton" : "editButton")
         }
         .fixedSize(horizontal: false, vertical: true)
         .frame(minHeight: 32)
@@ -7548,9 +7706,15 @@ private struct CBTopBar: View {
             }
             .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: connectionTint))
 
-            // Edit button
-            Button("Edit", action: onEditToggle)
-                .buttonStyle(ThemedCapsuleButtonStyle(backgroundColor: lightButtonBackgroundColor, strokeColor: buttonColor))
+            // Edit button - pencil icon
+            Button(action: onEditToggle) {
+                Image(systemName: "pencil")
+                    .imageScale(.large)
+                    .foregroundColor(buttonColor)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(IOSPressButtonStyle())
         }
     }
 
@@ -7782,6 +7946,7 @@ private struct CBControlSection: View {
     @Binding var selectedCue: UUID?  // Chosen cue to clear when entering edit mode
     @Binding var currentPage: Int  // Current page (0-3) for multi-page control area
     let conflictFor: [MIDIKey: String]
+    @AppStorage("midiFiltersEnabled") private var midiFiltersEnabled: Bool = true
     let midiFilter: Set<Int>
     let showMIDIData: Bool  // Toggle for showing MIDI data
     var onTap: (ControlButton) -> Void
@@ -8096,8 +8261,9 @@ private struct CBControlSection: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal, 14)
                         .frame(height: 44)
-                        .background(.regularMaterial)
-                        .clipShape(Capsule())
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         .padding(.trailing, 16)
                         .padding(.bottom, 8)
@@ -8123,7 +8289,7 @@ private struct CBControlSection: View {
                             }) {
                                 Text(isEditing ? "Done" : "Edit")
                                     .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(defaultCueColor)
+                                    .foregroundColor(.white)
                                     .padding(.horizontal, 12)
                                     .frame(height: 44)
                             }
@@ -8137,14 +8303,15 @@ private struct CBControlSection: View {
                                 }) {
                                     Image(systemName: "chevron.up")
                                         .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(defaultCueColor)
+                                        .foregroundColor(.white)
                                         .frame(width: 44, height: 44)
                                 }
                                 .buttonStyle(IOSPressButtonStyle())
                             }
                         }
-                        .background(.regularMaterial)
-                        .clipShape(Capsule())
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         .padding(.trailing, 16)
                         .padding(.bottom, 8)
@@ -8173,7 +8340,7 @@ private struct CBControlSection: View {
         Button(action: {
             // Only allow toggle if there are buttons in the control area
             if !buttons.isEmpty {
-                withAnimation(.easeOut(duration: 0.1)) {
+                withAnimation(.easeInOut(duration: 0.3)) {
                     isCollapsed.toggle()
                 }
             }
@@ -8208,15 +8375,15 @@ private struct CBControlSection: View {
                     }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(previousPage != nil ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .foregroundColor(previousPage != nil ? .white : .white.opacity(0.3))
                             .frame(width: 36, height: 44)
                     }
                     .disabled(previousPage == nil)
 
                     // Page indicator
                     Text(pageIndicatorText)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(defaultCueColor)
+                        .font(.custom("Sora-Regular", size: 14))
+                        .foregroundColor(.white)
                         .frame(minWidth: 32)
 
                     // Next page button
@@ -8229,15 +8396,16 @@ private struct CBControlSection: View {
                     }) {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(nextPage != nil ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .foregroundColor(nextPage != nil ? .white : .white.opacity(0.3))
                             .frame(width: 36, height: 44)
                     }
                     .disabled(nextPage == nil)
                 }
-                .background(.regularMaterial)
-                .clipShape(Capsule())
-                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-                .contentShape(Capsule())
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
+                .contentShape(RoundedRectangle(cornerRadius: 10))
                 .gesture(
                     DragGesture(minimumDistance: 20)
                         .onEnded { value in
@@ -8267,7 +8435,7 @@ private struct CBControlSection: View {
                     Button(action: onUndo) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(canUndo ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .foregroundColor(canUndo ? .white : .white.opacity(0.3))
                             .frame(width: 44, height: 44)
                     }
                     .disabled(!canUndo)
@@ -8275,14 +8443,15 @@ private struct CBControlSection: View {
                     Button(action: onRedo) {
                         Image(systemName: "arrow.uturn.forward")
                             .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(canRedo ? defaultCueColor : defaultCueColor.opacity(0.3))
+                            .foregroundColor(canRedo ? .white : .white.opacity(0.3))
                             .frame(width: 44, height: 44)
                     }
                     .disabled(!canRedo)
                 }
-                .background(.regularMaterial)
-                .clipShape(Capsule())
-                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                 .transition(.scale.combined(with: .opacity))
 
                 // Capsule 2 (middle): Add (+)
@@ -8302,86 +8471,94 @@ private struct CBControlSection: View {
                         .overlay {
                             Image(systemName: "plus")
                                 .font(.system(size: 18, weight: .medium))
-                                .foregroundColor((canAddMoreControls || canAddFader) ? defaultCueColor : defaultCueColor.opacity(0.3))
+                                .foregroundColor((canAddMoreControls || canAddFader) ? .white : .white.opacity(0.3))
                         }
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(!canAddMoreControls && !canAddFader)
                 .frame(width: 44, height: 44)
-                .background(.regularMaterial)
-                .clipShape(Capsule())
-                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                 .transition(.scale.combined(with: .opacity))
             }
 
-            // Capsule 1 (rightmost): Done/Collapse or Edit
-            Button(action: {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                    if isEditing && buttons.isEmpty {
-                        // No buttons - collapse instead of exiting edit mode
-                        isCollapsed = true
-                        isEditing = false
-                        clearDragState(reason: "main edit button - collapsing empty control area")
-                    } else {
-                        isEditing.toggle()
-                        if !isEditing {
-                            clearDragState(reason: "main edit button - exiting edit mode")
-                        } else {
-                            // Entering edit mode - always unfold the control area and clear selection
+            // Rightmost capsule: always present, no conditional insertion
+            // Non-edit mode with buttons: [Edit | ▼] combined capsule
+            // Non-edit mode no buttons: [Edit] single button
+            // Edit mode: [✓] done button
+            HStack(spacing: 0) {
+                if isEditing && !isCollapsed {
+                    // Done button (checkmark or collapse chevron if empty)
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            if buttons.isEmpty {
+                                isCollapsed = true
+                                isEditing = false
+                                clearDragState(reason: "main edit button - collapsing empty control area")
+                            } else {
+                                isEditing = false
+                                clearDragState(reason: "main edit button - exiting edit mode")
+                            }
+                        }
+                    }) {
+                        Image(systemName: buttons.isEmpty ? "chevron.down" : "checkmark")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    // Edit button
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            isEditing = true
                             isCollapsed = false
-                            selectedCue = nil  // Clear chosen cue when entering edit mode
+                            selectedCue = nil
                             editSessionNonce &+= 1
                             clearDragState(reason: "main edit button - entering edit mode")
                         }
+                    }) {
+                        Text("Edit")
+                            .font(.custom("Sora-Regular", size: 15))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .frame(height: 44)
                     }
-                }
-            }) {
-                if isEditing && !isCollapsed {
-                    // In edit mode: show chevron if empty, checkmark if has buttons
-                    Image(systemName: buttons.isEmpty ? "chevron.down" : "checkmark")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(defaultCueColor)
-                        .frame(width: 44, height: 44)
-                        .transaction { $0.animation = nil }  // Prevent icon swap animation during sheet transitions
-                } else {
-                    Text("Edit")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(defaultCueColor)
-                        .padding(.horizontal, 14)
-                        .frame(height: 44)
-                }
-            }
-            .background(.regularMaterial)
-            .clipShape(Capsule())
-            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                    .buttonStyle(.plain)
 
-            // Chevron collapse button capsule - only in non-edit mode with buttons
-            if !isEditing && !buttons.isEmpty {
-                Button(action: {
-                    withAnimation(.easeOut(duration: 0.1)) {
-                        isCollapsed.toggle()
+                    // Collapse chevron — always here when Edit is shown + buttons exist
+                    // No conditional insertion = no transition animation issues
+                    if !buttons.isEmpty {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 1, height: 24)
+
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isCollapsed.toggle()
+                            }
+                        }) {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 44)
+                        }
+                        .buttonStyle(.plain)
                     }
-                }) {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(defaultCueColor)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .background(.regularMaterial)
-                .clipShape(Capsule())
-                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-                .transition(.scale.combined(with: .opacity))
             }
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
         }
         .padding(.horizontal, 12)
-        .padding(.top, 8)  // Match sheet toolbar top spacing
-        .padding(.bottom, 12)  // Space between header capsules and button grid (prevents X button clipping)
-        .frame(height: 68)  // Taller to accommodate top + bottom padding + 44pt buttons
-        .animation(nil, value: buttons.count)  // Prevent capsule animations when buttons are added/removed (e.g. Save & Add Another)
-        .animation(nil, value: buttons.isEmpty)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+        .frame(height: 68)
     }
 
 
@@ -8645,7 +8822,11 @@ private struct CBControlSection: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(.regularMaterial)
+                    .fill(Color.black.opacity(0.8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    )
                     .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
             )
         }
@@ -8720,7 +8901,7 @@ private struct CBControlSection: View {
 
             // Reserve space for header (68pt is added separately) and grid padding
             let headerHeight: CGFloat = 68
-            let gridVerticalPadding: CGFloat = 40  // 4pt top + 4pt bottom + scrollbar (28pt handle + 4pt bottom padding)
+            let gridVerticalPadding: CGFloat = 52  // 8pt top + 12pt bottom + scrollbar (28pt handle + 4pt bottom padding)
             let maxGridAreaHeight = maxAvailableHeight - headerHeight - gridVerticalPadding
 
             // Calculate cell size based on 4 rows max - NO MINIMUM, let it shrink to fit
@@ -9605,8 +9786,8 @@ private struct CBControlSection: View {
                         }
                     }
 
-                    // Check for filtered MIDI (only filter CC, not notes)
-                    if !midiFilter.isEmpty && button.kind == .cc && midiFilter.contains(button.number) {
+                    // Check for filtered MIDI (only when filters are enabled)
+                    if midiFiltersEnabled && !midiFilter.isEmpty && button.kind == .cc && midiFilter.contains(button.number) {
                         let filteredMsg = "Filtered CC"
                         if let existing = warning {
                             warning = "\(existing) • \(filteredMsg)"
@@ -9626,7 +9807,11 @@ private struct CBControlSection: View {
                     defaultCueColor: defaultCueColor,
                     showMIDIData: showMIDIData,
                     onTap: { onTap(button) },
-                    onEdit: { onEditButton(button) },
+                    onEdit: {
+                        // Look up the current button by ID to avoid stale closure captures after drag reorder
+                        let current = controlButtons.wrappedValue.first(where: { $0.id == button.id }) ?? button
+                        onEditButton(current)
+                    },
                     onDelete: { onDelete(button) },
                     onDrag: {
                         // Keep the old system for compatibility, but we'll add smooth gesture on top
@@ -9646,7 +9831,7 @@ private struct CBControlSection: View {
                         connectionCoordinator.sendMIDI(type: .cc, channel: channel, number: cc, value: value, label: title, buttonID: buttonID.uuidString)
                     }
                 )
-                .id("\(button.id.uuidString)-\(isEditing)-\(button.colorHex ?? "nil")-\(button.kind.rawValue)-\(button.channel)-\(button.number)")
+                .id(button.id)
                 .frame(width: width, height: height)
                 .offset(
                     x: x + (dragging?.id == button.id ? dragTranslation.width : 0),
@@ -9809,7 +9994,7 @@ private struct CBControlSection: View {
             let availableHeight = landscapeHeight * 0.8
             // Reserve space for header and grid padding
             let headerHeight: CGFloat = 68
-            let gridVerticalPadding: CGFloat = 40  // 4pt top + 4pt bottom + scrollbar (28pt handle + 4pt bottom padding)
+            let gridVerticalPadding: CGFloat = 52  // 8pt top + 12pt bottom + scrollbar (28pt handle + 4pt bottom padding)
             let gridAreaHeight = availableHeight - headerHeight - gridVerticalPadding
 
             // Calculate cell size based on 4 rows (max) - NO MINIMUM, let it shrink to fit 80% height
@@ -9983,8 +10168,8 @@ private struct CBControlSection: View {
                     GeometryReader { viewportGeo in
                         gridContent
                             .padding(.horizontal, columnSpacing)
-                            .padding(.top, 4)
-                            .padding(.bottom, 4)
+                            .padding(.top, 8)
+                            .padding(.bottom, 12)
                             .offset(x: -controlScrollOffset)
                             .onAppear {
                                 controlVisibleWidth = viewportGeo.size.width
@@ -10018,7 +10203,7 @@ private struct CBControlSection: View {
                 gridContent
                     .id("ctrl-container-\(isCtrlEditing)-sess-\(sessionNonce)-page-\(currentPage)-\(pageButtons.count)")
                     .padding(EdgeInsets(
-                        top: 8,
+                        top: isCtrlEditing ? 20 : 8,
                         leading: gridPadding,
                         bottom: gridPadding,
                         trailing: gridPadding
@@ -10082,61 +10267,47 @@ private struct ControlButtonTile: View {
             }
         }()
 
-        // iPhone mode: Keyboard-style solid buttons
-        // iPad mode: Original stroked style
-        let buttonColor: Color = {
-            if isPhone {
-                // iPhone: Solid buttons like keyboard keys
-                // Background: slightly lighter than control area (darker overall)
-                let controlAreaBg = selectedTheme.titleBarColor(for: colorScheme)
-                let lightenAmount = colorScheme == .dark ? 0.1 : -0.05 // Lighter in dark mode, darker in light mode
-                return controlAreaBg.adjust(brightness: lightenAmount)
-            } else {
-                // iPad: Original behavior
-                let offColor = selectedTheme.titleBarColor(for: colorScheme)
-                return isOn ? accentColor : offColor
-            }
-        }()
+        // Filled tile background — always accent color
+        let buttonColor: Color = isOn ? accentColor : accentColor.opacity(0.9)
 
-        let textColor: Color = {
-            if isPhone {
-                // Text: accent color when off, contrasting when on
-                return isOn ? accentColor.contrastingTextColor : accentColor
-            } else {
-                // iPad: Original behavior
-                return isOn ? accentColor.contrastingTextColor : selectedTheme.primaryTextColor(for: colorScheme)
-            }
-        }()
+        // Adaptive text color based on tile background brightness
+        let textColor: Color = accentColor.needsDarkText() ? .black : .white
 
         ZStack {
             Button {
                     if isEditing { onEdit() } else { onTap() }
             } label: {
-                VStack(spacing: isPhone ? 2 : 6) {
+                VStack(spacing: 4) {
+                        Spacer(minLength: 0)
+
                         if button.symbol.isEmpty {
                             // No icon: show title only
                             Text(button.title)
-                                .font(isPhone ? .caption.weight(.semibold) : .title3.weight(.semibold))
+                                .font(.custom("Sora-Bold", size: isPhone ? 11 : 12))
                         } else if button.title.trimmingCharacters(in: .whitespaces).isEmpty {
                             // Icon-only mode: center the icon without title or MIDI label
                             Image(systemName: button.symbol)
-                                .font(.system(size: isPhone ? 20 : 32, weight: .semibold))
+                                .font(.system(size: 22, weight: .semibold))
                                 .foregroundColor(textColor)
                         } else {
                             // Icon + title mode: show all elements
                             Image(systemName: button.symbol)
-                                .font(.system(size: isPhone ? 16 : 24, weight: .semibold))
+                                .font(.system(size: 22, weight: .semibold))
                                 .foregroundColor(textColor)
-                            Text(button.title).font(isPhone ? .caption2.weight(.semibold) : .footnote.weight(.semibold))
+                            Text(button.title)
+                                .font(.custom("Sora-Bold", size: 12))
+                                .lineLimit(1)
                             Text(midiLabel())
-                                .font(isPhone ? .system(size: 8) : .caption2)
-                                .foregroundColor(textColor.opacity(0.9))
+                                .font(.custom("Sora-Regular", size: 9))
+                                .foregroundColor(textColor.opacity(0.5))
                         }
+
+                        Spacer(minLength: 0)
                 }
                 .foregroundColor(textColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
-                    RoundedRectangle(cornerRadius: isPhone ? 6 : 14)
+                    RoundedRectangle(cornerRadius: 8)
                         .fill(buttonColor)
                 )
                     .overlay(alignment: .topLeading) {
@@ -10145,16 +10316,16 @@ private struct ControlButtonTile: View {
                                 ZStack {
                                     Circle()
                                         .fill(Color.gray.opacity(0.9))
-                                        .frame(width: 30, height: 30)
+                                        .frame(width: isPhone ? 20 : 30, height: isPhone ? 20 : 30)
                                     Image(systemName: "xmark")
-                                        .font(.system(size: 13, weight: .bold))
+                                        .font(.system(size: isPhone ? 10 : 13, weight: .bold))
                                         .foregroundColor(Color(uiColor: .systemBackground))
                                 }
                         }
                         .buttonStyle(.plain)
                         .contentShape(Rectangle())
-                        .frame(width: 70, height: 70)
-                            .offset(x: -32, y: -32)
+                        .frame(width: isPhone ? 44 : 70, height: isPhone ? 44 : 70)
+                            .offset(x: isPhone ? -10 : -32, y: isPhone ? -10 : -32)
                     }
                 }
             }
@@ -10183,23 +10354,10 @@ private struct ControlButtonTile: View {
     private func startWobble() {
         guard isEditing else { return }
 
-        // Generate unique wobble parameters for this tile (iPhone-like wobble)
         var rng = SeededRandom(seed: button.id.uuidString.hashValue)
-        let amplitude = 0.5 + Double(rng.nextNormalized()) * 0.3 // ~0.5 ... 0.8 deg (more subtle)
-        let scaleDelta = 0.001 + Double(rng.nextNormalized()) * 0.0005 // ~0.1% ... 0.15% (more subtle)
-        let interval = 0.16 + Double(rng.nextNormalized()) * 0.04 // ~0.16 ... 0.20s
-        let initialDelay = Double(rng.nextNormalized()) * 0.2
-
-        debugPrint("🔄 ControlButtonTile '\(button.title)': Starting wobble with wobbleID \(wobbleID.uuidString.prefix(8))...")
-        DispatchQueue.main.asyncAfter(deadline: .now() + initialDelay) {
-            guard self.isEditing else { return }
-            self.wobbleAnimator.startWobbling(
-                for: self.wobbleID,
-                amplitude: amplitude,
-                scaleDelta: scaleDelta,
-                interval: interval
-            )
-        }
+        let amplitude = 0.5 + Double(rng.nextNormalized()) * 0.3
+        let scaleDelta = 0.001 + Double(rng.nextNormalized()) * 0.0005
+        wobbleAnimator.startWobbling(for: wobbleID, amplitude: amplitude, scaleDelta: scaleDelta)
     }
 
     private func stopWobble() {
@@ -10313,8 +10471,6 @@ private struct ControlButtonTile: View {
                     return selectedTheme.defaultCueColor(for: colorScheme)
                 }
             }()
-            let textColor = selectedTheme.primaryTextColor(for: colorScheme)
-
             ZStack(alignment: .topTrailing) {
                 // Fill entire available space - 1x2 for vertical, 2x1 for horizontal
                 GeometryReader { geo in
@@ -10329,13 +10485,13 @@ private struct ControlButtonTile: View {
                         let fillAlignment: Alignment = (direction == "right") ? .leading : .trailing
 
                         ZStack(alignment: fillAlignment) {
-                            // Main fader track background
-                            RoundedRectangle(cornerRadius: isPhone ? 4 : 10)
-                                .fill(faderColor.opacity(0.3))
+                            // Main fader track background - filled style with 8pt corners
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(faderColor.opacity(0.2))
 
                             // Fader fill (dynamic based on value) - alignment handles the direction
-                            RoundedRectangle(cornerRadius: isPhone ? 3 : 8)
-                                .fill(faderColor.opacity(0.6))
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(faderColor.opacity(0.85))
                                 .frame(width: w * value)
                                 .padding(3)
 
@@ -10347,18 +10503,24 @@ private struct ControlButtonTile: View {
                                 .padding(.vertical, 6)
 
                             // Text overlay inside fader at left
+                            // Adaptive text color: switches based on whether fader fill covers the text
+                            // Text is left-aligned, so for "right" direction fill covers it early, for "left" late
                             HStack(spacing: 2) {
+                                let filledTextColor: Color = faderColor.needsDarkText() ? .black : .white
+                                let emptyTextColor: Color = .white  // Dark mode background
+                                let textOnFill = (direction == "right") ? value > 0.1 : value > 0.85
+                                let faderTextColor = textOnFill ? filledTextColor : emptyTextColor
                                 Text(button.title)
-                                    .font(.caption.weight(.semibold))
+                                    .font(.custom("Sora-Bold", size: 11))
                                     .lineLimit(1)
-                                    .foregroundColor(textColor)
+                                    .foregroundColor(faderTextColor)
                                     .minimumScaleFactor(0.7)
                                 Text("CC\(button.number)")
-                                    .font(.caption2)
-                                    .foregroundColor(textColor.opacity(0.9))
+                                    .font(.custom("Sora-Regular", size: 9))
+                                    .foregroundColor(faderTextColor.opacity(0.5))
                                 Text("Ch\(button.channel)")
-                                    .font(.caption2)
-                                    .foregroundColor(textColor.opacity(0.9))
+                                    .font(.custom("Sora-Regular", size: 9))
+                                    .foregroundColor(faderTextColor.opacity(0.5))
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                             .padding(.leading, 6)
@@ -10395,13 +10557,13 @@ private struct ControlButtonTile: View {
                         let fillAlignment: Alignment = (direction == "up") ? .bottom : .top
 
                         ZStack(alignment: fillAlignment) {
-                            // Main fader track background
-                            RoundedRectangle(cornerRadius: isPhone ? 4 : 10)
-                                .fill(faderColor.opacity(0.3))
+                            // Main fader track background - filled style with 8pt corners
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(faderColor.opacity(0.2))
 
                             // Fader fill (dynamic based on value) - alignment handles the direction
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(faderColor.opacity(0.6))
+                                .fill(faderColor.opacity(0.85))
                                 .frame(height: h * value)
                                 .padding(3)
 
@@ -10413,18 +10575,23 @@ private struct ControlButtonTile: View {
                                 .padding(.horizontal, 6)
 
                             // Text overlay inside fader at top
-                            VStack(spacing: 1) {
+                            // Adaptive text color: for "up" direction title at top needs high fill, for "down" title covered early
+                            VStack(spacing: 2) {
+                                let filledTextColor: Color = faderColor.needsDarkText() ? .black : .white
+                                let emptyTextColor: Color = .white  // Dark mode background
+                                let titleOnFill = (direction == "up") ? value > 0.75 : value > 0.15
+                                let midiOnFill = (direction == "up") ? value > 0.15 : value > 0.75
                                 Text(button.title)
-                                    .font(.caption.weight(.semibold))
+                                    .font(.custom("Sora-Bold", size: 11))
                                     .lineLimit(1)
-                                    .foregroundColor(textColor)
+                                    .foregroundColor(titleOnFill ? filledTextColor : emptyTextColor)
                                     .minimumScaleFactor(0.7)
                                 Text("CC\(button.number)")
-                                    .font(.caption2)
-                                    .foregroundColor(textColor.opacity(0.9))
+                                    .font(.custom("Sora-Regular", size: 9))
+                                    .foregroundColor((midiOnFill ? filledTextColor : emptyTextColor).opacity(0.5))
                                 Text("Ch\(button.channel)")
-                                    .font(.caption2)
-                                    .foregroundColor(textColor.opacity(0.9))
+                                    .font(.custom("Sora-Regular", size: 9))
+                                    .foregroundColor((midiOnFill ? filledTextColor : emptyTextColor).opacity(0.5))
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                             .padding(.top, 6)
@@ -10507,22 +10674,10 @@ private struct ControlButtonTile: View {
         private func startWobble() {
             guard isEditing else { return }
 
-            // Generate unique wobble parameters for this tile (iPhone-like wobble)
             var rng = SeededRandom(seed: button.id.uuidString.hashValue)
-            let amplitude = 0.5 + Double(rng.nextNormalized()) * 0.3 // ~0.5 ... 0.8 deg (more subtle)
-            let scaleDelta = 0.001 + Double(rng.nextNormalized()) * 0.0005 // ~0.1% ... 0.15% (more subtle)
-            let interval = 0.16 + Double(rng.nextNormalized()) * 0.04 // ~0.16 ... 0.20s
-            let initialDelay = Double(rng.nextNormalized()) * 0.3
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + initialDelay) {
-                guard self.isEditing else { return }
-                self.wobbleAnimator.startWobbling(
-                    for: self.wobbleID,
-                    amplitude: amplitude,
-                    scaleDelta: scaleDelta,
-                    interval: interval
-                )
-            }
+            let amplitude = 0.5 + Double(rng.nextNormalized()) * 0.3
+            let scaleDelta = 0.001 + Double(rng.nextNormalized()) * 0.0005
+            wobbleAnimator.startWobbling(for: wobbleID, amplitude: amplitude, scaleDelta: scaleDelta)
         }
 
         private func stopWobble() {
@@ -11090,22 +11245,10 @@ private struct iPadControlTile: View {
     private func startWobble() {
         guard isEditing else { return }
 
-        // Generate unique wobble parameters for this tile (iPhone-like wobble)
         var rng = SeededRandom(seed: button.id.uuidString.hashValue)
-        let amplitude = 0.8 + Double(rng.nextNormalized()) * 0.4 // ~0.8 ... 1.2 deg (reduced from 1.2...1.8)
-        let scaleDelta = 0.002 + Double(rng.nextNormalized()) * 0.001 // ~0.2% ... 0.3% (reduced from 0.3%...0.5%)
-        let interval = 0.12 + Double(rng.nextNormalized()) * 0.03
-        let initialDelay = Double(rng.nextNormalized()) * 0.3
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + initialDelay) {
-            guard self.isEditing else { return }
-            self.wobbleAnimator.startWobbling(
-                for: self.wobbleID,
-                amplitude: amplitude,
-                scaleDelta: scaleDelta,
-                interval: interval
-            )
-        }
+        let amplitude = 0.8 + Double(rng.nextNormalized()) * 0.4
+        let scaleDelta = 0.002 + Double(rng.nextNormalized()) * 0.001
+        wobbleAnimator.startWobbling(for: wobbleID, amplitude: amplitude, scaleDelta: scaleDelta)
     }
 
     private func stopWobble() {
@@ -11142,23 +11285,23 @@ private struct iPadControlTile: View {
                 }
             }
             
-            // Delete button in edit mode
+            // Delete button in edit mode — positioned so circle center sits at tile corner
             if isEditing {
                 Button(action: onDelete) {
                     ZStack {
                         Circle()
                             .fill(Color.gray.opacity(0.9))
-                            .frame(width: isPhone ? 20 : 30, height: isPhone ? 20 : 30)  // iPhone: 20pt (like homescreen), iPad: 30pt
+                            .frame(width: isPhone ? 20 : 30, height: isPhone ? 20 : 30)
                         Image(systemName: "xmark")
-                            .font(.system(size: isPhone ? 10 : 13, weight: .bold))  // iPhone: smaller X
+                            .font(.system(size: isPhone ? 10 : 13, weight: .bold))
                             .foregroundColor(Color(uiColor: .systemBackground))
                     }
                 }
                 .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .frame(width: isPhone ? 44 : 70, height: isPhone ? 44 : 70)  // iPhone: smaller hit area
-                .offset(x: isPhone ? -10 : -30, y: isPhone ? -10 : -30)  // iPhone: position at corner, half sticking out
+                .contentShape(Circle().scale(2))  // Generous hit area around the circle
+                .position(x: isPhone ? 4 : 0, y: isPhone ? 4 : 0)  // Slightly inset from corner
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .allowsHitTesting(true)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -11219,169 +11362,77 @@ private struct iPadControlTile: View {
         return defaultCueColor
     }
 
-    // Computed property for button background color based on toggle state
+    // Filled tile background — always accent color (palette style)
     private var buttonBackgroundColor: Color {
-        if isPressed {
-            return customButtonColor
-        } else if button.isToggle == true && button.toggleState {
-            return customButtonColor // Full color for toggle ON
+        if button.isToggle == true {
+            // Toggle buttons: clear visual distinction between ON and OFF
+            let isOn = button.toggleState || isPressed
+            return isOn ? customButtonColor : customButtonColor.opacity(0.45)
         } else {
-            return selectedTheme.titleBarColor(for: colorScheme) // Control area color
+            // Momentary buttons: subtle press feedback
+            return isPressed ? customButtonColor : customButtonColor.opacity(0.9)
         }
     }
 
-    // Computed property for button text color based on toggle state
+    // Adaptive text color based on tile background brightness (palette style)
     private var buttonTextColor: Color {
-        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-
-        // iPad toggle buttons: don't flash, only show toggle state
-        if !isPhone && button.isToggle == true {
-            if button.toggleState {
-                return customButtonColor // Custom color for toggle ON
-            } else {
-                return .primary // Default text color
-            }
-        }
-
-        // Regular buttons or iPhone: show press flash
-        if isPressed {
-            return Color(uiColor: .systemBackground)
-        } else if button.isToggle == true && button.toggleState {
-            return customButtonColor // Custom color for toggle ON
-        } else {
-            return .primary // Default text color
-        }
+        customButtonColor.needsDarkText() ? .black : .white
     }
 
-    // Computed property for icon color based on button state
+    // Icon color matches text color (palette style)
     private var buttonIconColor: Color {
-        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-
-        // iPad toggle buttons: don't flash, only show toggle state
-        if !isPhone && button.isToggle == true {
-            if button.toggleState {
-                return selectedTheme.accentColor(for: colorScheme) // White when toggled ON
-            } else {
-                return customButtonColor // Custom color when unpressed
-            }
-        }
-
-        // Regular buttons or iPhone: show press flash
-        if isPressed {
-            return selectedTheme.accentColor(for: colorScheme) // White when pressed
-        } else if button.isToggle == true && button.toggleState {
-            return selectedTheme.accentColor(for: colorScheme) // White when toggled ON
-        } else {
-            return customButtonColor // Custom color when unpressed
-        }
-    }
-
-    // iPhone-specific background color (keyboard-style solid buttons)
-    private var phoneButtonBackgroundColor: Color {
-        if isPressed || (button.isToggle == true && button.toggleState) {
-            // When pressed/toggled: background is accent color
-            return customButtonColor
-        } else {
-            // When off: background is lightened titleBarColor
-            let controlAreaBg = selectedTheme.titleBarColor(for: colorScheme)
-            let lightenAmount = colorScheme == .dark ? 0.1 : -0.05
-            return controlAreaBg.adjust(brightness: lightenAmount)
-        }
-    }
-
-    // iPhone-specific text color (accent color when off, contrasting when on)
-    private var phoneButtonTextColor: Color {
-        if isPressed || (button.isToggle == true && button.toggleState) {
-            // When pressed/toggled: text is contrasting color
-            return customButtonColor.contrastingTextColor
-        } else {
-            // When off: text is accent color
-            return customButtonColor
-        }
+        buttonTextColor
     }
 
     @ViewBuilder
     private func ButtonTileContent() -> some View {
-        Group {
+        VStack(spacing: isPhone ? 1 : 4) {
+            Spacer(minLength: 0)
+
             if button.symbol.isEmpty {
                 // Text only
-                VStack(spacing: isPhone ? 2 : 6) {
-                    if !isPhone {
-                        Spacer(minLength: 0)
-                    }
-                    Text(button.title)
-                        .font(isPhone ? .system(size: 11, weight: .semibold) : .title3.weight(.regular))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                    if showMIDIData {
-                        Text(midiLabel())
-                            .font(isPhone ? .system(size: 7) : .caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    if !isPhone {
-                        Spacer(minLength: 0)
-                    }
-                }
+                Text(button.title)
+                    .font(.custom("Sora-Bold", size: isPhone ? 11 : 12))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
             } else if button.title.isEmpty {
-                // Icon only - center it vertically (no outer VStack to avoid layout issues)
-                if showMIDIData {
-                    // With MIDI label: use VStack with proper spacing
-                    VStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        Image(systemName: button.symbol)
-                            .font(.system(size: isPhone ? 16 : 32, weight: .semibold))
-                            .foregroundColor(buttonIconColor)
-                        Spacer(minLength: 0)
-                        Text(midiLabel())
-                            .font(isPhone ? .system(size: 7) : .caption2)
-                            .foregroundColor(.secondary)
-                            .padding(.bottom, isPhone ? 2 : 4)
-                    }
-                } else {
-                    // Without MIDI label: perfectly center the icon
-                    Image(systemName: button.symbol)
-                        .font(.system(size: isPhone ? 16 : 32, weight: .semibold))
-                        .foregroundColor(buttonIconColor)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+                // Icon only
+                Image(systemName: button.symbol)
+                    .font(.system(size: isPhone ? 16 : 22, weight: .semibold))
+                    .foregroundColor(buttonIconColor)
             } else {
                 // Icon + text
-                VStack(spacing: isPhone ? 2 : 6) {
-                    if !isPhone {
-                        Spacer(minLength: 0)
-                    }
-                    Image(systemName: button.symbol)
-                        .font(.system(size: isPhone ? 14 : 24, weight: .semibold))
-                        .foregroundColor(buttonIconColor)
-                    Text(button.title)
-                        .font(isPhone ? .system(size: 9, weight: .semibold) : .footnote.weight(.regular))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    if showMIDIData {
-                        Text(midiLabel())
-                            .font(isPhone ? .system(size: 7) : .caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    if !isPhone {
-                        Spacer(minLength: 0)
-                    }
-                }
+                Image(systemName: button.symbol)
+                    .font(.system(size: isPhone ? 14 : 22, weight: .semibold))
+                    .foregroundColor(buttonIconColor)
+                Text(button.title)
+                    .font(.custom("Sora-Bold", size: isPhone ? 10 : 12))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
+
+            if showMIDIData {
+                Text(midiLabel())
+                    .font(.custom("Sora-Regular", size: isPhone ? 8 : 9))
+                    .foregroundColor(buttonTextColor.opacity(0.5))
+            }
+
+            Spacer(minLength: 0)
         }
-        .foregroundColor(buttonTextColor)  // Same text color for iPhone and iPad
+        .foregroundColor(buttonTextColor)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            // Same stroked design for both iPhone and iPad
-            RoundedRectangle(cornerRadius: isPhone ? 10 : 14)
-                .stroke(customButtonColor, lineWidth: 2)
-                .background(
-                    RoundedRectangle(cornerRadius: isPhone ? 10 : 14)
-                        .fill(buttonBackgroundColor)
-                )
+            RoundedRectangle(cornerRadius: 8)
+                .fill(buttonBackgroundColor)
         )
-            .scaleEffect(isTouching ? 1.02 : 1.0)
+        .opacity(isTouching ? 0.7 : 1.0)
+        .transaction { t in
+            // Instant dim on press, animated restore on release
+            if isTouching { t.animation = nil } else { t.animation = .easeOut(duration: 0.1) }
+        }
+        .animation(.easeOut(duration: 0.08), value: button.toggleState)
     }
-    
+
     @ViewBuilder
     private func FaderTileContent() -> some View {
         GeometryReader { geo in
@@ -11399,17 +11450,13 @@ private struct iPadControlTile: View {
                 let fillAlignment: Alignment = (direction == "right") ? .leading : .trailing
 
                 ZStack(alignment: fillAlignment) {
-                    // Main fader track background - same stroked design for iPhone and iPad
-                    RoundedRectangle(cornerRadius: isPhone ? 8 : 10)
-                        .fill(selectedTheme.titleBarColor(for: colorScheme))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: isPhone ? 8 : 10)
-                                .stroke(customButtonColor, lineWidth: 2)
-                        )
+                    // Main fader track background - filled style with 8pt corners
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(customButtonColor.opacity(0.2))
 
                     // Fader fill (dynamic based on faderValue) - alignment handles the direction
-                    RoundedRectangle(cornerRadius: isPhone ? 6 : 8)
-                        .fill(customButtonColor.opacity(0.2))
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(customButtonColor.opacity(0.85))
                         .frame(width: w * faderVisualValue)
                         .padding(3)
 
@@ -11473,17 +11520,23 @@ private struct iPadControlTile: View {
                 )
 
                 // Title overlay - centered
+                // Text color adapts to whether the fader fill is behind the text
+                // For horizontal: text is centered, so it's covered when fill > ~50%
                 HStack {
+                    let filledTextColor: Color = customButtonColor.needsDarkText() ? .black : .white
+                    let emptyTextColor: Color = .white  // Dark mode background
+                    let textOnFill = faderVisualValue > 0.45
+                    let faderTextColor = textOnFill ? filledTextColor : emptyTextColor
                     Text(button.title)
-                        .font(isPhone ? .system(size: 9, weight: .semibold) : .caption.weight(.regular))
-                        .foregroundColor(.primary)
+                        .font(.custom("Sora-Bold", size: 11))
+                        .foregroundColor(faderTextColor)
                         .multilineTextAlignment(.center)
                         .padding(.leading, isPhone ? 2 : 4)
                     Spacer()
                     if showMIDIData {
                         Text(midiLabel())
-                            .font(isPhone ? .system(size: 7) : .caption2)
-                            .foregroundColor(.secondary)
+                            .font(.custom("Sora-Regular", size: 9))
+                            .foregroundColor(faderTextColor.opacity(0.5))
                             .multilineTextAlignment(.center)
                             .padding(.trailing, isPhone ? 2 : 4)
                     }
@@ -11501,17 +11554,13 @@ private struct iPadControlTile: View {
                 let fillAlignment: Alignment = (direction == "up") ? .bottom : .top
 
                 ZStack(alignment: fillAlignment) {
-                    // Main fader track background - same stroked design for iPhone and iPad
-                    RoundedRectangle(cornerRadius: isPhone ? 8 : 10)
-                        .fill(selectedTheme.titleBarColor(for: colorScheme))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: isPhone ? 8 : 10)
-                                .stroke(customButtonColor, lineWidth: 2)
-                        )
+                    // Main fader track background - filled style with 8pt corners
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(customButtonColor.opacity(0.2))
 
                     // Fader fill (dynamic based on faderValue) - alignment handles the direction
-                    RoundedRectangle(cornerRadius: isPhone ? 6 : 8)
-                        .fill(customButtonColor.opacity(0.2))
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(customButtonColor.opacity(0.85))
                         .frame(height: h * faderVisualValue)
                         .padding(3)
 
@@ -11575,19 +11624,26 @@ private struct iPadControlTile: View {
                 )
 
                 // Title overlay - centered
-                VStack {
+                // Text color adapts to whether the fader fill is behind the text
+                // For vertical "up": title at top needs high fill, MIDI at bottom covered first
+                // For vertical "down": title at top covered first, MIDI at bottom needs high fill
+                VStack(spacing: 2) {
+                    let filledTextColor: Color = customButtonColor.needsDarkText() ? .black : .white
+                    let emptyTextColor: Color = .white  // Dark mode background
+                    let titleOnFill = (direction == "up") ? faderVisualValue > 0.75 : faderVisualValue > 0.15
+                    let midiOnFill = (direction == "up") ? faderVisualValue > 0.15 : faderVisualValue > 0.75
                     Text(button.title)
-                        .font(isPhone ? .system(size: 9, weight: .semibold) : .caption.weight(.regular))
-                        .foregroundColor(.primary)
+                        .font(.custom("Sora-Bold", size: 11))
+                        .foregroundColor(titleOnFill ? filledTextColor : emptyTextColor)
                         .multilineTextAlignment(.center)
                         .padding(.top, isPhone ? 2 : 4)
                     Spacer()
                     if showMIDIData {
                         Text(midiLabel())
-                            .font(isPhone ? .system(size: 7) : .caption2)
-                            .foregroundColor(.secondary)
+                            .font(.custom("Sora-Regular", size: 9))
+                            .foregroundColor((midiOnFill ? filledTextColor : emptyTextColor).opacity(0.5))
                             .multilineTextAlignment(.center)
-                            .padding(.bottom, isPhone ? 2 : 4)
+                            .padding(.bottom, isPhone ? 2 : 8)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -11595,7 +11651,7 @@ private struct iPadControlTile: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.clear))
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.clear))
         .contentShape(Rectangle())  // Ensure entire frame is tappable
         .highPriorityGesture(
             // Only apply TapGesture for buttons, not faders (faders have DragGesture with minimumDistance: 0)
@@ -11607,7 +11663,6 @@ private struct iPadControlTile: View {
                 }
             }
         )
-        .scaleEffect(isTouching ? 1.02 : 1.0)  // Same scale effect for iPhone and iPad
         .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isTouching)
         .animation(.spring(response: 0.15, dampingFraction: 0.75), value: isDragging)
     }
@@ -11949,10 +12004,10 @@ struct MidiTableSheet: View {
 
                 // Section 2: MIDI Filter
                 Section {
-                    NavigationLink(destination: MidiFilterView(midiFiltersEnabled: $midiFiltersEnabled, midiFilter: $midiFilter, customMidiFilters: $customMidiFilters)) {
+                    NavigationLink(destination: MidiFilterView(midiFilter: $midiFilter, customMidiFilters: $customMidiFilters)) {
                         Text("MIDI Filter")
                     }
-                    .tint(selectedTheme.defaultCueColor(for: colorScheme))
+                    .tint(selectedTheme.accentColor(for: colorScheme))
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 } header: {
                     Text("Auto-Assignment")
@@ -11974,7 +12029,7 @@ struct MidiTableSheet: View {
                     )) {
                         Text("MIDI Assignments")
                     }
-                    .tint(selectedTheme.defaultCueColor(for: colorScheme))
+                    .tint(selectedTheme.accentColor(for: colorScheme))
                     .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 } footer: {
                     Text("View and edit MIDI assignments for all cues and controls")
@@ -11984,13 +12039,13 @@ struct MidiTableSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("MIDI Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done", action: onDismiss)
-                        .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
+                    CBSheetButton(title: "Done", bold: true) { onDismiss() }
                 }
             }
-            .tint(selectedTheme.defaultCueColor(for: colorScheme))
+            .tint(selectedTheme.accentColor(for: colorScheme))
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
     }
@@ -12106,41 +12161,38 @@ struct MidiAssignmentsView: View {
         .onAppear {
             buildMidiTableItems()
         }
-        .alert("MIDI Conflict", isPresented: $showingConflictAlert) {
-            Button("Cancel", role: .cancel) {
-                pendingConflict = nil
-            }
-            Button("Reassign") {
-                if let conflict = pendingConflict {
-                    resolveMidiConflict(conflict)
+        .cbDialog("MIDI Conflict", isPresented: $showingConflictAlert, themeFont: selectedTheme.font,
+            message: pendingConflict.map { c in
+                "MIDI \(c.midiKey.kind == .cc ? "CC" : "Note") #\(c.midiKey.number) on Channel \(c.midiKey.channel) is already used by \"\(c.existingOwner)\". Reassign to \"\(c.newItem.name)\"? Previous mapping will be removed."
+            } ?? "",
+            buttons: [
+                .init("Reassign", role: .primary) {
+                    if let conflict = pendingConflict {
+                        resolveMidiConflict(conflict)
+                    }
+                    pendingConflict = nil
+                },
+                .init("Cancel", role: .cancel) {
+                    pendingConflict = nil
                 }
-                pendingConflict = nil
-            }
-        } message: {
-            if let conflict = pendingConflict {
-                Text("MIDI \(conflict.midiKey.kind == .cc ? "CC" : "Note") #\(conflict.midiKey.number) on Channel \(conflict.midiKey.channel) is already used by \"\(conflict.existingOwner)\". Reassign to \"\(conflict.newItem.name)\"? Previous mapping will be removed.")
-            }
-        }
+            ]
+        )
         .navigationTitle("MIDI Assignments")
         .navigationBarTitleDisplayMode(.inline)
         .background(selectedTheme.backgroundColor(for: colorScheme))
-        .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .tint(selectedTheme.defaultCueColor(for: colorScheme))
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .tint(selectedTheme.accentColor(for: colorScheme))
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
+                CBSheetButton(title: "Done", bold: true) {
                     debugPrint("🎛️ [MIDI Assignments] Done button clicked - applying \(editableItems.count) items")
-                    // Only call onApply - the parent will handle updating controlButtons
                     onApply?(editableItems)
-                    // Dismiss all sheets (MIDI Settings + MIDI Assignments)
                     if let onDismissAll = onDismissAll {
                         onDismissAll()
                     } else {
                         dismiss()
                     }
                 }
-                .foregroundColor(selectedTheme.defaultCueColor(for: colorScheme))
             }
         }
     }
@@ -12596,8 +12648,8 @@ struct MidiAssignmentEditSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        // Show filtered MIDI warning (only for CC, notes are never filtered)
-                        if !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue) {
+                        // Show filtered MIDI warning only when filters are enabled
+                        if midiFiltersEnabled && !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue) {
                             Text("⚠️ This CC is filtered. Turn off filter to use it.")
                                 .font(.caption)
                                 .foregroundColor(selectedTheme.warningColor(for: colorScheme))
@@ -12611,7 +12663,7 @@ struct MidiAssignmentEditSheet: View {
             Section {
                 let channel = isGlobalChannel ? globalChannel : editedChannel
                 let hasConflict = getOwnerName(editedType, channel, editedValue, item.id, item.name) != nil
-                let isFiltered = !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue)
+                let isFiltered = midiFiltersEnabled && !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue)
                 let isDisabled = hasConflict || isFiltered
 
                 Button(action: {
@@ -12641,7 +12693,7 @@ struct MidiAssignmentEditSheet: View {
                         .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(isDisabled ? Color.gray.opacity(0.3) : selectedTheme.defaultCueColor(for: colorScheme))
+                        .background(isDisabled ? Color.gray.opacity(0.3) : selectedTheme.accentColor(for: colorScheme))
                         .cornerRadius(10)
                 }
                 .disabled(isDisabled)
@@ -12653,12 +12705,10 @@ struct MidiAssignmentEditSheet: View {
         .background(selectedTheme.backgroundColor(for: colorScheme))
         .navigationTitle("Edit MIDI Assignment")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
-                    dismiss()
-                }
-                .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
+                CBSheetButton(title: "Cancel") { dismiss() }
             }
         }
         .preferredColorScheme(selectedTheme.preferredColorScheme(for: colorScheme))
@@ -12739,7 +12789,7 @@ struct MidiTableRow: View {
 
 // MARK: - MIDI Filter View
 struct MidiFilterView: View {
-    @Binding var midiFiltersEnabled: Bool
+    @AppStorage("midiFiltersEnabled") private var midiFiltersEnabled: Bool = true
     @Binding var midiFilter: Set<Int>
     @Binding var customMidiFilters: [(Int, String)]
 
@@ -12786,11 +12836,11 @@ struct MidiFilterView: View {
                 )) {
                     HStack {
                         Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(selectedTheme.accentColor(for: colorScheme))
                         Text("Add Custom Filter")
                     }
                 }
-                .tint(selectedTheme.defaultCueColor(for: colorScheme))
+                .tint(selectedTheme.accentColor(for: colorScheme))
                 .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                 .disabled(!midiFiltersEnabled)
             }
@@ -12874,7 +12924,7 @@ struct MidiFilterView: View {
         .background(selectedTheme.backgroundColor(for: colorScheme))
         .navigationTitle("MIDI Filter")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(selectedTheme.defaultCueColor(for: colorScheme))
+        .tint(selectedTheme.accentColor(for: colorScheme))
     }
 
     @Environment(\.colorScheme) private var colorScheme
@@ -12914,20 +12964,19 @@ struct AddCustomFilterView: View {
         .background(selectedTheme.backgroundColor(for: colorScheme))
         .navigationTitle("Add Custom Filter")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Add") {
+                CBSheetButton(title: "Add", bold: true, disabled: customDescription.isEmpty) {
                     if !customDescription.isEmpty {
                         customMidiFilters.append((customCC, customDescription))
                         midiFilter.insert(customCC)
                     }
                     dismiss()
                 }
-                .foregroundColor(Color(hex: "0A84FF"))  // Default cue color
-                .disabled(customDescription.isEmpty)
             }
         }
-        .tint(selectedTheme.defaultCueColor(for: colorScheme))
+        .tint(selectedTheme.accentColor(for: colorScheme))
     }
 
     @Environment(\.colorScheme) private var colorScheme
@@ -12953,14 +13002,14 @@ struct NavPillContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top button: Minus (PREVIOUS)
+            // Top button: Up arrow (PREVIOUS)
             Button(action: {
                 guard canPrev && !isDragging else { return }
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 onPrev()
                 flashPrev()
             }) {
-                Image(systemName: "minus")
+                Image(systemName: "chevron.up")
                     .font(.system(size: 35, weight: .bold))
                     .foregroundColor(canPrev ? .primary : .secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -12971,14 +13020,14 @@ struct NavPillContent: View {
 
             Divider().frame(height: 1)
 
-            // Bottom button: Plus (NEXT)
+            // Bottom button: Down arrow (NEXT)
             Button(action: {
                 guard canNext && !isDragging else { return }
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 onNext()
                 flashNext()
             }) {
-                Image(systemName: "plus")
+                Image(systemName: "chevron.down")
                     .font(.system(size: 35, weight: .bold))
                     .foregroundColor(canNext ? .primary : .secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -13253,7 +13302,11 @@ struct DraggableNavigationCapsule: View {
             .background(
                 GeometryReader { geo in
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(.regularMaterial)
+                        .fill(Color.black.opacity(0.5))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
                         .preference(
                             key: CapsuleBoundsPreferenceKey.self,
                             value: ["navPill.bounds": geo.frame(in: .global)]
@@ -13480,7 +13533,11 @@ struct SimpleDraggableTransportDock: View {
             .background(
                 GeometryReader { geo in
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(.regularMaterial)
+                        .fill(Color.black.opacity(0.8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
                         .preference(
                             key: CapsuleBoundsPreferenceKey.self,
                             value: ["cueCapsule.bounds": geo.frame(in: .global)]
@@ -13639,19 +13696,15 @@ struct DesignPreviewSheet: View {
             .background(selectedTheme.backgroundColor(for: colorScheme))
             .navigationTitle("Design Preview")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(selectedTheme.backgroundColor(for: colorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(Color(hex: "0A84FF"))
+                    CBSheetButton(title: "Done", bold: true) { dismiss() }
                 }
             }
         }
     }
-    
+
     private func previewCueButton(_ cue: Song) -> some View {
         let isCued = selectedCue == cue.id
         let isLastPlayed = lastPlayedCue == cue.id

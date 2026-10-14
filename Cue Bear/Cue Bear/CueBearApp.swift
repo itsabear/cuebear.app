@@ -7,8 +7,13 @@
         @StateObject private var wifiClient = BridgeOutput()
         @StateObject private var connectionCoordinator = ConnectionCoordinator()
 
+        @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
         @State private var showingCrashAlert = false
         @State private var crashAlertWasDismissed = false
+
+        private var selectedTheme: AppTheme {
+            AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+        }
 
         init() {
             // Setup crash handlers as early as possible
@@ -17,7 +22,7 @@
 
         var body: some Scene {
             WindowGroup {
-                ContentView(crashAlertActive: $showingCrashAlert)
+                ThemedContentView(crashAlertActive: $showingCrashAlert)
                     .environmentObject(store)
                     .environmentObject(usbServer)
                     .environmentObject(wifiClient)
@@ -46,8 +51,10 @@
                         // Debug: Check if custom fonts are loaded
                         FontDebugHelper.checkCustomFonts()
 
-                        // Demo project installation disabled - new users start with empty project
-                        // installDemoProjectsIfNeeded()
+                        // Simulator-only: ship a sample project for demos/screenshots, never on a real device
+                        #if targetEnvironment(simulator)
+                        installDemoProjectsIfNeeded()
+                        #endif
 
                         // Prevent screen from locking during live performance
                         UIApplication.shared.isIdleTimerDisabled = true
@@ -67,9 +74,9 @@
                         connectionCoordinator.startConnections()
                     }
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-                        debugPrint("📱 iPad: App entered background - connections will gracefully disconnect if backgrounded >3min")
-                        // beginBackgroundTask in ConnectionManager gives ~3 minutes of background time
-                        // Connection will auto-reconnect in 1-3 seconds when returning to foreground
+                        debugPrint("📱 iPad: App entered background - iOS grants ~30s before suspension")
+                        // beginBackgroundTask gives ~30s of background time on iOS (no UIBackgroundModes declared).
+                        // Connection will auto-reconnect immediately when returning to foreground.
                     }
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                         debugPrint("📱 iPad: App entering foreground - reconnecting if needed")
@@ -156,5 +163,21 @@
             } catch {
                 debugPrint("❌ Failed to install demo project \(demoName): \(error)")
             }
+        }
+    }
+
+    // Wrapper to apply theme-based tint at root level (needs @Environment for colorScheme)
+    private struct ThemedContentView: View {
+        @Binding var crashAlertActive: Bool
+        @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
+        @Environment(\.colorScheme) private var colorScheme
+
+        private var selectedTheme: AppTheme {
+            AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+        }
+
+        var body: some View {
+            ContentView(crashAlertActive: $crashAlertActive)
+                .tint(selectedTheme.accentColor(for: colorScheme))
         }
     }

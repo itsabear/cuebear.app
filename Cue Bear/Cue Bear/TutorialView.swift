@@ -152,7 +152,7 @@ struct TutorialOverlay: View {
                     // Step indicator
                     HStack {
                         Text("Step \(coordinator.currentStep.rawValue + 1) of \(TutorialCoordinator.TutorialStep.allCases.count)")
-                            .font(.caption)
+                            .font(.custom("Sora-Regular", size: 12))
                             .foregroundColor(.secondary)
                         Spacer()
                     }
@@ -169,14 +169,14 @@ struct TutorialOverlay: View {
 
                     // Title
                     Text(coordinator.currentStep.title)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(.custom("Sora-Bold", size: 28))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                         .padding(.bottom, 16)
 
                     // Description
                     Text(coordinator.currentStep.description)
-                        .font(.system(size: 17))
+                        .font(.custom("Sora-Regular", size: 17))
                         .multilineTextAlignment(.center)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 32)
@@ -190,12 +190,12 @@ struct TutorialOverlay: View {
                             coordinator.nextStep()
                         }) {
                             Text(coordinator.currentStep.actionButtonTitle)
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.custom("Sora-Bold", size: 17))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 50)
                                 .background(Color.accentColor)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
 
                         if coordinator.currentStep != .complete {
@@ -203,7 +203,7 @@ struct TutorialOverlay: View {
                                 coordinator.skipTutorial()
                             }) {
                                 Text("Skip Tutorial")
-                                    .font(.system(size: 15))
+                                    .font(.custom("Sora-Regular", size: 15))
                                     .foregroundColor(.secondary)
                             }
                         }
