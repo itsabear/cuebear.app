@@ -96,10 +96,8 @@ final class BridgeOutput: ObservableObject {
     private let staleAfter: TimeInterval = 6.0         // 1.2.1 Bridges send a heartbeat every 2 s
     private let reconnectDelays: [TimeInterval] = [0.5, 1, 2, 4, 8]
 
-    /// v1.2.1 step 3: while USB is active, keep a quiet Wi-Fi link to the same Mac open as a backup
-    /// (and keep reconnecting it if it drops), so unplugging switches to Wi-Fi with no gap.
-    /// Set to false for the old behaviour (Wi-Fi stays as it was when USB took over).
-    static let keepStandbyWhileSuspended = true
+    // While USB is active, a quiet Wi-Fi link to the same Mac stays open as a backup (and is
+    // reconnected if it drops), so unplugging switches to Wi-Fi with no gap.
     private static let knownBridgeNamesKey = "CueBear.KnownWiFiBridgeNames"   // [bridgeID: Bonjour name]
 
     init() {
@@ -286,9 +284,7 @@ final class BridgeOutput: ObservableObject {
         if wasSuspended {
             // USB is active. resume() reconnects Wi-Fi when USB goes away.
             isSuspended = true
-            if Self.keepStandbyWhileSuspended {
-                scheduleReconnect()   // quietly rebuild the backup link
-            }
+            scheduleReconnect()   // quietly rebuild the backup link
             return
         }
         scheduleReconnect()
@@ -303,7 +299,6 @@ final class BridgeOutput: ObservableObject {
 
         let work = DispatchWorkItem { [weak self] in
             guard let self = self, !self.userInitiatedDisconnect, self.connection == nil else { return }
-            guard !self.isSuspended || Self.keepStandbyWhileSuspended else { return }
             // Prefer a freshly discovered entry with the same name (the Bridge may have restarted).
             let target = self.discovered.first { $0.name == item.name } ?? item
             if self.isSuspended {

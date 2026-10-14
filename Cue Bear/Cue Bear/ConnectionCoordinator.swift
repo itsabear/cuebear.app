@@ -21,10 +21,8 @@ class ConnectionCoordinator: ObservableObject {
     private var usbMonitorTimer: Timer?
     private var wifiMonitorTimer: Timer?
     
-    /// v1.2.1 step 3: while on USB, keep a paired Wi-Fi link to the same Mac ready in the background,
-    /// so pulling the cable switches to Wi-Fi with no gap, and plugging back in returns to USB.
-    /// Set to false for the old behaviour.
-    static let seamlessHandover = true
+    // Seamless handover: while on USB, a paired Wi-Fi link to the same Mac is kept ready in the
+    // background, so pulling the cable switches to Wi-Fi with no gap, and plugging back in returns to USB.
     private var lastStandbyAttempt = Date.distantPast
 
     enum ConnectionType {
@@ -58,12 +56,10 @@ class ConnectionCoordinator: ObservableObject {
         // Add additional monitoring for debugging
         monitorConnectionState()
 
-        if Self.seamlessHandover {
-            // Safety net: once a second, make sure the active connection matches reality.
-            usbMonitorTimer?.invalidate()
-            usbMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-                Task { @MainActor in self?.reconcileActiveConnection() }
-            }
+        // Safety net: once a second, make sure the active connection matches reality.
+        usbMonitorTimer?.invalidate()
+        usbMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.reconcileActiveConnection() }
         }
     }
 
@@ -112,30 +108,27 @@ class ConnectionCoordinator: ObservableObject {
             }
             .store(in: &cancellables)
 
-        if Self.seamlessHandover {
-            // The Bridge ID (from the USB handshake) and Bonjour results arrive at different moments;
-            // try to set up the Wi-Fi backup whenever either changes.
-            usbServer.$usbBridgeID
-                .removeDuplicates()
-                .sink { [weak self] _ in
-                    Task { @MainActor in self?.armWiFiStandby() }
-                }
-                .store(in: &cancellables)
-            wifiClient.$discovered
-                .map { $0.map(\.name) }
-                .removeDuplicates()
-                .sink { [weak self] _ in
-                    Task { @MainActor in self?.armWiFiStandby() }
-                }
-                .store(in: &cancellables)
-        }
+        // The Bridge ID (from the USB handshake) and Bonjour results arrive at different moments;
+        // try to set up the Wi-Fi backup whenever either changes.
+        usbServer.$usbBridgeID
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                Task { @MainActor in self?.armWiFiStandby() }
+            }
+            .store(in: &cancellables)
+        wifiClient.$discovered
+            .map { $0.map(\.name) }
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                Task { @MainActor in self?.armWiFiStandby() }
+            }
+            .store(in: &cancellables)
     }
 
     /// Opens the quiet Wi-Fi backup link if USB is active, the Mac on USB has been paired over
     /// Wi-Fi before, and it's visible on the network. Does nothing otherwise.
     private func armWiFiStandby() {
-        guard Self.seamlessHandover,
-              activeConnection == .usb,
+        guard activeConnection == .usb,
               let usbServer = usbServer, usbServer.isConnected,
               let wifiClient = wifiClient, wifiClient.isIdle,
               let bridgeID = usbServer.usbBridgeID,
@@ -184,7 +177,7 @@ class ConnectionCoordinator: ObservableObject {
             if wifiClient.isSuspended {
                 debugPrint("🔌 ConnectionCoordinator: WiFi connection was suspended - resuming it now")
                 wifiClient.resume()  // v1.0.8: Resume the suspended WiFi connection
-                if wifiClient.isConnected || !Self.seamlessHandover {
+                if wifiClient.isConnected {
                     activeConnection = .wifi
                     connectionStatus = "WiFi Connected"
                     debugPrint("🔌 ConnectionCoordinator: ✅ WiFi resumed and activeConnection switched to .wifi")
@@ -248,7 +241,7 @@ class ConnectionCoordinator: ObservableObject {
 
         // v1.2.1: with seamless handover, USB wins whenever it's up, unless the user just chose Wi-Fi.
         // (Before, any Wi-Fi link coming up would shut USB down.)
-        if isConnected, Self.seamlessHandover, !isManualWiFiConnection,
+        if isConnected, !isManualWiFiConnection,
            let wifiClient = wifiClient, usbServer.isConnected {
             debugPrint("🔌 ConnectionCoordinator: Wi-Fi came up while USB is connected - keeping USB, Wi-Fi on standby")
             wifiClient.suspend()

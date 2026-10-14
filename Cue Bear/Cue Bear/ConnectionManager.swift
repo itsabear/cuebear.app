@@ -32,18 +32,11 @@ class ConnectionManager: ObservableObject {
     // Connection configuration
     private let port: UInt16 = 9360  // USB server port for Bridge app connection
 
-    /// v1.2.1: USB-tunnelled connections (usbmuxd / iproxy) arrive on the iPad's loopback
-    /// interface, so the USB listener binds to 127.0.0.1 only. Before this, port 9360 was open
-    /// to every device on the Wi-Fi network, and its handshake accepted anyone.
-    /// If USB stops connecting after this change, set this to false and tell Claude.
-    static let usbListenOnLoopbackOnly = true
+    // USB-tunnelled connections (usbmuxd) arrive on the iPad's loopback interface, so the USB
+    // listener binds to 127.0.0.1 only; port 9360 is not reachable from the network.
+    // Each USB connection has one line-buffered receive loop that handles the handshake too.
 
-    /// v1.2.1 step 2: one receive loop per USB connection instead of two loops reading the same
-    /// socket (which could hand half a message to each). The handshake is handled inside the same
-    /// line-buffered loop, and the dead-cable check runs on a timer that actually fires.
-    /// If USB misbehaves after this change, set this to false to get the old behaviour back.
-    static let unifiedUSBReceive = true
-    /// With unifiedUSBReceive: the Bridge sends a heartbeat every 2 s, so 6 s of silence means the cable or Bridge is gone.
+    /// The Bridge sends a heartbeat every 2 s, so 6 s of silence means the cable or Bridge is gone.
     private let usbSilenceTimeout: TimeInterval = 6.0
     private weak var watchedUSBConnection: NWConnection?
 
@@ -51,13 +44,12 @@ class ConnectionManager: ObservableObject {
     /// Its late "closed" events must not mark the new, working connection as disconnected.
     /// Only call on usbQueue (where activeUSB is changed).
     private func isStaleUSB(_ connection: NWConnection) -> Bool {
-        guard Self.unifiedUSBReceive, let active = activeUSB else { return false }
+        guard let active = activeUSB else { return false }
         return active !== connection
     }
     private let healthCheckInterval: TimeInterval = 2.0
     private let reconnectInterval: TimeInterval = 0.5  // Faster reconnection attempts
     private let heartbeatCheckInterval: TimeInterval = 1.0  // Check for heartbeat every 1 second
-    private let heartbeatTimeout: TimeInterval = 3.0  // Consider disconnected if no heartbeat for 3 seconds
     private let maxReconnectAttempts = 10  // More attempts before giving up
     
     // Connection state tracking
@@ -443,15 +435,10 @@ class ConnectionManager: ObservableObject {
                 handleConnectionFailure()
                 return
             }
-            if Self.usbListenOnLoopbackOnly {
-                // Only reachable through the USB tunnel, not from the network
-                params.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: nwPort)
-                listener = try NWListener(using: params)
-                debugPrint("🔗 ConnectionManager: Created listener for port \(port) on loopback only")
-            } else {
-                listener = try NWListener(using: params, on: nwPort)
-                debugPrint("🔗 ConnectionManager: Created listener for port \(port) on all interfaces")
-            }
+            // Only reachable through the USB tunnel, not from the network
+            params.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: nwPort)
+            listener = try NWListener(using: params)
+            debugPrint("🔗 ConnectionManager: Created listener for port \(port) on loopback only")
             debugPrint("🔗 ConnectionManager: Listener parameters: \(params)")
             debugPrint("🔗 ConnectionManager: Listener port: \(nwPort)")
             debugPrint("🔗 ConnectionManager: Listener queue: \(usbQueue)")
@@ -515,15 +502,9 @@ class ConnectionManager: ObservableObject {
                             self?.handleConnectionFailure()
                         }
                     }
-                    if Self.unifiedUSBReceive {
-                        self.rxBuffer = Data()   // fresh framing state for the new connection
-                        connection.start(queue: self.usbQueue)
-                        // Receiving starts once, in handleConnectionStateChange(.ready)
-                    } else {
-                        connection.start(queue: self.usbQueue)
-                        // Start receiving data to handle handshake properly
-                        self.beginUSBReceive(on: connection)
-                    }
+                    self.rxBuffer = Data()   // fresh framing state for the new connection
+                    connection.start(queue: self.usbQueue)
+                    // Receiving starts once, in handleConnectionStateChange(.ready)
                 }
             }
             debugPrint("🔗 ConnectionManager: newConnectionHandler set successfully")
@@ -588,79 +569,6 @@ class ConnectionManager: ObservableObject {
         }
     }
     
-    private func beginUSBReceive(on conn: NWConnection) {
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, isComplete, err in
-            guard let self = self else { return }
-            if let err = err {
-                self.logMain("❌ USB recv error: \(err)")
-                self.closeUSB(conn)
-                return
-            }
-            if isComplete {
-                self.logMain("ℹ️ USB conn completed")
-                self.closeUSB(conn)
-                return
-            }
-            if let data = data, !data.isEmpty {
-                let s = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-                self.logMain("🔹 USB received: \(s)")
-                
-                // Handle handshake from Bridge app - support CB/1, CB/2, and JSON formats
-                if s == "CB/1 HELLO" {
-                    self.logMain("🤝 USB: Received CB/1 handshake from Bridge")
-                    guard let ack = "CB/1 HELLO_ACK\n".data(using: .utf8) else {
-                        self.logMain("❌ USB: Failed to encode CB/1 HELLO_ACK as UTF-8")
-                        return
-                    }
-                    conn.send(content: ack, completion: .contentProcessed({ [weak self] error in
-                        if let error = error {
-                            self?.logMain("❌ USB: Failed to send CB/1 HELLO_ACK: \(error)")
-                        } else {
-                            self?.logMain("🔗 USB: sent CB/1 HELLO_ACK")
-                        }
-                    }))
-                } else if s.hasPrefix("CB/") {
-                    // Handle CB/2+ protocol handshake
-                    self.logMain("🤝 USB: Received CB/2+ handshake from Bridge: \(s)")
-                    self.logMain("🤝 USB: Processing CB/2+ handshake...")
-                    self.logMain("🤝 USB: About to call handleCBProtocolHandshake")
-                    self.handleCBProtocolHandshake(s, connection: conn)
-                    self.logMain("🤝 USB: handleCBProtocolHandshake call completed")
-                    self.logMain("🤝 USB: Handshake processing finished, continuing to receive...")
-                } else if let jsonData = s.data(using: .utf8),
-                          let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                          let type = json["type"] as? String,
-                          type == "handshake" {
-                    self.logMain("🤝 USB: Received JSON handshake from Bridge")
-                    // Send JSON response
-                    let response: [String: Any] = [
-                        "type": "handshake_response",
-                        "server": "ipad",
-                        "ok": true,
-                        "proto": 1
-                    ]
-                    guard let responseData = try? JSONSerialization.data(withJSONObject: response),
-                          let responseString = String(data: responseData, encoding: .utf8),
-                          let ack = (responseString + "\n").data(using: .utf8) else {
-                        self.logMain("❌ USB: Failed to create JSON response")
-                        return
-                    }
-                    conn.send(content: ack, completion: .contentProcessed({ [weak self] error in
-                        if let error = error {
-                            self?.logMain("❌ USB: Failed to send JSON response: \(error)")
-                        } else {
-                            self?.logMain("🔗 USB: sent JSON handshake response")
-                        }
-                    }))
-                } else {
-                    // TODO: route to message handler (MIDI, etc.)
-                }
-            }
-            // Continue receiving on usbQueue (non-blocking)
-            self.usbQueue.async { self.beginUSBReceive(on: conn) }
-        }
-    }
-
     private func closeUSB(_ conn: NWConnection?) {
         conn?.cancel()
         if activeUSB === conn { activeUSB = nil }
@@ -839,11 +747,7 @@ class ConnectionManager: ObservableObject {
             startReceivingData(from: connection)
             
             // Start heartbeat monitoring to detect USB disconnection
-            if Self.unifiedUSBReceive {
-                startUSBSilenceWatch(for: connection)
-            } else {
-                startHeartbeatMonitoring()
-            }
+            startUSBSilenceWatch(for: connection)
             
             // Start aggressive connection monitoring for immediate disconnect detection
             startConnectionMonitoring()
@@ -943,9 +847,7 @@ class ConnectionManager: ObservableObject {
                     self?.logMain("🔗 Clearing activeUSB for clean disconnect - ready for new Bridge")
                     self?.activeUSB = nil
                 }
-                if Self.unifiedUSBReceive {
-                    connection.cancel()   // close our end too, so the dead socket can't report again later
-                }
+                connection.cancel()   // close our end too, so the dead socket can't report again later
 
                 // Update connection state when connection is completed
                 DispatchQueue.main.async { [weak self] in
@@ -1002,9 +904,7 @@ class ConnectionManager: ObservableObject {
                     self?.logMain("🔗 Clearing activeUSB for clean disconnect - ready for new Bridge")
                     self?.activeUSB = nil
                 }
-                if Self.unifiedUSBReceive {
-                    connection.cancel()   // close our end too, so the dead socket can't report again later
-                }
+                connection.cancel()   // close our end too, so the dead socket can't report again later
 
                 // Update connection state when connection is completed
                 DispatchQueue.main.async { [weak self] in
@@ -1038,23 +938,9 @@ class ConnectionManager: ObservableObject {
     }
     
     private func processReceivedData(_ data: Data, from connection: NWConnection? = nil) {
-        if Self.unifiedUSBReceive {
-            processUSBData(data, from: connection)
-            return
-        }
-        debugPrint("🔗 ConnectionManager: Processing received data (\(data.count) bytes)...")
-        debugPrint("🔗 ConnectionManager: Raw data as string: \(String(data: data, encoding: .utf8) ?? "invalid UTF-8")")
-        rxBuffer.append(data)
-        
-        // Split on newline to handle newline-delimited JSON
-        while let nl = rxBuffer.firstIndex(of: 0x0A) { // '\n'
-            let line = rxBuffer.prefix(upTo: nl)
-            rxBuffer.removeSubrange(...nl)
-            debugPrint("🔗 ConnectionManager: Processing line: \(String(data: Data(line), encoding: .utf8) ?? "invalid")")
-            handleJSONLine(Data(line))
-        }
+        processUSBData(data, from: connection)
     }
-    
+
     /// v1.2.1 step 2: single line-buffered handler for everything the Bridge sends over USB:
     /// the CB/ text handshake, JSON handshake, heartbeats and MIDI from the DAW.
     private func processUSBData(_ data: Data, from connection: NWConnection?) {
@@ -1170,11 +1056,7 @@ class ConnectionManager: ObservableObject {
             
         case "heartbeat":
             debugPrint("🔗 ConnectionManager: Received heartbeat from Mac bridge")
-            if Self.unifiedUSBReceive {
-                DispatchQueue.main.async { [weak self] in self?.lastHeartbeat = Date() }
-            } else {
-                lastHeartbeat = Date()
-            }
+            DispatchQueue.main.async { [weak self] in self?.lastHeartbeat = Date() }
             
         case "midi_cc", "midi_note", "transport":
             debugPrint("🔗 ConnectionManager: Received MIDI/transport message: \(type)")
@@ -1426,64 +1308,15 @@ class ConnectionManager: ObservableObject {
     
     // MARK: - Heartbeat Monitoring for USB Disconnect Detection
 
-    private func startHeartbeatMonitoring() {
-        guard isConnected else {
-            debugPrint("🔗 ConnectionManager: Skipping heartbeat monitoring - not connected")
-            return
-        }
-
-        debugPrint("🔗 ConnectionManager: Starting heartbeat monitoring for USB disconnect detection")
-        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: heartbeatCheckInterval, repeats: true) { [weak self] _ in
-            guard let self = self, self.isConnected else {
-                self?.stopHeartbeatMonitoring()
-                return
-            }
-            self.checkHeartbeat()
-        }
-    }
-    
     private func stopHeartbeatMonitoring() {
         debugPrint("🔗 ConnectionManager: Stopping heartbeat monitoring")
-        if Self.unifiedUSBReceive && !Thread.isMainThread {
+        if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in self?.stopHeartbeatMonitoring() }
             return
         }
         heartbeatTimer?.invalidate()
         heartbeatTimer = nil
         watchedUSBConnection = nil
-    }
-    
-    private func checkHeartbeat() {
-        guard isConnected else { return }
-        
-        let now = Date()
-        let timeSinceLastHeartbeat = now.timeIntervalSince(lastHeartbeat)
-        
-        debugPrint("🔗 ConnectionManager: Heartbeat check - time since last heartbeat: \(timeSinceLastHeartbeat)s")
-        
-        if timeSinceLastHeartbeat > heartbeatTimeout {
-            debugPrint("🔗 ConnectionManager: Heartbeat timeout - USB connection appears to be disconnected")
-            debugPrint("🔗 ConnectionManager: Last heartbeat was \(timeSinceLastHeartbeat)s ago, timeout is \(heartbeatTimeout)s")
-            
-            // USB connection appears to be disconnected
-            DispatchQueue.main.async { [weak self] in
-                self?.isConnected = false
-                self?.isConnecting = false
-                self?.connectionHealth = .disconnected
-                // Don't clear connectedComputerName to keep USB chip visible
-                // self?.connectedComputerName = nil
-                self?.connectionQuality = .disconnected
-                
-                // Notify callback of connection state change
-                self?.connectionStateCallback?(false)
-            }
-            
-            // Stop heartbeat monitoring
-            stopHeartbeatMonitoring()
-            
-            // Handle the connection failure
-            handleConnectionFailure()
-        }
     }
     
     // MARK: - Aggressive Connection Monitoring for Immediate Disconnect Detection
@@ -1763,10 +1596,8 @@ class ConnectionManager: ObservableObject {
     @objc private func appWillEnterForeground() {
         debugPrint("🔗 ConnectionManager: App entering foreground - ending background task")
         endBackgroundTask()
-        if Self.unifiedUSBReceive {
-            // Give the link a fresh grace period: heartbeats queued while frozen arrive in a burst.
-            lastHeartbeat = Date()
-        }
+        // Give the link a fresh grace period: heartbeats queued while frozen arrive in a burst.
+        lastHeartbeat = Date()
 
         // FIX: Ensure listener is running when returning to foreground
         // The listener may have stopped while in background, so restart it if needed
