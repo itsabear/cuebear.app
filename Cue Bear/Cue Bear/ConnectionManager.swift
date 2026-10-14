@@ -29,6 +29,12 @@ class ConnectionManager: ObservableObject {
     
     // Connection configuration
     private let port: UInt16 = 9360  // USB server port for Bridge app connection
+
+    /// v1.2.1: USB-tunnelled connections (usbmuxd / iproxy) arrive on the iPad's loopback
+    /// interface, so the USB listener binds to 127.0.0.1 only. Before this, port 9360 was open
+    /// to every device on the Wi-Fi network, and its handshake accepted anyone.
+    /// If USB stops connecting after this change, set this to false and tell Claude.
+    static let usbListenOnLoopbackOnly = true
     private let healthCheckInterval: TimeInterval = 2.0
     private let reconnectInterval: TimeInterval = 0.5  // Faster reconnection attempts
     private let heartbeatCheckInterval: TimeInterval = 1.0  // Check for heartbeat every 1 second
@@ -418,10 +424,15 @@ class ConnectionManager: ObservableObject {
                 handleConnectionFailure()
                 return
             }
-            // For USB connections, we need to listen on localhost interface
-            listener = try NWListener(using: params, on: nwPort)
-            
-            debugPrint("🔗 ConnectionManager: Created listener for port \(port) on all interfaces")
+            if Self.usbListenOnLoopbackOnly {
+                // Only reachable through the USB tunnel, not from the network
+                params.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: nwPort)
+                listener = try NWListener(using: params)
+                debugPrint("🔗 ConnectionManager: Created listener for port \(port) on loopback only")
+            } else {
+                listener = try NWListener(using: params, on: nwPort)
+                debugPrint("🔗 ConnectionManager: Created listener for port \(port) on all interfaces")
+            }
             debugPrint("🔗 ConnectionManager: Listener parameters: \(params)")
             debugPrint("🔗 ConnectionManager: Listener port: \(nwPort)")
             debugPrint("🔗 ConnectionManager: Listener queue: \(usbQueue)")

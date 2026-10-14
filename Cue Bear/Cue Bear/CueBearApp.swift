@@ -48,8 +48,10 @@
 
                         debugPrint("📱 iPad: starting connection coordinator")
 
+                        #if DEBUG
                         // Debug: Check if custom fonts are loaded
                         FontDebugHelper.checkCustomFonts()
+                        #endif
 
                         // Simulator-only: ship a sample project for demos/screenshots, never on a real device
                         #if targetEnvironment(simulator)
@@ -171,6 +173,7 @@
         @Binding var crashAlertActive: Bool
         @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
         @Environment(\.colorScheme) private var colorScheme
+        @EnvironmentObject private var wifiClient: BridgeOutput
 
         private var selectedTheme: AppTheme {
             AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
@@ -179,5 +182,18 @@
         var body: some View {
             ContentView(crashAlertActive: $crashAlertActive)
                 .tint(selectedTheme.accentColor(for: colorScheme))
+                // v1.2.1: pairing with the Mac Bridge. An overlay rather than a sheet,
+                // so it can't collide with sheets or popovers the main view presents.
+                .overlay {
+                    if let prompt = wifiClient.pairingPrompt {
+                        PairingOverlay(
+                            prompt: prompt,
+                            onCancel: { wifiClient.cancelPairing() },
+                            onDismiss: { wifiClient.dismissPairingPrompt() }
+                        )
+                        .tint(selectedTheme.accentColor(for: colorScheme))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: wifiClient.pairingPrompt)
         }
     }

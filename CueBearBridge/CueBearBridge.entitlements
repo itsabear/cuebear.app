@@ -2,54 +2,27 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Hardened Runtime - Required for Notarization -->
+	<!--
+	  v1.2.1: removed entitlements the Bridge never needed:
+	    com.apple.security.cs.allow-dyld-environment-variables
+	    com.apple.security.cs.allow-jit
+	    com.apple.security.cs.allow-unsigned-executable-memory
+	    com.apple.security.cs.disable-executable-page-protection
+	    com.apple.security.device.audio-input   (the Bridge never uses the microphone)
 
-    <!-- Allow loading of bundled dylibs using @rpath -->
-    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
-    <true/>
+	  Kept disable-library-validation for now: the bundled libusbmuxd / libplist /
+	  libimobiledevice-glue dylibs are ad-hoc signed by the build script. Once they are
+	  signed with your Developer ID (same Team ID as the app), delete this key too.
+	-->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
 
-    <!-- Allow loading unsigned or differently-signed dylibs (for bundled libraries) -->
-    <key>com.apple.security.cs.disable-library-validation</key>
-    <true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
 
-    <!-- Allow JIT compilation (if needed by any dependency) -->
-    <key>com.apple.security.cs.allow-jit</key>
-    <false/>
-
-    <!-- Allow unsigned executable memory (if needed) -->
-    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-    <false/>
-
-    <!-- Network Access - Required for USB proxy and WiFi connections -->
-
-    <!-- Outgoing network connections -->
-    <key>com.apple.security.network.client</key>
-    <true/>
-
-    <!-- Incoming network connections (for proxy server) -->
-    <key>com.apple.security.network.server</key>
-    <true/>
-
-    <!-- Device Access - Required for iOS device communication -->
-
-    <!-- USB device access (for iOS devices via libimobiledevice) -->
-    <key>com.apple.security.device.usb</key>
-    <true/>
-
-    <!-- Audio/MIDI - Required for MIDI output -->
-
-    <!-- Audio input (MIDI) -->
-    <key>com.apple.security.device.audio-input</key>
-    <true/>
-
-    <!-- App Sandbox - NOT enabled (would prevent USB access) -->
-    <!-- <key>com.apple.security.app-sandbox</key> -->
-    <!-- <false/> -->
-
-    <!-- Additional entitlements for helper processes -->
-
-    <!-- Allow spawning helper processes (iproxy) -->
-    <key>com.apple.security.cs.disable-executable-page-protection</key>
-    <false/>
+	<key>com.apple.security.device.usb</key>
+	<true/>
 </dict>
 </plist>

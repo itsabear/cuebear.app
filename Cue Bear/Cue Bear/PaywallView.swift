@@ -1,6 +1,9 @@
 //
 //  PaywallView.swift — Cue Bear
-//  Simple paywall for $4.99 purchase
+//  One-time purchase paywall
+//
+//  v1.2.1: shows the App Store's localized price (it was hardcoded to "$4.99"),
+//  handles pending purchases, and no longer shows an error when the user cancels.
 //
 
 import SwiftUI
@@ -11,12 +14,18 @@ struct PaywallView: View {
     @State private var isPurchasing = false
     @State private var isRestoring = false
     @State private var errorMessage: String?
+    @State private var infoMessage: String?
 
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("selectedThemeID") private var selectedThemeID: String = "default"
 
     private var selectedTheme: AppTheme {
         AppTheme.allThemes.first { $0.id == selectedThemeID } ?? AppTheme.defaultTheme
+    }
+
+    /// Localized price from the App Store; falls back to the US price while loading.
+    private var priceText: String {
+        purchaseManager.lifetimeProduct?.displayPrice ?? "$4.99"
     }
 
     var body: some View {
@@ -63,7 +72,7 @@ struct PaywallView: View {
 
                         // Price
                         VStack(spacing: 8) {
-                            Text("$4.99")
+                            Text(priceText)
                                 .font(.custom("Sora-Bold", size: 48))
                                 .foregroundColor(.primary)
 
@@ -113,7 +122,15 @@ struct PaywallView: View {
                         }
                         .disabled(isPurchasing || isRestoring)
 
-                        // Error Message
+                        // Status messages
+                        if let info = infoMessage {
+                            Text(info)
+                                .font(.custom("Sora-Regular", size: 13))
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 40)
+                                .multilineTextAlignment(.center)
+                        }
+
                         if let error = errorMessage {
                             Text(error)
                                 .font(.custom("Sora-Regular", size: 12))
@@ -135,9 +152,12 @@ struct PaywallView: View {
                 }
             }
         }
+        .task {
+            await purchaseManager.loadProducts()
+        }
         .onChange(of: purchaseManager.hasLifetimeAccess) { _, hasAccess in
             if hasAccess {
-                // Purchase successful - dismiss paywall
+                // Purchase successful (or approved later) - dismiss paywall
                 dismiss()
             }
         }
@@ -147,21 +167,19 @@ struct PaywallView: View {
         Task {
             isPurchasing = true
             errorMessage = nil
+            infoMessage = nil
 
             do {
                 let success = try await purchaseManager.purchase(
-                    productID: "com.cuebear.onetime_4_99"
+                    productID: purchaseManager.lifetimePurchaseID
                 )
 
-                if success {
-                    // Purchase successful
-                    debugPrint("💰 Purchase successful!")
-                } else {
-                    errorMessage = "Purchase was cancelled"
+                if !success && purchaseManager.purchasePending {
+                    infoMessage = "Waiting for approval. Cue Bear unlocks automatically once the purchase is approved."
                 }
+                // Cancelled by the user: no message, as in Apple's own apps.
             } catch {
                 errorMessage = "Purchase failed: \(error.localizedDescription)"
-                debugPrint("💰 Purchase error: \(error)")
             }
 
             isPurchasing = false
@@ -172,13 +190,15 @@ struct PaywallView: View {
         Task {
             isRestoring = true
             errorMessage = nil
+            infoMessage = nil
 
             do {
                 try await purchaseManager.restorePurchases()
-                debugPrint("💰 Purchases restored!")
+                if !purchaseManager.hasLifetimeAccess && !purchaseManager.hasActiveSubscription {
+                    infoMessage = "No previous purchase was found for this Apple ID."
+                }
             } catch {
                 errorMessage = "Restore failed: \(error.localizedDescription)"
-                debugPrint("💰 Restore error: \(error)")
             }
 
             isRestoring = false

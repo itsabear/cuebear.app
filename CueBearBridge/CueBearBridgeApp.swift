@@ -3,7 +3,9 @@ import Combine
 import Foundation
 import Network
 import CoreMIDI
+import CryptoKit
 import AppKit
+import SystemConfiguration
 
 // Helper to provide version string without blocking
 struct VersionHelper {
@@ -20,7 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         // Ensure iproxy is properly stopped when app quits
-        Logger.shared.log("🔧 App: applicationWillTerminate - stopping iproxy")
+        Logger.shared.log("App: applicationWillTerminate - stopping iproxy")
         bridgeApp?.iproxy.stop(manual: false)
     }
 }
@@ -71,9 +73,9 @@ struct MenuBarView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.top, 8)
-            
+
             Divider()
-            
+
             // Status Indicators
             VStack(spacing: 6) {
                 // USB Connection Status
@@ -90,7 +92,7 @@ struct MenuBarView: View {
                         .fontWeight(.medium)
                 }
                 .padding(.horizontal, 12)
-                
+
                 // WiFi Status
                 HStack {
                     Circle()
@@ -107,7 +109,11 @@ struct MenuBarView: View {
                 .padding(.horizontal, 12)
             }
             .padding(.vertical, 4)
-            
+
+            // v1.2.1: Pairing / security
+            Divider()
+            SecuritySection(server: app.wifiServer)
+
             // Settings Section
             Divider()
 
@@ -170,7 +176,7 @@ struct MenuBarView: View {
             }
             .buttonStyle(PlainButtonStyle())
             .background(Color.clear)
-            
+
             // Creator credit
             HStack {
                 Text("Created by Omri Behr")
@@ -181,48 +187,156 @@ struct MenuBarView: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
         }
-        .frame(width: 200)
+        .frame(width: 220)
         .background(Color(NSColor.controlBackgroundColor))
     }
 
 }
 
-// MARK: - WiFi Server
+/// v1.2.1: shows who is connected, whether the link is paired, and pairing controls.
+struct SecuritySection: View {
+    @ObservedObject var server: WifiServer
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: lockSymbol)
+                    .font(.system(size: 10))
+                    .foregroundColor(server.isConnected && !server.connectionIsSecure ? .orange : .secondary)
+                Text(statusText)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                Spacer()
+            }
+
+            HStack {
+                Text("Require pairing")
+                    .font(.system(size: 13))
+                    .foregroundColor(.primary)
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { server.requirePairing },
+                    set: { server.setRequirePairing($0) }
+                ))
+                .toggleStyle(SwitchToggleStyle())
+                .labelsHidden()
+            }
+            .help("When on, only iPads you have approved on this Mac can send MIDI over Wi-Fi.")
+
+            if server.pairedDeviceCount > 0 {
+                Button(action: { server.forgetPairedDevices() }) {
+                    HStack {
+                        Text("Forget Paired iPads (\(server.pairedDeviceCount))")
+                            .font(.system(size: 13))
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+    }
+
+    private var lockSymbol: String {
+        if server.isConnected && !server.connectionIsSecure { return "lock.open.fill" }
+        return "lock.fill"
+    }
+
+    private var statusText: String {
+        if server.isConnected {
+            if server.connectionIsSecure {
+                return "Paired: \(server.connectedDeviceName ?? "iPad")"
+            }
+            return "Unpaired iPad connected (older app)"
+        }
+        switch server.pairedDeviceCount {
+        case 0: return "No iPads paired yet"
+        case 1: return "1 paired iPad"
+        default: return "\(server.pairedDeviceCount) paired iPads"
+        }
+    }
+}
+
+// MARK: - WiFi Server (v1.2.1)
+//
+// Changes from 1.2.0:
+// - Every connection must authenticate (or pair) before it can send MIDI. Older iPad apps
+//   are still accepted until the first iPad pairs, or until "Require pairing" is turned on.
+// - A new connection can no longer knock off a paired iPad that is still alive.
+// - Incoming data is split into lines, so merged or split TCP reads no longer lose messages.
+// - Heartbeats are actually sent and checked. (Timers were created on a background queue
+//   with no run loop, so they never fired.) A dead iPad is detected within ~6 s.
+
+/// One TCP connection from an iPad. Only touched on WifiServer.queue.
+private final class ClientSession {
+    let id = UUID()
+    let connection: NWConnection
+    var buffer = LineBuffer()
+    let sessionNonce = SecureLink.randomToken()
+    var lastHeard = Date()
+    var deviceID: String?
+    var deviceName: String?
+    var isAuthenticated = false
+    var authRequiredSent = false
+    var isClosed = false
+
+    // Pairing in progress on this connection
+    var pairDeviceID: String?
+    var pairDeviceName: String?
+    var pairCommitment: String?
+    var pairBridgeKey: Curve25519.KeyAgreement.PrivateKey?
+    var pairBridgeNonce: Data?
+    var pairStartedAt: Date?
+    var awaitingUserApproval = false
+
+    init(connection: NWConnection) {
+        self.connection = connection
+    }
+}
+
 class WifiServer: ObservableObject {
     @Published private(set) var status: String = "Stopped"
     @Published private(set) var isConnected: Bool = false
+    @Published private(set) var connectedDeviceName: String?
+    @Published private(set) var connectionIsSecure: Bool = false
+    @Published private(set) var pairedDeviceCount: Int = PairedDeviceStore.shared.deviceCount
+    @Published private(set) var requirePairing: Bool = PairedDeviceStore.shared.requirePairing
 
     private var listener: NWListener?
-    private var connection: NWConnection?
-    private let queue = DispatchQueue(label: "WifiServer", qos: .utility)
+    private let queue = DispatchQueue(label: "WifiServer", qos: .userInteractive)
     private var midi: MIDIManager?
     private var usbConnectionManager: MacConnectionManager?
-    private var heartbeatTimer: Timer?
     private var midiObserver: NSObjectProtocol?
-    private var pathRecoveryTimer: Timer?
-
-    // RESILIENCE FIX: Connection health monitoring
-    private var connectionHealthTimer: Timer?
-    private var lastHeartbeatReceived: Date = Date.distantPast
-
     private var port: UInt16 = 8078
+    private var bridgeDisplayName = "Mac"
 
-    private enum State {
-        case stopped, starting, listening, connected
-    }
+    // Everything below is only touched on `queue`.
+    private var running = false
+    private var sessions: [UUID: ClientSession] = [:]
+    private var activeSessionID: UUID?
+    private var pairingSessionID: UUID?
+    private var housekeepingTimer: DispatchSourceTimer?
+    private var housekeepingTicks = 0
 
-    // Fix Issue #16: Use NSLock to protect state enum access
-    private let stateLock = NSLock()
-    private var state: State = .stopped
+    private let store = PairedDeviceStore.shared
+    private let maxSessions = 8
+    private let authenticatedStaleAfter: TimeInterval = 6      // 1.2.1 iPads send a heartbeat every 2 s
+    private let legacyStaleAfter: TimeInterval = 45            // older iPads send one every 15 s
+    private let unauthenticatedTimeout: TimeInterval = 20
+    private let pairingTimeout: TimeInterval = 120
 
     deinit {
         if let observer = midiObserver {
             NotificationCenter.default.removeObserver(observer)
         }
-        heartbeatTimer?.invalidate()
-        connectionHealthTimer?.invalidate()
-        stop()
-        log("WiFi server deinit - all resources cleaned up")
+        housekeepingTimer?.cancel()
+        listener?.cancel()
+        for session in sessions.values {
+            session.connection.cancel()
+        }
     }
 
     func setMidiRouter(_ midi: MIDIManager) {
@@ -243,305 +357,590 @@ class WifiServer: ObservableObject {
             }
         }
     }
-    
+
     func setUSBConnectionManager(_ usbManager: MacConnectionManager) {
         self.usbConnectionManager = usbManager
     }
-    
+
     func setPort(_ port: UInt16) {
         self.port = port
     }
-    
+
     private func log(_ message: String) {
-        print("📡 WiFi Server: \(message)")
+        print("WiFi Server: \(message)")
     }
-    
+
+    // MARK: - Start / stop
+
     func start() {
-        // Fix Issue #16: Protect state access with lock
-        stateLock.lock()
-        let currentState = state
-        if currentState == .stopped {
-            state = .starting
+        // Computer name without a DNS lookup (Host.current() can block for seconds).
+        if let cfName = SCDynamicStoreCopyComputerName(nil, nil) {
+            let name = cfName as String
+            if !name.isEmpty { bridgeDisplayName = name }
         }
-        stateLock.unlock()
-
-        guard currentState == .stopped else { return }
-        stop()
-
-        log("Starting WiFi server on port \(port)...")
         status = "Starting..."
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        queue.async { [weak self] in
+            guard let self = self, !self.running else { return }
+            self.running = true
+            self.log("Starting WiFi server on port \(self.port)...")
             self.setupListener()
+            self.startHousekeeping()
         }
     }
 
     func stop() {
-        log("Stopping WiFi server")
-        stopHeartbeat()
-        stopConnectionHealthMonitor() // RESILIENCE FIX
-        connection?.cancel()
-        connection = nil
-        listener?.cancel()
-        listener = nil
-        // Fix Issue #16: Protect state access with lock
-        stateLock.lock()
-        state = .stopped
-        stateLock.unlock()
-        status = "Stopped"
-        DispatchQueue.main.async {
-            self.isConnected = false
+        queue.async { [weak self] in
+            self?.shutdown()
         }
     }
-    
+
+    private func shutdown() {
+        log("Stopping WiFi server")
+        running = false
+        housekeepingTimer?.cancel()
+        housekeepingTimer = nil
+        listener?.cancel()
+        listener = nil
+        for session in Array(sessions.values) {
+            close(session)
+        }
+        activeSessionID = nil
+        pairingSessionID = nil
+        DispatchQueue.main.async {
+            self.status = "Stopped"
+            self.isConnected = false
+            self.connectedDeviceName = nil
+            self.connectionIsSecure = false
+        }
+    }
+
+    private func setStatus(_ value: String) {
+        DispatchQueue.main.async {
+            self.status = value
+        }
+    }
+
     private func setupListener() {
+        guard running else { return }
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
+        if let tcp = parameters.defaultProtocolStack.transportProtocol as? NWProtocolTCP.Options {
+            tcp.noDelay = true
+        }
 
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
             log("Invalid port: \(port)")
-            // Fix Issue #16: Protect state access with lock
-            stateLock.lock()
-            state = .stopped
-            stateLock.unlock()
-            status = "Failed"
+            running = false
+            setStatus("Failed")
             return
         }
 
         do {
-            listener = try NWListener(using: parameters, on: nwPort)
-            listener?.newConnectionHandler = { [weak self] connection in
-                self?.log("📡 WiFi: New connection attempt received by listener")
-                self?.acceptConnection(connection)
+            let newListener = try NWListener(using: parameters, on: nwPort)
+            newListener.newConnectionHandler = { [weak self] connection in
+                self?.accept(connection)
             }
-
-            listener?.stateUpdateHandler = { [weak self] nwState in
-                guard let self = self else { return }
-                switch nwState {
-                case .ready:
-                    self.log("WiFi server listening on port \(self.port)")
-                    // Fix Issue #16: Protect state access with lock
-                    self.stateLock.lock()
-                    self.state = .listening
-                    self.stateLock.unlock()
-                    DispatchQueue.main.async {
-                        self.status = "Listening"
-                    }
-                case .failed(let error):
-                    self.log("WiFi server failed: \(error.localizedDescription)")
-                    // Fix Issue #16: Protect state access with lock
-                    self.stateLock.lock()
-                    self.state = .stopped
-                    self.stateLock.unlock()
-                    DispatchQueue.main.async {
-                        self.status = "Failed"
-                    }
-                case .cancelled:
-                    self.log("WiFi server cancelled")
-                    // Fix Issue #16: Protect state access with lock
-                    self.stateLock.lock()
-                    self.state = .stopped
-                    self.stateLock.unlock()
-                    DispatchQueue.main.async {
-                        self.status = "Stopped"
-                    }
-                default: break
-                }
+            newListener.stateUpdateHandler = { [weak self] state in
+                self?.handleListenerState(state)
             }
-
-            listener?.start(queue: queue)
+            listener = newListener
+            newListener.start(queue: queue)
         } catch {
             log("Failed to create listener: \(error.localizedDescription)")
-            // Fix Issue #16: Protect state access with lock
-            stateLock.lock()
-            state = .stopped
-            stateLock.unlock()
-            status = "Failed"
+            setStatus("Failed")
+            retryListenerLater()
         }
     }
-    
-    private func acceptConnection(_ conn: NWConnection) {
-        log("New WiFi connection received from: \(conn.currentPath?.remoteEndpoint?.debugDescription ?? "unknown")")
 
-        // SECURITY: Validate connection before accepting
-        guard let remoteEndpoint = conn.currentPath?.remoteEndpoint else {
-            log("🔒 WiFi: Cannot determine remote endpoint, rejecting")
-            conn.cancel()
+    private func handleListenerState(_ state: NWListener.State) {
+        switch state {
+        case .ready:
+            log("WiFi server listening on port \(port)")
+            if activeSessionID == nil {
+                setStatus("Listening")
+            }
+        case .failed(let error):
+            log("WiFi server failed: \(error.localizedDescription)")
+            listener?.cancel()
+            listener = nil
+            setStatus("Failed")
+            retryListenerLater()
+        default:
+            break
+        }
+    }
+
+    private func retryListenerLater() {
+        queue.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let self = self, self.running, self.listener == nil else { return }
+            self.setupListener()
+        }
+    }
+
+    // MARK: - Connections
+
+    private var activeSession: ClientSession? {
+        guard let id = activeSessionID else { return nil }
+        return sessions[id]
+    }
+
+    private func accept(_ connection: NWConnection) {
+        guard running else {
+            connection.cancel()
+            return
+        }
+        guard ConnectionSecurity.shared.validateConnection(from: connection.endpoint) else {
+            log("Rejecting connection from \(connection.endpoint): too many attempts")
+            connection.cancel()
+            return
+        }
+        guard sessions.count < maxSessions else {
+            log("Rejecting connection from \(connection.endpoint): too many open connections")
+            connection.cancel()
             return
         }
 
-        guard ConnectionSecurity.shared.validateConnection(from: remoteEndpoint) else {
-            log("🔒 WiFi: Connection validation failed, rejecting connection from \(remoteEndpoint)")
-            conn.cancel()
-            return
-        }
+        let session = ClientSession(connection: connection)
+        sessions[session.id] = session
+        log("New connection from \(connection.endpoint)")
 
-        log("✅ WiFi: Connection validation passed, accepting connection")
-
-        // RESILIENCE FIX: Properly cleanup old connection before replacing
-        // This prevents memory leaks during many reconnections over long sessions
-        if let oldConn = connection {
-            log("📡 WiFi: Cleaning up old connection before accepting new one")
-            oldConn.cancel()
-            oldConn.stateUpdateHandler = nil
-            oldConn.pathUpdateHandler = nil
-        }
-        connection = conn
-
-        log("📡 WiFi: Connection object assigned, starting state handler")
-
-        conn.stateUpdateHandler = { [weak self] nwState in
-            guard let self = self else { return }
-            self.log("📡 WiFi state: \(nwState)")
-            switch nwState {
+        connection.stateUpdateHandler = { [weak self, weak session] state in
+            guard let self = self, let session = session else { return }
+            switch state {
             case .ready:
-                self.log("WiFi ready - starting receive loop")
-                // Fix Issue #16: Protect state access with lock
-                self.stateLock.lock()
-                self.state = .connected
-                self.stateLock.unlock()
-                DispatchQueue.main.async {
-                    self.log("📡 WiFi: Setting status to 'Connected' and isConnected to true")
-                    self.status = "Connected"
-                    self.isConnected = true
-                    self.log("📡 WiFi: Status updated - status=\(self.status), isConnected=\(self.isConnected)")
-                }
-                self.startReceiving(conn)
-                self.startHeartbeat()
-                self.startConnectionHealthMonitor() // RESILIENCE FIX
+                self.sendHello(to: session)
+                self.receive(on: session)
             case .failed(let error):
-                self.log("WiFi failed: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.status = "Connection failed"
-                    self.isConnected = false
-                }
+                self.log("Connection failed: \(error.localizedDescription)")
+                self.close(session)
             case .cancelled:
-                self.log("WiFi cancelled")
-                self.stopHeartbeat()
-                self.stopConnectionHealthMonitor() // RESILIENCE FIX
-                DispatchQueue.main.async {
-                    self.status = "Connection cancelled"
-                    self.isConnected = false
-                }
-            case .preparing:
-                break // No action needed
-            case .waiting(let error):
-                self.log("WiFi waiting: \(error.localizedDescription)")
-            case .setup:
-                break // No action needed
-            @unknown default:
-                self.log("WiFi unknown state: \(nwState)")
+                self.close(session)
+            default:
+                break
             }
         }
-
-        // Handle network path changes (e.g., when USB unplugs and routing changes)
-        conn.pathUpdateHandler = { [weak self] path in
-            guard let self = self else { return }
-            self.log("📡 WiFi path changed: \(path.status)")
-
-            // v1.2.0 FIX: Don't cancel on path.unsatisfied - this happens when USB is plugged in
-            // and routing priorities change, but the WiFi connection still works fine.
-            // Only log the path change for debugging. Let heartbeat timeout handle true failures.
-            if path.status == .satisfied {
-                self.log("📡 WiFi path satisfied")
-            } else if path.status == .unsatisfied {
-                self.log("📡 WiFi path unsatisfied (routing changed, but connection may still work)")
-            }
-        }
-
-        log("📡 WiFi: Starting connection processing on queue")
-        log("📡 WiFi: Current connection state before start: \(conn.state)")
-        conn.start(queue: queue)
-        log("📡 WiFi: Connection.start() called, waiting for state updates...")
-
-        // FIX: Check if connection is already ready (can happen with incoming connections)
-        // The state handler only fires on state CHANGES, not the current state
-        if conn.state == .ready {
-            log("📡 WiFi: ⚠️ Connection already in ready state! Manually triggering ready logic...")
-            // Manually trigger the ready logic since state handler won't fire
-            DispatchQueue.main.async {
-                self.log("📡 WiFi: Setting status to 'Connected' (manual trigger)")
-                self.status = "Connected"
-                self.isConnected = true
-            }
-            self.stateLock.lock()
-            self.state = .connected
-            self.stateLock.unlock()
-            self.startReceiving(conn)
-            self.startHeartbeat()
-            self.startConnectionHealthMonitor()
-        }
+        connection.start(queue: queue)
     }
-    
-    private func startReceiving(_ conn: NWConnection) {
-        log("📡 WiFi: Starting receive loop for connection")
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+
+    private func sendHello(to session: ClientSession) {
+        send([
+            "type": SecureLink.MessageType.hello,
+            "proto": SecureLink.protocolVersion,
+            "bridge_id": store.bridgeID,
+            "name": bridgeDisplayName,
+            "nonce": session.sessionNonce,
+            "pairing_required": store.requirePairing
+        ], to: session)
+    }
+
+    private func send(_ object: [String: Any], to session: ClientSession) {
+        guard !session.isClosed, let data = SecureLink.encodeLine(object) else { return }
+        session.connection.send(content: data, completion: .contentProcessed { _ in })
+    }
+
+    private func receive(on session: ClientSession) {
+        session.connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self, weak session] data, _, isComplete, error in
+            guard let self = self, let session = session, !session.isClosed else { return }
             if let data = data, !data.isEmpty {
-                self?.log("📥 WiFi RX \(data.count)B")
-                if let dataString = String(data: data, encoding: .utf8) {
-                    self?.log("📥 WiFi RX data preview: \(dataString.prefix(100))...")
+                session.lastHeard = Date()
+                for line in session.buffer.append(data) {
+                    self.handleLine(line, from: session)
+                    if session.isClosed { return }
                 }
-                self?.processReceivedData(data)
             }
-
-            if isComplete {
-                self?.log("WiFi closed")
-                self?.stopHeartbeat()
-                DispatchQueue.main.async {
-                    self?.isConnected = false
-                    self?.status = "Disconnected"
-                }
-            } else if let error = error {
-                self?.log("WiFi RX error: \(error.localizedDescription)")
-            } else {
-                self?.startReceiving(conn)
-            }
-        }
-    }
-    
-    private func processReceivedData(_ data: Data) {
-        // SECURITY: Rate limit messages
-        guard ConnectionSecurity.shared.validateMessageRate(for: "wifi_connection") else {
-            log("🔒 WiFi: Message rate limit exceeded, dropping message")
-            return
-        }
-
-        guard let message = String(data: data, encoding: .utf8) else { return }
-        log("Received WiFi message: \(message)")
-
-        // Handle legacy text-based MIDI messages (for backward compatibility)
-        if message.hasPrefix("midi_cc") {
-            processMIDICC(message)
-        } else if message.hasPrefix("midi_note") {
-            processMIDINote(message)
-        } else if message.contains("\"type\":\"batch\"") || message.contains("\"type\":") {
-            // SECURITY: Validate JSON messages through security layer
-            guard let jsonData = message.data(using: .utf8),
-                  let jsonObj = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                  let sanitized = ConnectionSecurity.shared.validateAndSanitizeMIDIMessage(jsonObj) else {
-                log("🔒 WiFi: Invalid message rejected by security validation")
+            if isComplete || error != nil {
+                self.close(session)
                 return
             }
-
-            // Process sanitized message
-            if let type = sanitized["type"] as? String {
-                if type == "batch" {
-                    processBatchMessage(message, sanitized: sanitized)
-                } else {
-                    processMIDIMessage(sanitized)
-                }
-            }
-        } else {
-            log("Unknown message type: \(message)")
+            self.receive(on: session)
         }
     }
-    
+
+    private func close(_ session: ClientSession) {
+        guard !session.isClosed else { return }
+        session.isClosed = true
+        session.connection.stateUpdateHandler = nil
+        session.connection.cancel()
+        sessions.removeValue(forKey: session.id)
+        if pairingSessionID == session.id {
+            pairingSessionID = nil
+        }
+        if activeSessionID == session.id {
+            activeSessionID = nil
+            let stillRunning = running
+            DispatchQueue.main.async {
+                self.isConnected = false
+                self.connectedDeviceName = nil
+                self.connectionIsSecure = false
+                self.status = stillRunning ? "Listening" : "Stopped"
+            }
+            log("iPad disconnected")
+        }
+    }
+
+    private func isAlive(_ session: ClientSession) -> Bool {
+        let limit = session.isAuthenticated ? authenticatedStaleAfter : legacyStaleAfter
+        return Date().timeIntervalSince(session.lastHeard) < limit
+    }
+
+    private func makeActive(_ session: ClientSession) {
+        if let previous = activeSession, previous.id != session.id {
+            log("Replacing previous iPad connection")
+            close(previous)
+        }
+        activeSessionID = session.id
+        let name = session.deviceName ?? "iPad"
+        let secure = session.isAuthenticated
+        DispatchQueue.main.async {
+            self.status = "Connected"
+            self.isConnected = true
+            self.connectedDeviceName = name
+            self.connectionIsSecure = secure
+        }
+        log("Active iPad: \(name) (\(secure ? "paired" : "unpaired, older app"))")
+    }
+
+    /// Decides whether MIDI from this connection may reach the DAW.
+    private func admitMIDI(from session: ClientSession) -> Bool {
+        if session.isAuthenticated {
+            return activeSessionID == session.id
+        }
+
+        // Unpaired client: an iPad running Cue Bear 1.2.0 or older.
+        if store.requirePairing {
+            if !session.authRequiredSent {
+                session.authRequiredSent = true
+                send(["type": SecureLink.MessageType.authRequired], to: session)
+                log("Ignoring MIDI from an unpaired iPad (pairing is required)")
+            }
+            return false
+        }
+        if activeSessionID != session.id {
+            if let active = activeSession, active.isAuthenticated, isAlive(active) {
+                return false   // never let an unpaired device take over from a paired one
+            }
+            makeActive(session)
+        }
+        return true
+    }
+
+    // MARK: - Messages
+
+    private func handleLine(_ line: Data, from session: ClientSession) {
+        guard ConnectionSecurity.shared.validateMessageRate(for: session.id.uuidString) else { return }
+
+        // Legacy text format: "midi_cc channel=1 cc=7 value=100"
+        if line.first != UInt8(ascii: "{") {
+            guard let text = String(data: line, encoding: .utf8) else { return }
+            if text.hasPrefix("midi_cc") || text.hasPrefix("midi_note") {
+                guard admitMIDI(from: session) else { return }
+                if text.hasPrefix("midi_cc") {
+                    processMIDICC(text)
+                } else {
+                    processMIDINote(text)
+                }
+            }
+            return
+        }
+
+        guard let json = SecureLink.decode(line), let type = json["type"] as? String else {
+            log("Dropping unreadable message")
+            return
+        }
+
+        switch type {
+        case SecureLink.MessageType.heartbeat:
+            return  // lastHeard was already updated
+
+        case SecureLink.MessageType.auth:
+            handleAuth(json, from: session)
+
+        case SecureLink.MessageType.pairStart:
+            handlePairStart(json, from: session)
+
+        case SecureLink.MessageType.pairReveal:
+            handlePairReveal(json, from: session)
+
+        case "pair_request", "switch_to_wifi", "transport":
+            return  // sent by older iPad apps; nothing to do
+
+        case "midi_cc", "midi_note", "batch":
+            guard admitMIDI(from: session) else { return }
+            guard let sanitized = ConnectionSecurity.shared.validateAndSanitizeMIDIMessage(json) else { return }
+            if type == "batch" {
+                for messageString in (sanitized["messages"] as? [String]) ?? [] {
+                    if let data = messageString.data(using: .utf8), let message = SecureLink.decode(data) {
+                        processMIDIMessage(message)
+                    }
+                }
+            } else {
+                processMIDIMessage(sanitized)
+            }
+
+        default:
+            log("Ignoring message type: \(type)")
+        }
+    }
+
+    // MARK: - Authentication
+
+    private func handleAuth(_ json: [String: Any], from session: ClientSession) {
+        guard let deviceID = json["device_id"] as? String, !deviceID.isEmpty, deviceID.count <= 128,
+              let mac = json["mac"] as? String, mac.count <= 128 else {
+            send(["type": SecureLink.MessageType.authFailed, "reason": "malformed"], to: session)
+            return
+        }
+        guard let device = store.device(id: deviceID) else {
+            send(["type": SecureLink.MessageType.authFailed, "reason": "unknown_device"], to: session)
+            return
+        }
+        let key = SymmetricKey(data: device.key)
+        guard SecureLink.verifyAuthMAC(mac, key: key, bridgeID: store.bridgeID,
+                                       deviceID: deviceID, sessionNonce: session.sessionNonce) else {
+            log("Authentication failed for \(device.name)")
+            send(["type": SecureLink.MessageType.authFailed, "reason": "bad_mac"], to: session)
+            return
+        }
+
+        session.isAuthenticated = true
+        session.deviceID = deviceID
+        if let name = json["device_name"] as? String, !name.isEmpty {
+            session.deviceName = String(name.prefix(64))
+        } else {
+            session.deviceName = device.name
+        }
+
+        // A different paired iPad that is still alive keeps the link.
+        if let active = activeSession, active.id != session.id, active.isAuthenticated,
+           active.deviceID != deviceID, isAlive(active) {
+            log("Refusing \(session.deviceName ?? "iPad"): \(active.deviceName ?? "another iPad") is connected")
+            send(["type": SecureLink.MessageType.busy, "device_name": active.deviceName ?? "another iPad"], to: session)
+            queue.asyncAfter(deadline: .now() + 0.5) { [weak self, weak session] in
+                guard let self = self, let session = session else { return }
+                self.close(session)
+            }
+            return
+        }
+
+        makeActive(session)
+        send(["type": SecureLink.MessageType.authOK], to: session)
+    }
+
+    // MARK: - Pairing
+
+    private func handlePairStart(_ json: [String: Any], from session: ClientSession) {
+        guard let deviceID = json["device_id"] as? String, !deviceID.isEmpty, deviceID.count <= 128,
+              let commit = json["commit"] as? String, !commit.isEmpty, commit.count <= 128 else {
+            return
+        }
+        if let otherID = pairingSessionID, otherID != session.id, let other = sessions[otherID], !other.isClosed {
+            send(["type": SecureLink.MessageType.pairDenied, "reason": "busy"], to: session)
+            return
+        }
+
+        let name = String(((json["device_name"] as? String) ?? "iPad").prefix(64))
+        let bridgeKey = Curve25519.KeyAgreement.PrivateKey()
+        let bridgeNonce = SecureLink.randomBytes(16)
+
+        session.pairDeviceID = deviceID
+        session.pairDeviceName = name
+        session.pairCommitment = commit
+        session.pairBridgeKey = bridgeKey
+        session.pairBridgeNonce = bridgeNonce
+        session.pairStartedAt = Date()
+        session.awaitingUserApproval = false
+        pairingSessionID = session.id
+
+        log("Pairing requested by \(name)")
+        send([
+            "type": SecureLink.MessageType.pairKey,
+            "bridge_pub": bridgeKey.publicKey.rawRepresentation.base64EncodedString(),
+            "nonce": bridgeNonce.base64EncodedString()
+        ], to: session)
+    }
+
+    private func handlePairReveal(_ json: [String: Any], from session: ClientSession) {
+        guard pairingSessionID == session.id, !session.awaitingUserApproval,
+              let deviceID = session.pairDeviceID,
+              let commit = session.pairCommitment,
+              let bridgeKey = session.pairBridgeKey,
+              let bridgeNonce = session.pairBridgeNonce,
+              let publicKeyString = json["device_pub"] as? String,
+              let devicePublicKey = Data(base64Encoded: publicKeyString), devicePublicKey.count == 32,
+              let nonceString = json["nonce"] as? String,
+              let deviceNonce = Data(base64Encoded: nonceString), deviceNonce.count == 16 else {
+            return
+        }
+
+        guard SecureLink.commitment(publicKey: devicePublicKey, nonce: deviceNonce) == commit else {
+            log("Pairing rejected: commitment mismatch")
+            send(["type": SecureLink.MessageType.pairDenied, "reason": "commitment_mismatch"], to: session)
+            endPairing(on: session)
+            return
+        }
+
+        let linkKey: SymmetricKey
+        do {
+            linkKey = try SecureLink.deriveLinkKey(privateKey: bridgeKey, peerPublicKey: devicePublicKey,
+                                                   deviceNonce: deviceNonce, bridgeNonce: bridgeNonce)
+        } catch {
+            send(["type": SecureLink.MessageType.pairDenied, "reason": "bad_key"], to: session)
+            endPairing(on: session)
+            return
+        }
+
+        let code = SecureLink.comparisonCode(bridgePublicKey: bridgeKey.publicKey.rawRepresentation,
+                                             devicePublicKey: devicePublicKey,
+                                             deviceNonce: deviceNonce, bridgeNonce: bridgeNonce)
+        session.awaitingUserApproval = true
+        let deviceName = session.pairDeviceName ?? "iPad"
+        let sessionID = session.id
+
+        DispatchQueue.main.async { [weak self] in
+            let allowed = WifiServer.askUserToApprovePairing(deviceName: deviceName, code: code)
+            self?.queue.async { [weak self] in
+                self?.finishPairing(sessionID: sessionID, allowed: allowed,
+                                    deviceID: deviceID, deviceName: deviceName, key: linkKey)
+            }
+        }
+    }
+
+    private func finishPairing(sessionID: UUID, allowed: Bool, deviceID: String, deviceName: String, key: SymmetricKey) {
+        guard let session = sessions[sessionID], !session.isClosed else {
+            if pairingSessionID == sessionID { pairingSessionID = nil }
+            log("Pairing answered after the iPad disconnected; ignoring")
+            return
+        }
+        endPairing(on: session)
+
+        if allowed {
+            store.add(id: deviceID, name: deviceName, key: key)
+            publishStoreState()
+            log("Paired with \(deviceName)")
+            send(["type": SecureLink.MessageType.pairOK], to: session)
+            // The iPad now authenticates on this same connection.
+        } else {
+            log("Pairing declined for \(deviceName)")
+            send(["type": SecureLink.MessageType.pairDenied, "reason": "declined"], to: session)
+        }
+    }
+
+    private func endPairing(on session: ClientSession) {
+        session.pairDeviceID = nil
+        session.pairDeviceName = nil
+        session.pairCommitment = nil
+        session.pairBridgeKey = nil
+        session.pairBridgeNonce = nil
+        session.pairStartedAt = nil
+        session.awaitingUserApproval = false
+        if pairingSessionID == session.id {
+            pairingSessionID = nil
+        }
+    }
+
+    /// Shows the pairing approval alert. Main thread only.
+    private static func askUserToApprovePairing(deviceName: String, code: String) -> Bool {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Allow “\(deviceName)” to control this Mac?"
+        alert.informativeText = "Cue Bear on the iPad is showing a pairing code. Only click Allow if it matches the code below.\n\nOnce paired, this iPad connects automatically, and other devices on the network can't send MIDI to this Mac."
+
+        let codeLabel = NSTextField(labelWithString: SecureLink.formattedCode(code))
+        codeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 34, weight: .semibold)
+        codeLabel.alignment = .center
+        codeLabel.frame = NSRect(x: 0, y: 0, width: 260, height: 44)
+        alert.accessoryView = codeLabel
+
+        alert.addButton(withTitle: "Allow")
+        alert.addButton(withTitle: "Don't Allow")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    // MARK: - Pairing settings (called from the menu bar)
+
+    func setRequirePairing(_ value: Bool) {
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            self.store.setRequirePairing(value)
+            self.publishStoreState()
+            if value, let active = self.activeSession, !active.isAuthenticated {
+                self.log("Pairing now required; disconnecting unpaired iPad")
+                self.close(active)
+            }
+        }
+    }
+
+    func forgetPairedDevices() {
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            self.store.forgetAll()
+            self.publishStoreState()
+            for session in Array(self.sessions.values) {
+                self.close(session)
+            }
+        }
+    }
+
+    private func publishStoreState() {
+        let count = store.deviceCount
+        let required = store.requirePairing
+        DispatchQueue.main.async {
+            self.pairedDeviceCount = count
+            self.requirePairing = required
+        }
+    }
+
+    // MARK: - Housekeeping (heartbeats, dead connections)
+
+    private func startHousekeeping() {
+        housekeepingTimer?.cancel()
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + 2.0, repeating: 2.0, leeway: .milliseconds(200))
+        timer.setEventHandler { [weak self] in
+            self?.housekeeping()
+        }
+        housekeepingTimer = timer
+        timer.resume()
+    }
+
+    private func housekeeping() {
+        let now = Date()
+
+        if let active = activeSession {
+            if isAlive(active) {
+                send(["type": SecureLink.MessageType.heartbeat, "source": "wifi_bridge"], to: active)
+            } else {
+                log("iPad stopped responding; closing connection")
+                close(active)
+            }
+        }
+
+        for session in Array(sessions.values) where session.id != activeSessionID {
+            if let startedAt = session.pairStartedAt {
+                if now.timeIntervalSince(startedAt) > pairingTimeout {
+                    close(session)
+                }
+            } else if now.timeIntervalSince(session.lastHeard) > unauthenticatedTimeout {
+                close(session)
+            }
+        }
+
+        housekeepingTicks += 1
+        if housekeepingTicks % 30 == 0 {
+            ConnectionSecurity.shared.cleanupOldData()
+        }
+    }
+
+    // MARK: - MIDI out (to the DAW)
+
     private func processMIDICC(_ message: String) {
         let components = message.components(separatedBy: " ")
         guard components.count >= 4 else { return }
-        
+
         var channel: UInt8 = 0, cc: UInt8 = 0, value: UInt8 = 0
-        
+
         for component in components[1...] {
             let parts = component.components(separatedBy: "=")
             if parts.count == 2 {
@@ -553,16 +952,16 @@ class WifiServer: ObservableObject {
                 }
             }
         }
-        
-        sendMIDICC(channel: channel, cc: cc, value: value)
+
+        sendMIDICC(channel: channel, cc: min(cc, 127), value: min(value, 127))
     }
-    
+
     private func processMIDINote(_ message: String) {
         let components = message.components(separatedBy: " ")
         guard components.count >= 4 else { return }
-        
+
         var channel: UInt8 = 0, note: UInt8 = 0, velocity: UInt8 = 0
-        
+
         for component in components[1...] {
             let parts = component.components(separatedBy: "=")
             if parts.count == 2 {
@@ -574,232 +973,116 @@ class WifiServer: ObservableObject {
                 }
             }
         }
-        
-        sendMIDINote(channel: channel, note: note, velocity: velocity)
+
+        sendMIDINote(channel: channel, note: min(note, 127), velocity: min(velocity, 127))
     }
-    
+
     private func processMIDIMessage(_ midiObj: [String: Any]) {
         guard let type = midiObj["type"] as? String else { return }
 
         switch type {
         case "heartbeat":
-            // RESILIENCE FIX: Mark heartbeat received for health monitoring
-            markHeartbeatReceived()
-            log("💓 Received heartbeat from iPad")
             return
 
         case "midi_cc":
-            if let channel = midiObj["channel"] as? Int,
-               let cc = midiObj["cc"] as? Int,
-               let value = midiObj["value"] as? Int {
+            if let channel = midiObj["channel"] as? Int, (1...16).contains(channel),
+               let cc = midiObj["cc"] as? Int, (0...127).contains(cc),
+               let value = midiObj["value"] as? Int, (0...127).contains(value) {
                 // Convert 1-based iPad channel to 0-based MIDI channel
-                let midiChannel = UInt8(max(0, channel - 1))
-                log("✅ Processing WiFi MIDI CC: iPad ch=\(channel) -> MIDI ch=\(midiChannel) cc=\(cc) val=\(value)")
-                sendMIDICC(channel: midiChannel, cc: UInt8(cc), value: UInt8(value))
+                sendMIDICC(channel: UInt8(channel - 1), cc: UInt8(cc), value: UInt8(value))
             } else {
-                log("❌ Missing MIDI CC parameters")
+                log("Invalid MIDI CC parameters")
             }
 
         case "midi_note":
-            if let channel = midiObj["channel"] as? Int,
-               let note = midiObj["note"] as? Int,
-               let velocity = midiObj["velocity"] as? Int {
-                // Convert 1-based iPad channel to 0-based MIDI channel
-                let midiChannel = UInt8(max(0, channel - 1))
-                log("✅ Processing WiFi MIDI Note: iPad ch=\(channel) -> MIDI ch=\(midiChannel) note=\(note) vel=\(velocity)")
-                sendMIDINote(channel: midiChannel, note: UInt8(note), velocity: UInt8(velocity))
+            if let channel = midiObj["channel"] as? Int, (1...16).contains(channel),
+               let note = midiObj["note"] as? Int, (0...127).contains(note),
+               let velocity = midiObj["velocity"] as? Int, (0...127).contains(velocity) {
+                sendMIDINote(channel: UInt8(channel - 1), note: UInt8(note), velocity: UInt8(velocity))
             } else {
-                log("❌ Missing MIDI Note parameters")
+                log("Invalid MIDI Note parameters")
             }
 
         default:
-            log("❌ Unknown MIDI message type: \(type)")
+            log("Unknown MIDI message type: \(type)")
         }
     }
-    
-    private func processBatchMessage(_ message: String, sanitized: [String: Any]) {
-        log("Processing batch message")
 
-        // SECURITY: Use pre-sanitized batch data from ConnectionSecurity
-        // The sanitized parameter already has validated messages
-        guard let messages = sanitized["messages"] as? [String] else {
-            log("❌ Invalid batch structure in sanitized message")
-            return
-        }
-
-        log("Found \(messages.count) validated messages in batch")
-
-        for messageString in messages {
-            // Remove any trailing newline characters
-            let cleanMessage = messageString.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            log("Processing individual message: \(cleanMessage)")
-
-            // Parse the individual message JSON (already validated by ConnectionSecurity)
-            if let messageData = cleanMessage.data(using: .utf8),
-               let messageDict = try? JSONSerialization.jsonObject(with: messageData) as? [String: Any] {
-
-                // Process the validated message
-                processMIDIMessage(messageDict)
-            } else {
-                log("❌ Failed to parse individual message JSON: \(cleanMessage)")
-            }
-        }
-    }
-    
     private func sendMIDICC(channel: UInt8, cc: UInt8, value: UInt8) {
-        guard let midi = midi else { 
-            log("❌ MIDI manager not available")
-            return 
-        }
-        
-        // Check if MIDI source is valid
-        log("🔍 Checking MIDI source: \(midi.source)")
-        if midi.source == 0 {
-            log("❌ MIDI source not initialized (source=0)")
-            return
-        }
-        
-        var packet = MIDIPacket()
-        packet.timeStamp = 0
-        packet.length = 3
-        packet.data.0 = 0xB0 | (channel & 0x0F)
-        packet.data.1 = cc
-        packet.data.2 = value
-        
-        var list = MIDIPacketList(numPackets: 1, packet: packet)
-        let result = MIDIReceived(midi.source, &list)
-        
-        if result == noErr {
-            log("✅ MIDI CC sent successfully: ch=\(channel) cc=\(cc) val=\(value)")
-        } else {
-            log("❌ Failed to send MIDI CC: error=\(result)")
-        }
+        sendMIDI(status: 0xB0 | (channel & 0x0F), data1: cc, data2: value)
     }
-    
+
     private func sendMIDINote(channel: UInt8, note: UInt8, velocity: UInt8) {
-        guard let midi = midi else { 
-            log("❌ MIDI manager not available")
-            return 
-        }
-        
-        // Check if MIDI source is valid
-        log("🔍 Checking MIDI source: \(midi.source)")
-        if midi.source == 0 {
-            log("❌ MIDI source not initialized (source=0)")
+        sendMIDI(status: 0x90 | (channel & 0x0F), data1: note, data2: velocity)
+    }
+
+    private func sendMIDI(status: UInt8, data1: UInt8, data2: UInt8) {
+        guard let midi = midi else {
+            log("MIDI manager not available")
             return
         }
-        
+        guard midi.source != 0 else {
+            log("MIDI source not initialized (source=0)")
+            return
+        }
+
         var packet = MIDIPacket()
         packet.timeStamp = 0
         packet.length = 3
-        packet.data.0 = 0x90 | (channel & 0x0F)
-        packet.data.1 = note
-        packet.data.2 = velocity
-        
+        packet.data.0 = status
+        packet.data.1 = data1
+        packet.data.2 = data2
+
         var list = MIDIPacketList(numPackets: 1, packet: packet)
         let result = MIDIReceived(midi.source, &list)
-        
-        if result == noErr {
-            log("✅ MIDI Note sent successfully: ch=\(channel) note=\(note) vel=\(velocity)")
-        } else {
-            log("❌ Failed to send MIDI Note: error=\(result)")
+        if result != noErr {
+            log("Failed to send MIDI: error=\(result)")
         }
     }
-    
+
+    // MARK: - MIDI in (from the DAW, back to the iPad)
+
     private func forwardMIDIToIPad(_ midiData: Data) {
-        // Only forward MIDI that comes from DAW (virtual MIDI destination)
-        // Do NOT forward MIDI that comes from iPad (USB/WiFi connections)
-        // This prevents MIDI feedback loops
-        log("📤 Forwarding DAW MIDI to iPad (not iPad-originated MIDI)")
-        forwardMIDIToWiFi(midiData)
-        forwardMIDIToUSB(midiData)
-    }
-    
-    private func forwardMIDIToWiFi(_ midiData: Data) {
-        guard let connection = connection else { return }
-        
-        // Parse the MIDI data and convert channel from 0-based to 1-based
-        do {
-            if let midiDict = try JSONSerialization.jsonObject(with: midiData) as? [String: Any] {
-                var convertedDict = midiDict
-                
-                // Convert MIDI channel from 0-based to 1-based for iPad
-                if let channel = midiDict["channel"] as? Int {
-                    convertedDict["channel"] = channel + 1
-                    log("Converting MIDI channel: DAW ch=\(channel) -> iPad ch=\(channel + 1)")
-                }
-                
-                // Wrap the MIDI message in the format expected by iPad ConnectionManager
-                let channel = Int(convertedDict["channel"] as? Int ?? 0) - 1 // Convert back to 0-based for raw MIDI
-                let cc = convertedDict["cc"] as? Int ?? 0
-                let value = convertedDict["value"] as? Int ?? 0
-                let statusByte = 0xB0 | channel // Control Change status byte with channel
-                
-                let wrappedMessage: [String: Any] = [
-                    "type": "midi_input",
-                    "midi": [statusByte, cc, value]
-                ]
-                
-                let wrappedData = try JSONSerialization.data(withJSONObject: wrappedMessage)
-                let jsonString = String(data: wrappedData, encoding: .utf8) ?? ""
-                let message = jsonString + "\n"
-                
-                connection.send(content: message.data(using: .utf8), completion: .contentProcessed { error in
-                    if let error = error {
-                        self.log("Failed to send MIDI to iPad via WiFi: \(error.localizedDescription)")
-                    } else {
-                        self.log("Sent MIDI to iPad via WiFi: \(jsonString)")
-                    }
-                })
-            } else {
-                log("Failed to parse MIDI data for iPad forwarding")
-            }
-        } catch {
-            log("Error processing MIDI data for iPad: \(error.localizedDescription)")
+        // Only MIDI that comes from the DAW (virtual MIDI destination) is forwarded.
+        // MIDI from the iPad is never echoed back, which prevents feedback loops.
+        guard let message = makeMIDIInputLine(from: midiData) else { return }
+        queue.async { [weak self] in
+            guard let self = self, let active = self.activeSession else { return }
+            active.connection.send(content: message, completion: .contentProcessed { _ in })
         }
+        usbConnectionManager?.sendMIDIToIPad(String(decoding: message, as: UTF8.self))
     }
-    
-    private func forwardMIDIToUSB(_ midiData: Data) {
-        // Send MIDI to iPad via USB connection
-        do {
-            if let midiDict = try JSONSerialization.jsonObject(with: midiData) as? [String: Any] {
-                var convertedDict = midiDict
-                
-                // Convert MIDI channel from 0-based to 1-based for iPad
-                if let channel = midiDict["channel"] as? Int {
-                    convertedDict["channel"] = channel + 1
-                    log("Converting MIDI channel for USB: DAW ch=\(channel) -> iPad ch=\(channel + 1)")
-                }
-                
-                // Wrap the MIDI message in the format expected by iPad ConnectionManager
-                let channel = Int(convertedDict["channel"] as? Int ?? 0) - 1 // Convert back to 0-based for raw MIDI
-                let cc = convertedDict["cc"] as? Int ?? 0
-                let value = convertedDict["value"] as? Int ?? 0
-                let statusByte = 0xB0 | channel // Control Change status byte with channel
-                
-                let wrappedMessage: [String: Any] = [
-                    "type": "midi_input",
-                    "midi": [statusByte, cc, value]
-                ]
-                
-                let wrappedData = try JSONSerialization.data(withJSONObject: wrappedMessage)
-                let jsonString = String(data: wrappedData, encoding: .utf8) ?? ""
-                let message = jsonString + "\n"
-                
-                // Send via USB connection
-                usbConnectionManager?.sendMIDIToIPad(message)
-                
-            } else {
-                log("Failed to parse MIDI data for USB forwarding")
-            }
-        } catch {
-            log("Error processing MIDI data for USB: \(error.localizedDescription)")
+
+    /// Wraps a DAW MIDI event in the "midi_input" format the iPad expects.
+    private func makeMIDIInputLine(from midiData: Data) -> Data? {
+        guard let midiDict = (try? JSONSerialization.jsonObject(with: midiData)) as? [String: Any] else {
+            log("Failed to parse MIDI data for iPad forwarding")
+            return nil
         }
+        let channel = max(0, min(15, midiDict["channel"] as? Int ?? 0))   // 0-based from the DAW
+        let bytes: [Int]
+        switch (midiDict["type"] as? String) ?? "" {
+        case "midi_note":
+            // v1.2.1: notes were previously sent to the iPad as CC 0.
+            let note = max(0, min(127, midiDict["note"] as? Int ?? 0))
+            let velocity = max(0, min(127, midiDict["velocity"] as? Int ?? 0))
+            bytes = [0x90 | channel, note, velocity]
+        case "midi_cc":
+            let cc = max(0, min(127, midiDict["cc"] as? Int ?? 0))
+            let value = max(0, min(127, midiDict["value"] as? Int ?? 0))
+            bytes = [0xB0 | channel, cc, value]
+        default:
+            return nil
+        }
+
+        return SecureLink.encodeLine([
+            "type": "midi_input",
+            "midi": bytes
+        ])
     }
-    
+
     func testMIDITransmission() {
-        log("🧪 Testing MIDI transmission through WiFi server...")
+        log("Testing MIDI transmission through WiFi server...")
         sendMIDICC(channel: 0, cc: 1, value: 64) // ModWheel on channel 1
     }
 }
@@ -808,35 +1091,38 @@ class WifiServer: ObservableObject {
 class BridgeBonjour: NSObject, ObservableObject {
     @Published private(set) var isPublished: Bool = false
     @Published private(set) var status: String = "Stopped"
-    
+
     private var netService: NetService?
     private var port: Int = 8078
-    
+
     // Helper function to get user-friendly display name
     private func getDisplayName() -> String {
-        let computerName = Host.current().name ?? "Mac" // Use .name to avoid duplication
-        return computerName
+        if let cfName = SCDynamicStoreCopyComputerName(nil, nil) {
+            let name = cfName as String
+            if !name.isEmpty { return name }
+        }
+        return "Mac"
     }
-    
+
     func publish(port: Int) {
         self.port = port
         stop()
-        
+
         let displayName = getDisplayName()
         netService = NetService(domain: "local.", type: "_cuebear._tcp.", name: displayName, port: Int32(port))
         netService?.delegate = self
         netService?.publish()
-        
+
         status = "Publishing..."
-        print("📡 Bonjour: Publishing service '_cuebear._tcp.' as '\(displayName)' on port \(port)")
+        print("Bonjour: Publishing service '_cuebear._tcp.' as '\(displayName)' on port \(port)")
     }
-    
+
     func stop() {
         netService?.stop()
         netService = nil
         isPublished = false
         status = "Stopped"
-        print("📡 Bonjour: Service stopped")
+        print("Bonjour: Service stopped")
     }
 }
 
@@ -846,23 +1132,23 @@ extension BridgeBonjour: NetServiceDelegate {
             self.isPublished = true
             self.status = "Published"
         }
-        print("📡 Bonjour: Service published successfully on port \(sender.port)")
+        print("Bonjour: Service published successfully on port \(sender.port)")
     }
-    
+
     func netService(_ sender: NetService, didNotPublish errorDict: [String : NSNumber]) {
         DispatchQueue.main.async {
             self.isPublished = false
             self.status = "Failed"
         }
-        print("📡 Bonjour: Failed to publish service: \(errorDict)")
+        print("Bonjour: Failed to publish service: \(errorDict)")
     }
-    
+
     func netServiceDidStop(_ sender: NetService) {
         DispatchQueue.main.async {
             self.isPublished = false
             self.status = "Stopped"
         }
-        print("📡 Bonjour: Service stopped")
+        print("Bonjour: Service stopped")
     }
 }
 
@@ -914,26 +1200,19 @@ final class BridgeApp: ObservableObject {
 
     deinit {
         midiActivityTimer?.invalidate()
-        print("🔗 BridgeApp: deinit - resources cleaned up")
+        print("BridgeApp: deinit - resources cleaned up")
     }
 
     private func setupSubscriptions() {
-        // Set up all Combine subscriptions BEFORE any services start
-        // This ensures UI updates are never missed
-        print("🔗 BridgeApp: Setting up Combine subscriptions")
-
         // Monitor iproxy status
         iproxy.$status.receive(on: DispatchQueue.main).sink { [weak self] s in
-            print("🔗 BridgeApp: iproxy status update: \(s)")
             self?.iproxyStatus = "iproxy: " + s
             self?.isRunning = s.contains("Running")
         }.store(in: &cancellables)
 
         // Monitor iproxy bound port and trigger connection attempts
         iproxy.$boundLocalPort.receive(on: DispatchQueue.main).sink { [weak self] p in
-            print("🔗 BridgeApp: iproxy port update: \(p?.description ?? "nil")")
             self?.localPort = p
-            // SPEED FIX: Reduced delay from 2.0s to 0.1s for faster startup connection
             // The retry logic handles cases where iPad isn't ready yet
             if let _ = p, self?.iproxy.isRunning == true {
                 DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { [weak self] in
@@ -944,18 +1223,14 @@ final class BridgeApp: ObservableObject {
 
         // Monitor USB connection status
         conn.$connectionStatus.receive(on: DispatchQueue.main).sink { [weak self] s in
-            print("🔗 BridgeApp: USB status update: \(s)")
             self?.usbStatus = s
             self?.isConnected = s.contains("Connected")
         }.store(in: &cancellables)
 
         // Monitor WiFi status
         wifiServer.$status.receive(on: DispatchQueue.main).sink { [weak self] s in
-            print("🔗 BridgeApp: WiFi status update: \(s)")
             self?.wifiStatus = "WiFi: " + s
         }.store(in: &cancellables)
-
-        print("🔗 BridgeApp: ✅ All subscriptions set up successfully")
     }
 
     func triggerMIDIActivity() {
@@ -979,12 +1254,12 @@ final class BridgeApp: ObservableObject {
     func start() {
         guard status != "Running" else { return }
         status = "Starting…"
-        
+
         // Setup MIDI
         midi.createVirtualSourceIfNeeded()
         midi.createVirtualDestinationIfNeeded()
         midiReady = true
-        
+
         // Small delay to ensure MIDI source is fully initialized
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             // Setup WiFi
@@ -994,25 +1269,15 @@ final class BridgeApp: ObservableObject {
             self.wifiServer.start()
 
             // Always advertise WiFi via Bonjour - let the iPad choose which connection to use
-            print("🔗 BridgeApp: WiFi server started, publishing Bonjour service...")
             self.bonjour.publish(port: 8078)
         }
 
         do {
             try iproxy.start()
 
-            // NOTE: Combine subscriptions are now set up in setupSubscriptions()
-            // which is called during init() BEFORE start() runs.
-            // This ensures UI updates are never missed.
-
-            // REMOVED: Don't attempt initial connection automatically
-            // Instead, rely on USB device mount events which trigger instant connection
-            // This ensures iPad app is fully ready before connecting (same as fast reconnect behavior)
-            //
-            // The connection will happen automatically when:
-            // 1. USB device mounts (handled by MacConnectionManager.handleUSBDeviceMounted)
-            // 2. User manually clicks "Connect" in the menu
-            // 3. System wake events (handled by IProxyManager sleep/wake monitoring)
+            // The USB connection happens automatically when:
+            // 1. An iOS device attaches (USBMuxdMonitor → IProxyManager starts iproxy → waitAndConnect)
+            // 2. System wake events (handled by IProxyManager sleep/wake monitoring)
 
             status = "Running"
         } catch {
@@ -1021,116 +1286,23 @@ final class BridgeApp: ObservableObject {
     }
 
     func stop() {
-        print("🔗 BridgeApp: Stopping all services...")
-        
-        // Stop all services
+        print("BridgeApp: Stopping all services...")
+
         conn.stop()
         iproxy.stop()
         wifiServer.stop()
         bonjour.stop()
-        
-        // Clean up MIDI devices
-        print("🔗 BridgeApp: Cleaning up MIDI devices...")
+
         midi.cleanup()
-        
+
         status = "Stopped"
         isRunning = false
         isConnected = false
         midiReady = false
-        
-        print("🔗 BridgeApp: All services stopped and MIDI devices cleaned up")
     }
-    
+
     func testWiFiMIDI() {
         // Test sending MIDI CC through WiFi server
         wifiServer.testMIDITransmission()
-    }
-}
-
-// MARK: - WiFi Server Heartbeat Extension
-
-extension WifiServer {
-    // MARK: - Heartbeat for Connection Stability
-    
-    private func startHeartbeat() {
-        log("Starting WiFi heartbeat")
-        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.sendHeartbeat()
-        }
-    }
-    
-    private func stopHeartbeat() {
-        heartbeatTimer?.invalidate()
-        heartbeatTimer = nil
-        log("Stopped WiFi heartbeat")
-    }
-    
-    private func sendHeartbeat() {
-        guard let connection = connection else { return }
-
-        let heartbeat: [String: Any] = [
-            "type": "heartbeat",
-            "source": "wifi_bridge",
-            "timestamp": Int(Date().timeIntervalSince1970)
-        ]
-
-        guard let data = try? JSONSerialization.data(withJSONObject: heartbeat) else { return }
-        let framed = data + Data([0x0A])
-
-        connection.send(content: framed, completion: .contentProcessed { error in
-            if let error = error {
-                print("📡 WiFi Server: Heartbeat send error: \(error)")
-            }
-        })
-    }
-
-    // MARK: - Connection Health Monitoring (RESILIENCE FIX)
-
-    private func startConnectionHealthMonitor() {
-        log("Starting WiFi connection health monitor")
-        lastHeartbeatReceived = Date() // Initialize to current time
-
-        connectionHealthTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-            self?.checkConnectionHealth()
-        }
-    }
-
-    private func stopConnectionHealthMonitor() {
-        connectionHealthTimer?.invalidate()
-        connectionHealthTimer = nil
-        log("Stopped WiFi connection health monitor")
-    }
-
-    private func checkConnectionHealth() {
-        guard isConnected else { return }
-
-        let timeSinceLastHeartbeat = Date().timeIntervalSince(lastHeartbeatReceived)
-
-        // If no heartbeat received from iPad in 60 seconds, assume connection is dead
-        if timeSinceLastHeartbeat > 60.0 {
-            log("⚠️ WiFi: No heartbeat from iPad for \(Int(timeSinceLastHeartbeat))s - disconnecting zombie connection")
-
-            // Clean up zombie connection
-            stopHeartbeat()
-            stopConnectionHealthMonitor()
-
-            if let conn = connection {
-                conn.cancel()
-                conn.stateUpdateHandler = nil
-                conn.pathUpdateHandler = nil
-            }
-            connection = nil
-
-            DispatchQueue.main.async {
-                self.isConnected = false
-                self.status = "Listening on \(self.port)"
-            }
-
-            log("📡 WiFi: Zombie connection cleaned up, ready for new iPad connection")
-        }
-    }
-
-    func markHeartbeatReceived() {
-        lastHeartbeatReceived = Date()
     }
 }

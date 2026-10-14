@@ -1,11 +1,24 @@
-// BridgeOutput.swift — iPad client to Mac Bridge
+// BridgeOutput.swift — iPad client to Mac Bridge over Wi-Fi
 // - Browses Bonjour (_cuebear._tcp)
 // - Connects and sends newline-delimited JSON
+// - v1.2.1: pairs with the Bridge and authenticates every connection (see SecureLink.swift)
 // - Helpers: sendCC / sendNote / sendTransport
+//
+// v1.2.1 changes
+// - All state lives on the main thread. Network callbacks hop to main before touching it.
+//   (Timers used to be created on a background queue with no run loop, so the 30 s
+//   reconnect timer never fired and a dropped link stayed down.)
+// - Reconnects after 0.5, 1, 2, 4, then every 8 s instead of never / every 30 s.
+// - Detects a dead Bridge within ~6 s using the Bridge's 2 s heartbeat.
+// - Incoming data is split into lines, so merged or split TCP reads no longer lose messages.
+// - MIDI is sent immediately instead of waiting for a 10 ms batch timer.
+// - Still works with older Bridges (1.2.3 and earlier), without pairing.
 
 import Foundation
 import Network
 import UIKit
+import CryptoKit
+import Security
 
 final class BridgeOutput: ObservableObject {
     struct Item: Identifiable {
@@ -13,426 +26,164 @@ final class BridgeOutput: ObservableObject {
         let name: String
         let endpoint: NWEndpoint
     }
-    
+
     enum ConnectionQuality {
         case excellent, good, fair, poor, disconnected
     }
-    
-    // BridgeOutput now handles WiFi connections only
-    // USB connections are handled by ConnectionManager
-    
-    // Periodic reconnection check
-    private var reconnectionTimer: Timer?
-    private var connectionHealthTimer: Timer?
-    private var discoveryRefreshTimer: Timer?
-    private var lastSuccessfulMessage: Date = Date.distantPast
-    
-    // Connection quality metrics
-    private var connectionLatency: TimeInterval = 0
-    private var packetLossCount: Int = 0
-    private var totalPackets: Int = 0
-    private var lastQualityUpdate: Date = Date.distantPast
-    
-    // Message batching for performance optimization
-    private var messageBatch: [String] = []
-    private var batchTimer: Timer?
-    private let batchSize = 5 // Reduced for lower latency
-    private let batchTimeout: TimeInterval = 0.01 // 10ms for lower latency
+
+    /// What the pairing overlay shows. nil = no overlay.
+    struct PairingPrompt: Identifiable, Equatable {
+        enum Stage: Equatable {
+            case contacting
+            case confirmOnMac(code: String)
+            case declined
+            case busy(otherDevice: String)
+            case failed(message: String)
+        }
+        let id = UUID()
+        let bridgeName: String
+        var stage: Stage
+    }
 
     @Published var discovered: [Item] = []
     @Published var isConnected: Bool = false
     @Published var isConnecting: Bool = false
     @Published var current: Item? = nil
     @Published var connectionQuality: ConnectionQuality = .disconnected
+    @Published var pairingPrompt: PairingPrompt? = nil
+    /// True when the link is paired and authenticated.
+    @Published private(set) var isSecure: Bool = false
+    /// True when connected to a Bridge older than 1.2.1 (no pairing support).
+    @Published private(set) var bridgeNeedsUpdate: Bool = false
 
-    private var browser: NWBrowser?
-    // v1.0.8: Made internal (not private) so ConnectionCoordinator can check if connection is suspended
+    // v1.0.8: Internal (not private) so ConnectionCoordinator can check if connection is suspended
     internal var connection: NWConnection?
     // v1.0.8: Track if WiFi was actually suspended (for proper resume detection)
     internal var isSuspended: Bool = false
-    private let queue = DispatchQueue(label: "CueBear.BridgeOutput")
-    private var pairToken: String = UserDefaults.standard.string(forKey: "BridgePairToken") ?? ""
-    private var isPairing: Bool = false
-    
-    // Background task support for maintaining connections during sleep
-    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
-    
-    // Internal method for automatic pairing
-    private func setPairToken(_ token: String) {
-        pairToken = token
-        UserDefaults.standard.set(token, forKey: "BridgePairToken")
-        debugPrint("BridgeOutput: Automatic pairing token received and stored")
+
+    private enum LinkState {
+        case idle, waitingForHello, authenticating, pairing, authenticated, legacy
     }
-    
-    private func initiatePairing() {
-        debugPrint("BridgeOutput: Initiating automatic pairing")
-        isPairing = true
-        let pairRequest: [String: Any] = [
-            "type": "pair_request",
-            "timestamp": Date().timeIntervalSince1970
-        ]
-        sendJSON(pairRequest)
+
+    private var linkState: LinkState = .idle
+    private var lineBuffer = LineBuffer()
+    private var connectionGeneration = 0
+    private let queue = DispatchQueue(label: "CueBear.BridgeOutput", qos: .userInteractive)
+    private var browser: NWBrowser?
+    private var discoveryRefreshTimer: Timer?
+    private var heartbeatTimer: Timer?
+    private var helloTimeout: DispatchWorkItem?
+    private var reconnectWork: DispatchWorkItem?
+    private var reconnectAttempt = 0
+    private var userInitiatedDisconnect = false
+    private var lastReceived = Date.distantPast
+    private var lastSuccessfulMessage = Date.distantPast
+    private var backgroundSupportConfigured = false
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+
+    // Session / pairing state for the current connection
+    private var bridgeID: String?
+    private var bridgeName: String = "Mac"
+    private var sessionNonce: String?
+    private var pairingPrivateKey: Curve25519.KeyAgreement.PrivateKey?
+    private var pairingNonce: Data?
+    private var pendingLinkKey: SymmetricKey?
+
+    private let helloWait: TimeInterval = 2.5          // older Bridges never send hello
+    private let heartbeatInterval: TimeInterval = 2.0
+    private let staleAfter: TimeInterval = 6.0         // 1.2.1 Bridges send a heartbeat every 2 s
+    private let reconnectDelays: [TimeInterval] = [0.5, 1, 2, 4, 8]
+
+    init() {
+        // Tokens from the old (never-completed) pairing scheme are no longer used.
+        UserDefaults.standard.removeObject(forKey: "BridgePairToken")
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
-        stop()
-        debugPrint("🔌 BridgeOutput: Deallocating")
+        heartbeatTimer?.invalidate()
+        discoveryRefreshTimer?.invalidate()
+        connection?.cancel()
+        browser?.cancel()
     }
 
+    // MARK: - Discovery
+
     func start() {
-        debugPrint("🔌 DEBUG: BridgeOutput.start() called")
-        setupBackgroundTaskSupport() // Initialize background task support
+        setupBackgroundTaskSupport()
         startBrowsing()
         startDiscoveryRefreshTimer()
     }
-    
+
     private func startBrowsing() {
+        browser?.cancel()
         let params = NWParameters.tcp
         let bonjour = NWBrowser.Descriptor.bonjour(type: "_cuebear._tcp.", domain: nil)
-        let browser = NWBrowser(for: bonjour, using: params)
-        self.browser = browser
+        let newBrowser = NWBrowser(for: bonjour, using: params)
+        browser = newBrowser
 
-        browser.stateUpdateHandler = { state in 
+        newBrowser.stateUpdateHandler = { state in
             debugPrint("BridgeOutput: Browser state changed to: \(state)")
         }
-        browser.browseResultsChangedHandler = { [weak self] results, _ in
-            guard let self = self else { return }
-            debugPrint("BridgeOutput: Discovery results changed, found \(results.count) services")
-            let items: [Item] = results.compactMap { res in
-                guard case let .service(name: name, type: _, domain: _, interface: _) = res.endpoint else { 
-                    debugPrint("BridgeOutput: Skipping non-service result: \(res.endpoint)")
-                    return nil 
+        newBrowser.browseResultsChangedHandler = { [weak self] results, _ in
+            let items: [Item] = results.compactMap { result in
+                guard case let .service(name: name, type: _, domain: _, interface: _) = result.endpoint else {
+                    return nil
                 }
-                // Remove .local suffix from name for cleaner display
                 let cleanName = name.hasSuffix(".local") ? String(name.dropLast(6)) : name
-                debugPrint("BridgeOutput: Discovered bridge: \(cleanName)")
-                return Item(name: cleanName, endpoint: res.endpoint)
+                return Item(name: cleanName, endpoint: result.endpoint)
             }
-            DispatchQueue.main.async { 
-                self.discovered = items.sorted { $0.name < $1.name }
-                debugPrint("🔌 DEBUG: BridgeOutput.discovered updated to \(self.discovered.count) items")
-                debugPrint("🔌 DEBUG: BridgeOutput.discovered contents: \(self.discovered.map { $0.name })")
-                debugPrint("BridgeOutput: Updated discovered list with \(items.count) bridges")
-                
-                // Don't auto-connect - let user choose connection method
-                debugPrint("BridgeOutput: Found \(items.count) bridges - waiting for user to choose connection")
+            DispatchQueue.main.async {
+                self?.discovered = items.sorted { $0.name < $1.name }
             }
         }
-        browser.start(queue: queue)
+        newBrowser.start(queue: queue)
     }
-    
+
     private func startDiscoveryRefreshTimer() {
-        // Restart browsing every 30 seconds to catch Bridge apps that start later (reduced frequency)
-        // Only run when not connected to save CPU
+        discoveryRefreshTimer?.invalidate()
+        // Restart browsing every 30 s while disconnected, to catch Bridge apps that start later
         discoveryRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            guard !self.isConnected else {
-                debugPrint("BridgeOutput: Already connected, skipping discovery refresh")
-                return
-            }
-            debugPrint("BridgeOutput: Refreshing discovery to catch late-starting Bridge apps")
+            guard let self = self, !self.isConnected else { return }
             self.restartBrowsing()
         }
     }
-    
+
     private func restartBrowsing() {
         browser?.cancel()
+        browser = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.startBrowsing()
         }
     }
 
+    func restartDiscovery() {
+        debugPrint("BridgeOutput: Manually restarting discovery")
+        restartBrowsing()
+    }
+
     func stop() {
         disconnect()
-        browser?.cancel(); browser = nil
-        discoveryRefreshTimer?.invalidate(); discoveryRefreshTimer = nil
-        DispatchQueue.main.async {
-            self.discovered.removeAll()
-        }
+        browser?.cancel()
+        browser = nil
+        discoveryRefreshTimer?.invalidate()
+        discoveryRefreshTimer = nil
+        discovered.removeAll()
     }
 
-    func disconnect() {
-        connection?.cancel(); connection = nil
-        isSuspended = false  // Clear suspended flag on disconnect
-        DispatchQueue.main.async {
-            self.isConnected = false
-            self.isConnecting = false
-            self.current = nil
-        }
-        // Stop timers when manually disconnecting
-        reconnectionTimer?.invalidate()
-        reconnectionTimer = nil
-        connectionHealthTimer?.invalidate()
-        connectionHealthTimer = nil
-
-        // Clear message batch
-        batchTimer?.invalidate()
-        batchTimer = nil
-        messageBatch.removeAll()
-    }
-
-    // v1.0.8: Suspend WiFi connection temporarily (for USB priority) without destroying it
-    // This preserves the connection object so it can resume sending data when USB disconnects
-    func suspend() {
-        debugPrint("📡 BridgeOutput: Suspending WiFi connection (USB taking priority)")
-        // DON'T cancel the connection - keep it alive
-        // DON'T set connection = nil - preserve the connection object
-        // DON'T clear current - remember which bridge we're connected to
-
-        // Mark as suspended so we know this was an intentional suspension
-        isSuspended = true
-
-        // Just update UI state to show we're not actively using WiFi
-        DispatchQueue.main.async {
-            self.isConnected = false  // UI shows disconnected
-            self.isConnecting = false
-        }
-
-        // CRITICAL FIX: Stop health monitoring timer while suspended
-        // The timer's guard clause (line 366) will exit early while isConnected = false
-        // This leaves the timer in a broken state where it exists but doesn't work
-        // We must stop it now so resume() can restart it properly
-        stopConnectionHealthMonitoring()
-
-        // Keep message batch alive - don't stop batch timer
-
-        debugPrint("📡 BridgeOutput: WiFi connection suspended - connection object preserved for resume")
-    }
-
-    // v1.0.8: Resume WiFi connection after USB disconnects
-    // This reactivates the WiFi connection that was suspended
-    func resume() {
-        debugPrint("📡 BridgeOutput: Resuming WiFi connection after USB disconnect")
-
-        // CRITICAL FIX: Only resume if WiFi was actually suspended
-        guard isSuspended else {
-            debugPrint("📡 BridgeOutput: ⚠️ WiFi was NOT suspended - already active, no need to resume")
-            return
-        }
-
-        // Verify we still have a valid connection object
-        guard connection != nil, current != nil else {
-            debugPrint("📡 BridgeOutput: ⚠️ Cannot resume - connection object was destroyed, need full reconnect")
-            isSuspended = false  // Clear flag since we can't resume
-            return
-        }
-
-        // Clear suspended flag
-        isSuspended = false
-
-        // Reset last successful message timestamp to prevent immediate stale detection
-        self.lastSuccessfulMessage = Date()
-
-        // CRITICAL FIX: Must set isConnected FIRST, then start health monitoring
-        // The health monitoring has a guard clause that checks isConnected
-        // Do both on main queue together to avoid race condition
-        DispatchQueue.main.async {
-            self.isConnected = true
-            self.connectionQuality = .excellent
-
-            // CRITICAL FIX: Start health monitoring AFTER isConnected is set
-            // The timer was stopped in suspend(), so we must restart it
-            // This is what keeps the WiFi connection alive with periodic checks
-            self.startConnectionHealthMonitoring()
-        }
-
-        debugPrint("📡 BridgeOutput: ✅ WiFi connection resumed - MIDI data can flow again")
-    }
-    
-    // MARK: - Background Task Support
-    
-    private func setupBackgroundTaskSupport() {
-        // Register for app lifecycle notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(appDidEnterBackground),
-            name: UIApplication.didEnterBackgroundNotification,
-            object: nil
-        )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(appWillEnterForeground),
-            name: UIApplication.willEnterForegroundNotification,
-            object: nil
-        )
-        
-        debugPrint("📡 BridgeOutput: Background task support configured")
-    }
-    
-    @objc private func appDidEnterBackground() {
-        debugPrint("📡 BridgeOutput: App entered background - starting background task to maintain WiFi connection")
-        
-        // Start background task to keep WiFi connection alive
-        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "CueBearWiFiConnection") { [weak self] in
-            debugPrint("📡 BridgeOutput: Background task expired - ending task")
-            self?.endBackgroundTask()
-        }
-        
-        // Keep WiFi connection alive during background
-        if isConnected {
-            debugPrint("📡 BridgeOutput: Maintaining active WiFi connection during background")
-        }
-    }
-    
-    @objc private func appWillEnterForeground() {
-        debugPrint("📡 BridgeOutput: App entering foreground - ending background task")
-        endBackgroundTask()
-
-        // Check connection health immediately when returning to foreground
-        DispatchQueue.main.async { [weak self] in
-            self?.checkWiFiConnectionAfterWake()
-        }
-    }
-    
-    private func endBackgroundTask() {
-        if backgroundTaskID != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundTaskID)
-            backgroundTaskID = .invalid
-            debugPrint("📡 BridgeOutput: Background task ended")
-        }
-    }
-    
-    private func checkWiFiConnectionAfterWake() {
-        debugPrint("📡 BridgeOutput: Checking WiFi connection health after wake")
-        
-        // If we were connected before sleep, verify the connection is still alive
-        if isConnected && connection != nil {
-            debugPrint("📡 BridgeOutput: WiFi connection was active - verifying it's still healthy")
-
-            // Send an immediate heartbeat — if the socket is dead, keepalive will surface the
-            // failure via NWConnection state, triggering our reconnect path.
-            let testMessage: [String: Any] = [
-                "type": "heartbeat",
-                "timestamp": Date().timeIntervalSince1970
-            ]
-            sendJSONImmediate(testMessage)
-
-            // Check again quickly; if NWConnection hasn't flipped to .failed yet, force a reconnect.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self = self else { return }
-
-                if self.isConnected && self.connection != nil {
-                    debugPrint("📡 BridgeOutput: WiFi connection verified healthy after wake")
-                } else {
-                    debugPrint("📡 BridgeOutput: WiFi connection lost during sleep - attempting immediate reconnect")
-                    let last = self.current
-                    self.isConnected = false
-                    self.connection = nil
-                    self.connectionQuality = .disconnected
-                    if let last = last {
-                        self.connect(to: last)
-                    }
-                }
-            }
-        }
-    }
-    
-    private func attemptReconnection() {
-        // Only attempt reconnection if we're not already connected and have a preferred connection
-        guard !isConnected && connection == nil else { return }
-        
-        // Try to reconnect to the last known connection
-        if let lastConnection = current {
-            debugPrint("🔄 BridgeOutput: Attempting to reconnect to \(lastConnection.name)")
-            connect(to: lastConnection)
-        } else {
-            // If no last connection, try to find available connections
-            if !discovered.isEmpty {
-                let preferredConnection = discovered.first { $0.name.contains("Bear Bridge") } ?? discovered.first!
-                debugPrint("🔄 BridgeOutput: Attempting to reconnect to discovered connection: \(preferredConnection.name)")
-                connect(to: preferredConnection)
-            } else {
-                debugPrint("🔄 BridgeOutput: No connections available for reconnection")
-            }
-        }
-    }
-    
-    private func startReconnectionTimer() {
-        // Stop existing timer
-        reconnectionTimer?.invalidate()
-
-        // Start periodic reconnection check every 30 seconds (reduced frequency)
-        // Only runs when not connected
-        reconnectionTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            if !self.isConnected && self.connection == nil {
-                debugPrint("🔄 BridgeOutput: Periodic reconnection check - attempting to reconnect")
-                self.attemptReconnection()
-            } else {
-                debugPrint("🔄 BridgeOutput: Already connected, skipping reconnection attempt")
-            }
-        }
-    }
-    
-    private func stopReconnectionTimer() {
-        reconnectionTimer?.invalidate()
-        reconnectionTimer = nil
-    }
-    
-    private func startConnectionHealthMonitoring() {
-        guard isConnected else {
-            debugPrint("🔌 BridgeOutput: Skipping health monitoring - not connected")
-            return
-        }
-
-        debugPrint("🔌 BridgeOutput: ✅ Starting connection health monitoring")
-
-        // Stop existing timer
-        connectionHealthTimer?.invalidate()
-
-        // Start health check every 15 seconds (reduced frequency)
-        connectionHealthTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
-            guard let self = self, self.isConnected else {
-                self?.stopConnectionHealthMonitoring()
-                return
-            }
-
-            // Update connection quality
-            self.updateConnectionQuality()
-
-            // Heartbeat: keeps router NAT entries alive, keeps WiFi radio from power-saving,
-            // and lets TCP keepalive + NWConnection detect a dead socket on our next send.
-            let heartbeat: [String: Any] = [
-                "type": "heartbeat",
-                "timestamp": Date().timeIntervalSince1970
-            ]
-            self.sendJSONImmediate(heartbeat)
-        }
-    }
-    
-    private func stopConnectionHealthMonitoring() {
-        connectionHealthTimer?.invalidate()
-        connectionHealthTimer = nil
-    }
-    
-    private func forceReconnection() {
-        debugPrint("🔄 BridgeOutput: Forcing reconnection due to stale connection")
-        connection?.cancel()
-        connection = nil
-        DispatchQueue.main.async {
-            self.isConnected = false
-            self.current = nil
-        }
-        startReconnectionTimer()
-    }
+    // MARK: - Connect / disconnect
 
     func connect(to item: Item) {
-        debugPrint("🔌 DEBUG: BridgeOutput.connect called for: \(item.name)")
-        debugPrint("🔌 DEBUG: item.endpoint: \(item.endpoint)")
-        disconnect()
-        
-        // Set connecting state
-        DispatchQueue.main.async { 
-            self.isConnecting = true
-        }
-        
-        // Use WiFi connection only (USB handled by ConnectionManager)
-        let endpoint = item.endpoint
-        debugPrint("BridgeOutput: Using WiFi connection to \(item.endpoint)")
+        debugPrint("BridgeOutput: connect(to: \(item.name))")
+        tearDownConnection()
+        cancelReconnect()
+        userInitiatedDisconnect = false
+        isSuspended = false
+        current = item
+        isConnecting = true
+        bridgeName = item.name
 
-        // TCP keepalive: detect dead sockets within ~25s (router NAT drops, WiFi radio sleep, etc.)
+        // TCP keepalive: detect dead sockets even when nothing is being sent
         let tcp = NWProtocolTCP.Options()
         tcp.noDelay = true
         tcp.enableKeepalive = true
@@ -440,414 +191,638 @@ final class BridgeOutput: ObservableObject {
         tcp.keepaliveInterval = 5
         tcp.keepaliveCount = 3
         let params = NWParameters(tls: nil, tcp: tcp)
-        let conn = NWConnection(to: endpoint, using: params)
+        let conn = NWConnection(to: item.endpoint, using: params)
+
+        connectionGeneration += 1
+        let generation = connectionGeneration
         connection = conn
-        current = item
-        debugPrint("🔌 DEBUG: NWConnection created, starting connection...")
-        
+
         conn.stateUpdateHandler = { [weak self] state in
-            guard let self = self else { return }
-            debugPrint("🔌 DEBUG: Connection state changed to: \(state)")
-            switch state {
-            case .ready:
-                debugPrint("BridgeOutput: Connected successfully to \(item.name)")
-
-                // Clear suspended flag when establishing new connection
-                self.isSuspended = false
-
-                self.receiveLoop()
-
-                // Stop reconnection timer when connected
-                self.stopReconnectionTimer()
-
-                // Reset last successful message timestamp
-                self.lastSuccessfulMessage = Date()
-
-                // Automatic pairing for security
-                if self.pairToken.isEmpty {
-                    self.initiatePairing()
-                }
-
-                // CRITICAL: Set isConnected FIRST, then start health monitoring
-                // Must be done together on main queue to avoid race condition
-                DispatchQueue.main.async {
-                    self.isConnected = true
-                    self.isConnecting = false
-                    self.current = item
-                    self.connectionQuality = .excellent
-
-                    // Start health monitoring AFTER isConnected is set
-                    self.startConnectionHealthMonitoring()
-                }
-            case .failed(let error):
-                debugPrint("BridgeOutput: Connection failed to \(item.name): \(error)")
-                DispatchQueue.main.async {
-                    self.isConnected = false
-                    self.isConnecting = false
-                    self.current = nil
-                    self.connection = nil
-                    self.connectionQuality = .disconnected
-                }
-                // Stop health monitoring and start reconnection timer
-                self.stopConnectionHealthMonitoring()
-                self.startReconnectionTimer()
-            case .cancelled:
-                debugPrint("BridgeOutput: Connection cancelled to \(item.name)")
-                DispatchQueue.main.async {
-                    self.isConnected = false
-                    self.isConnecting = false
-                    self.current = nil
-                    self.connection = nil
-                    self.connectionQuality = .disconnected
-                }
-                // Stop health monitoring and start reconnection timer
-                self.stopConnectionHealthMonitoring()
-                self.startReconnectionTimer()
-            case .waiting(let error):
-                debugPrint("BridgeOutput: Connection waiting for \(item.name): \(error)")
-            default: 
-                debugPrint("BridgeOutput: Connection state changed: \(state)")
+            DispatchQueue.main.async {
+                self?.handleConnectionState(state, generation: generation)
             }
         }
         conn.start(queue: queue)
     }
 
+    /// Manual disconnect: stays disconnected until connect(to:) is called again.
+    func disconnect() {
+        userInitiatedDisconnect = true
+        cancelReconnect()
+        tearDownConnection()
+        isSuspended = false
+        current = nil
+    }
+
+    /// Closes the socket and resets per-connection state. Keeps `current` and `isSuspended`.
+    private func tearDownConnection() {
+        connectionGeneration += 1
+        connection?.stateUpdateHandler = nil
+        connection?.cancel()
+        connection = nil
+        linkState = .idle
+        lineBuffer.reset()
+        helloTimeout?.cancel()
+        helloTimeout = nil
+        stopHeartbeat()
+        sessionNonce = nil
+        pairingPrivateKey = nil
+        pairingNonce = nil
+        pendingLinkKey = nil
+        isConnected = false
+        isConnecting = false
+        isSecure = false
+        connectionQuality = .disconnected
+    }
+
+    private func handleConnectionState(_ state: NWConnection.State, generation: Int) {
+        guard generation == connectionGeneration, let conn = connection else { return }
+
+        switch state {
+        case .ready:
+            debugPrint("BridgeOutput: TCP connected to \(bridgeName)")
+            linkState = .waitingForHello
+            lastReceived = Date()
+            receive(on: conn, generation: generation)
+
+            let timeout = DispatchWorkItem { [weak self] in
+                guard let self = self, generation == self.connectionGeneration,
+                      self.linkState == .waitingForHello else { return }
+                self.enterLegacyMode()
+            }
+            helloTimeout = timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + helloWait, execute: timeout)
+
+        case .failed(let error):
+            debugPrint("BridgeOutput: Connection failed: \(error)")
+            handleLinkLost()
+
+        case .waiting(let error):
+            // The Bridge can't be reached right now (Mac asleep, Wi-Fi changed…).
+            debugPrint("BridgeOutput: Connection waiting: \(error)")
+            handleLinkLost()
+
+        case .cancelled:
+            handleLinkLost()
+
+        default:
+            break
+        }
+    }
+
+    private func handleLinkLost() {
+        let wasSuspended = isSuspended
+        tearDownConnection()
+        guard !userInitiatedDisconnect, current != nil else { return }
+        if wasSuspended {
+            // USB is active. resume() reconnects Wi-Fi when USB goes away.
+            isSuspended = true
+            return
+        }
+        scheduleReconnect()
+    }
+
+    private func scheduleReconnect() {
+        guard let item = current, !userInitiatedDisconnect else { return }
+        cancelReconnect()
+        let delay = reconnectDelays[min(reconnectAttempt, reconnectDelays.count - 1)]
+        reconnectAttempt += 1
+        debugPrint("BridgeOutput: Reconnecting to \(item.name) in \(delay)s (attempt \(reconnectAttempt))")
+
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self, !self.userInitiatedDisconnect, self.connection == nil, !self.isSuspended else { return }
+            // Prefer a freshly discovered entry with the same name (the Bridge may have restarted).
+            let target = self.discovered.first { $0.name == item.name } ?? item
+            self.connect(to: target)
+        }
+        reconnectWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func cancelReconnect() {
+        reconnectWork?.cancel()
+        reconnectWork = nil
+    }
+
+    // MARK: - USB priority (called by ConnectionCoordinator)
+
+    // v1.0.8: Suspend Wi-Fi temporarily (USB takes priority) without destroying it.
+    func suspend() {
+        debugPrint("BridgeOutput: Suspending Wi-Fi (USB taking priority)")
+        isSuspended = true
+        cancelReconnect()
+        // UI shows disconnected; heartbeats keep the socket alive for a quick resume.
+        isConnected = false
+        isConnecting = false
+    }
+
+    // v1.0.8: Resume Wi-Fi after USB disconnects.
+    func resume() {
+        guard isSuspended else {
+            debugPrint("BridgeOutput: Wi-Fi was not suspended - nothing to resume")
+            return
+        }
+        isSuspended = false
+
+        if connection != nil, linkState == .authenticated || linkState == .legacy {
+            lastSuccessfulMessage = Date()
+            isConnected = true
+            connectionQuality = .excellent
+            debugPrint("BridgeOutput: Wi-Fi resumed")
+        } else if let item = current {
+            debugPrint("BridgeOutput: Wi-Fi link was lost while suspended - reconnecting")
+            reconnectAttempt = 0
+            connect(to: item)
+        }
+    }
+
+    // MARK: - Receiving
+
+    private func receive(on conn: NWConnection, generation: Int) {
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+            DispatchQueue.main.async {
+                guard let self = self, generation == self.connectionGeneration else { return }
+
+                if let data = data, !data.isEmpty {
+                    self.lastReceived = Date()
+                    for line in self.lineBuffer.append(data) {
+                        self.handleLine(line)
+                        if generation != self.connectionGeneration { return }
+                    }
+                }
+
+                if let error = error {
+                    // A receive timeout is not fatal; keep listening.
+                    if case .posix(let code) = error, code == .ETIMEDOUT {
+                        self.receive(on: conn, generation: generation)
+                        return
+                    }
+                    debugPrint("BridgeOutput: Receive error: \(error)")
+                    self.handleLinkLost()
+                    return
+                }
+                if isComplete {
+                    self.handleLinkLost()
+                    return
+                }
+                self.receive(on: conn, generation: generation)
+            }
+        }
+    }
+
+    private func handleLine(_ line: Data) {
+        guard let json = SecureLink.decode(line), let type = json["type"] as? String else { return }
+
+        switch type {
+        case SecureLink.MessageType.hello:
+            handleHello(json)
+
+        case SecureLink.MessageType.authOK:
+            debugPrint("BridgeOutput: Paired link authenticated")
+            linkState = .authenticated
+            switch pairingPrompt?.stage {
+            case .some(.contacting), .some(.confirmOnMac(_)):
+                pairingPrompt = nil
+            default:
+                break
+            }
+            markConnected(secure: true)
+
+        case SecureLink.MessageType.authFailed:
+            let reason = json["reason"] as? String ?? "unknown"
+            debugPrint("BridgeOutput: Authentication failed (\(reason)) - pairing again")
+            if let id = bridgeID { BridgeKeyStore.delete(for: id) }
+            startPairing()
+
+        case SecureLink.MessageType.busy:
+            let other = json["device_name"] as? String ?? "another iPad"
+            pairingPrompt = PairingPrompt(bridgeName: bridgeName, stage: .busy(otherDevice: other))
+            stopTrying()
+
+        case SecureLink.MessageType.pairKey:
+            handlePairKey(json)
+
+        case SecureLink.MessageType.pairOK:
+            guard let key = pendingLinkKey, let id = bridgeID else { return }
+            BridgeKeyStore.save(key, for: id)
+            pendingLinkKey = nil
+            debugPrint("BridgeOutput: Paired with \(bridgeName)")
+            sendAuth(key: key)
+
+        case SecureLink.MessageType.pairDenied:
+            let reason = json["reason"] as? String ?? "declined"
+            pairingPrompt = PairingPrompt(bridgeName: bridgeName,
+                                          stage: reason == "busy" ? .busy(otherDevice: "another iPad") : .declined)
+            stopTrying()
+
+        case SecureLink.MessageType.authRequired:
+            // We are in compatibility mode but this Bridge wants pairing: start over.
+            if linkState == .legacy {
+                debugPrint("BridgeOutput: Bridge requires pairing - reconnecting")
+                handleLinkLost()
+            }
+
+        case SecureLink.MessageType.heartbeat:
+            break   // lastReceived is already updated
+
+        case "midi_input":
+            handleMIDIInputFromDAW(json)
+
+        default:
+            break
+        }
+    }
+
+    // MARK: - Authentication and pairing
+
+    private func handleHello(_ json: [String: Any]) {
+        guard linkState == .waitingForHello else { return }
+        helloTimeout?.cancel()
+        helloTimeout = nil
+
+        guard let id = json["bridge_id"] as? String, !id.isEmpty,
+              let nonce = json["nonce"] as? String, !nonce.isEmpty else {
+            enterLegacyMode()
+            return
+        }
+        bridgeID = id
+        sessionNonce = nonce
+        if let name = json["name"] as? String, !name.isEmpty {
+            bridgeName = name
+        }
+        bridgeNeedsUpdate = false
+
+        if let key = BridgeKeyStore.key(for: id) {
+            sendAuth(key: key)
+        } else {
+            startPairing()
+        }
+    }
+
+    private func sendAuth(key: SymmetricKey) {
+        guard let id = bridgeID, let nonce = sessionNonce else { return }
+        linkState = .authenticating
+        let mac = SecureLink.authMAC(key: key, bridgeID: id, deviceID: Self.deviceID, sessionNonce: nonce)
+        sendControl([
+            "type": SecureLink.MessageType.auth,
+            "proto": SecureLink.protocolVersion,
+            "device_id": Self.deviceID,
+            "device_name": UIDevice.current.name,
+            "mac": mac
+        ])
+    }
+
+    private func startPairing() {
+        linkState = .pairing
+        let privateKey = Curve25519.KeyAgreement.PrivateKey()
+        let nonce = SecureLink.randomBytes(16)
+        pairingPrivateKey = privateKey
+        pairingNonce = nonce
+        pendingLinkKey = nil
+
+        pairingPrompt = PairingPrompt(bridgeName: bridgeName, stage: .contacting)
+        sendControl([
+            "type": SecureLink.MessageType.pairStart,
+            "device_id": Self.deviceID,
+            "device_name": UIDevice.current.name,
+            "commit": SecureLink.commitment(publicKey: privateKey.publicKey.rawRepresentation, nonce: nonce)
+        ])
+    }
+
+    private func handlePairKey(_ json: [String: Any]) {
+        guard linkState == .pairing,
+              let privateKey = pairingPrivateKey,
+              let deviceNonce = pairingNonce,
+              let pubString = json["bridge_pub"] as? String,
+              let bridgePublicKey = Data(base64Encoded: pubString), bridgePublicKey.count == 32,
+              let nonceString = json["nonce"] as? String,
+              let bridgeNonce = Data(base64Encoded: nonceString), bridgeNonce.count == 16 else {
+            return
+        }
+
+        do {
+            pendingLinkKey = try SecureLink.deriveLinkKey(privateKey: privateKey,
+                                                          peerPublicKey: bridgePublicKey,
+                                                          deviceNonce: deviceNonce,
+                                                          bridgeNonce: bridgeNonce)
+        } catch {
+            pairingPrompt = PairingPrompt(bridgeName: bridgeName,
+                                          stage: .failed(message: "The Bridge sent an invalid key. Try again."))
+            stopTrying()
+            return
+        }
+
+        let devicePublicKey = privateKey.publicKey.rawRepresentation
+        sendControl([
+            "type": SecureLink.MessageType.pairReveal,
+            "device_pub": devicePublicKey.base64EncodedString(),
+            "nonce": deviceNonce.base64EncodedString()
+        ])
+
+        let code = SecureLink.comparisonCode(bridgePublicKey: bridgePublicKey,
+                                             devicePublicKey: devicePublicKey,
+                                             deviceNonce: deviceNonce,
+                                             bridgeNonce: bridgeNonce)
+        pairingPrompt = PairingPrompt(bridgeName: bridgeName, stage: .confirmOnMac(code: code))
+    }
+
+    /// Older Bridge (no hello): connect without pairing, as before.
+    private func enterLegacyMode() {
+        debugPrint("BridgeOutput: Bridge did not send hello - using compatibility mode (update the Bridge to pair)")
+        linkState = .legacy
+        bridgeNeedsUpdate = true
+        markConnected(secure: false)
+    }
+
+    private func markConnected(secure: Bool) {
+        cancelReconnect()
+        reconnectAttempt = 0
+        isSecure = secure
+        isConnecting = false
+        lastSuccessfulMessage = Date()
+        lastReceived = Date()
+        connectionQuality = .excellent
+        startHeartbeat()
+        // While USB has priority, stay quiet in the UI; resume() will flip this.
+        if !isSuspended {
+            isConnected = true
+        }
+    }
+
+    /// Stop after a final answer from the Bridge (declined, busy).
+    private func stopTrying() {
+        userInitiatedDisconnect = true
+        cancelReconnect()
+        tearDownConnection()
+    }
+
+    // Called by the pairing overlay
+    func cancelPairing() {
+        pairingPrompt = nil
+        disconnect()
+    }
+
+    func dismissPairingPrompt() {
+        pairingPrompt = nil
+    }
+
+    /// Removes every stored Bridge key. The next connection pairs again.
+    func forgetPairedBridges() {
+        BridgeKeyStore.deleteAll()
+    }
+
+    // MARK: - Heartbeat and health
+
+    private func startHeartbeat() {
+        stopHeartbeat()
+        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: heartbeatInterval, repeats: true) { [weak self] _ in
+            self?.heartbeatTick()
+        }
+    }
+
+    private func stopHeartbeat() {
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
+    }
+
+    private func heartbeatTick() {
+        guard connection != nil, linkState == .authenticated || linkState == .legacy else { return }
+
+        // Paired Bridges send a heartbeat every 2 s; silence means the link is gone.
+        if linkState == .authenticated, Date().timeIntervalSince(lastReceived) > staleAfter {
+            debugPrint("BridgeOutput: No data from Bridge for \(Int(staleAfter))s - reconnecting")
+            handleLinkLost()
+            return
+        }
+
+        sendControl([
+            "type": SecureLink.MessageType.heartbeat,
+            "timestamp": Date().timeIntervalSince1970
+        ])
+        updateConnectionQuality()
+    }
+
+    func checkConnectionHealth() {
+        if connection == nil, !isConnected, !userInitiatedDisconnect, !isSuspended, let item = current {
+            debugPrint("BridgeOutput: Health check - reconnecting to \(item.name)")
+            reconnectAttempt = 0
+            connect(to: item)
+        }
+    }
+
+    private func updateConnectionQuality() {
+        guard isConnected else {
+            connectionQuality = .disconnected
+            return
+        }
+        let silence = Date().timeIntervalSince(lastReceived)
+        if linkState == .legacy {
+            connectionQuality = .good   // older Bridges don't send heartbeats, so we can't measure
+        } else if silence < 3 {
+            connectionQuality = .excellent
+        } else if silence < 4 {
+            connectionQuality = .good
+        } else if silence < 5 {
+            connectionQuality = .fair
+        } else {
+            connectionQuality = .poor
+        }
+    }
+
     // MARK: - Send helpers
 
     func sendCC(channel: Int, cc: Int, value: Int, label: String, buttonID: String) {
-        let payload: [String: Any] = [
+        sendMIDIPayload([
             "type": "midi_cc",
             "channel": channel,
             "cc": cc,
             "value": value,
             "label": label,
             "button_id": buttonID
-        ]
-        sendJSON(payload)
+        ])
     }
 
     func sendNote(channel: Int, note: Int, velocity: Int, label: String, buttonID: String) {
-        let payload: [String: Any] = [
+        sendMIDIPayload([
             "type": "midi_note",
             "channel": channel,
             "note": note,
             "velocity": velocity,
             "label": label,
             "button_id": buttonID
-        ]
-        sendJSON(payload)
+        ])
     }
 
     func sendTransport(action: String) {
-        let payload: [String: Any] = [
+        sendMIDIPayload([
             "type": "transport",
             "action": action,
             "timestamp": Date().timeIntervalSince1970
-        ]
-        sendJSON(payload)
+        ])
     }
-    
-    // Send MIDI immediately without batching for critical messages
+
     func sendMIDIImmediate(channel: Int, cc: Int, value: Int, label: String, buttonID: String) {
-        let payload: [String: Any] = [
-            "type": "midi_cc",
-            "channel": channel,
-            "cc": cc,
-            "value": value,
-            "label": label,
-            "button_id": buttonID
-        ]
-        sendJSONImmediate(payload)
+        sendCC(channel: channel, cc: cc, value: value, label: label, buttonID: buttonID)
     }
 
     // MARK: - Low-level IO
 
-    private func sendJSON(_ obj: [String: Any]) {
-        guard let _ = connection else {
-            debugPrint("BridgeOutput: No connection, dropping message")
+    /// MIDI only goes out on an authenticated (or compatibility-mode) link.
+    private func sendMIDIPayload(_ object: [String: Any]) {
+        guard linkState == .authenticated || linkState == .legacy else {
+            debugPrint("BridgeOutput: Not connected - dropping MIDI message")
             return
         }
-        do {
-            var withToken = obj
-            
-            // Add token to regular messages (not pairing requests)
-            if obj["type"] as? String != "pair_request" && !pairToken.isEmpty {
-                withToken["token"] = pairToken
-            }
-            
-            let data = try JSONSerialization.data(withJSONObject: withToken)
-            guard var line = String(data: data, encoding: .utf8) else { return }
-            line.append("\n")
-            
-            // Add to batch for performance optimization
-            addToBatch(line)
-        } catch {
-            debugPrint("BridgeOutput: JSON serialization failed: \(error)")
-        }
-    }
-    
-    // Send JSON immediately without batching for critical messages
-    private func sendJSONImmediate(_ obj: [String: Any]) {
-        guard let connection = connection else {
-            debugPrint("BridgeOutput: No connection, dropping immediate message")
-            return
-        }
-        do {
-            var withToken = obj
-            
-            // Add token to regular messages (not pairing requests)
-            if obj["type"] as? String != "pair_request" && !pairToken.isEmpty {
-                withToken["token"] = pairToken
-            }
-            
-            let data = try JSONSerialization.data(withJSONObject: withToken)
-            guard var line = String(data: data, encoding: .utf8) else { return }
-            line.append("\n")
-            
-            // Send immediately without batching
-            guard let buf = line.data(using: .utf8) else { return }
-            connection.send(content: buf, completion: .contentProcessed { [weak self] error in
-                if error == nil {
-                    self?.lastSuccessfulMessage = Date()
-                    debugPrint("BridgeOutput: Immediate message sent successfully")
-                } else {
-                    debugPrint("BridgeOutput: Failed to send immediate message: \(error?.localizedDescription ?? "unknown error")")
-                }
-            })
-        } catch {
-            debugPrint("BridgeOutput: JSON serialization failed for immediate message: \(error)")
-        }
-    }
-    
-    private func addToBatch(_ message: String) {
-        messageBatch.append(message)
-        
-        // Send immediately if batch is full
-        if messageBatch.count >= batchSize {
-            sendBatch()
-        } else {
-            // Start timer for batch timeout
-            startBatchTimer()
-        }
-    }
-    
-    private func startBatchTimer() {
-        batchTimer?.invalidate()
-        batchTimer = Timer.scheduledTimer(withTimeInterval: batchTimeout, repeats: false) { [weak self] _ in
-            self?.sendBatch()
-        }
-    }
-    
-    private func sendBatch() {
-        guard !messageBatch.isEmpty else { return }
-        
-        batchTimer?.invalidate()
-        batchTimer = nil
-        
-        guard let connection = connection else {
-            debugPrint("BridgeOutput: No connection - cannot send batch")
-            messageBatch.removeAll()
-            return
-        }
-        
-        // Create batched message
-        let batchedMessage = [
-            "type": "batch",
-            "messages": messageBatch,
-            "count": messageBatch.count,
-            "timestamp": Date().timeIntervalSince1970
-        ] as [String: Any]
-        
-        do {
-            let data = try JSONSerialization.data(withJSONObject: batchedMessage)
-            guard var line = String(data: data, encoding: .utf8) else { 
-                messageBatch.removeAll()
-                return 
-            }
-            line.append("\n")
-            guard let buf = line.data(using: .utf8) else { 
-                messageBatch.removeAll()
-                return 
-            }
-            
-            connection.send(content: buf, completion: .contentProcessed { [weak self] error in
-                if error == nil {
-                    // Update last successful message timestamp
-                    self?.lastSuccessfulMessage = Date()
-                    debugPrint("BridgeOutput: Batch sent successfully (\(self?.messageBatch.count ?? 0) messages)")
-                } else {
-                    debugPrint("BridgeOutput: Failed to send batch: \(error?.localizedDescription ?? "unknown error")")
-                }
-                self?.messageBatch.removeAll()
-            })
-        } catch {
-            debugPrint("BridgeOutput: Failed to create batch JSON: \(error)")
-            messageBatch.removeAll()
-        }
+        sendControl(object)
+        lastSuccessfulMessage = Date()
     }
 
-    private func receiveLoop() {
-        guard let connection = connection else { return }
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, isComplete, error in
-            // v1.0.4: Handle timeout errors gracefully - retry instead of disconnecting
-            // This prevents WiFi disconnection when USB cable is unplugged
+    private func sendControl(_ object: [String: Any]) {
+        guard let conn = connection, let data = SecureLink.encodeLine(object) else { return }
+        conn.send(content: data, completion: .contentProcessed { error in
             if let error = error {
-                let nsError = error as NSError
-                // POSIX error 60 = Operation timed out (happens when no data received for ~30 seconds)
-                if nsError.domain == NSPOSIXErrorDomain && nsError.code == 60 {
-                    debugPrint("BridgeOutput: Receive timeout, retrying connection...")
-                    // Continue the receive loop instead of disconnecting
-                    self?.receiveLoop()
-                    return
-                }
-                // For other errors, disconnect
-                debugPrint("BridgeOutput: Receive error: \(error.localizedDescription), disconnecting")
-                self?.disconnect()
-                return
+                debugPrint("BridgeOutput: Send failed: \(error)")
             }
-
-            if isComplete {
-                self?.disconnect()
-                return
-            }
-
-            // Parse responses for automatic pairing
-            if let data = data, let self = self {
-                self.parseResponse(data)
-            }
-            self?.receiveLoop()
-        }
+        })
     }
-    
-    private func parseResponse(_ data: Data) {
-        guard let string = String(data: data, encoding: .utf8) else { return }
-        let lines = string.components(separatedBy: .newlines).filter { !$0.isEmpty }
-        
-        for line in lines {
-            guard let lineData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                  let type = json["type"] as? String else { continue }
-            
-            if type == "pair_response", let token = json["token"] as? String {
-                debugPrint("BridgeOutput: Received pairing token, storing and reconnecting")
-                setPairToken(token)
-                isPairing = false
 
-                // Reconnect with the new token
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    if let current = self?.current {
-                        self?.connect(to: current)
-                    }
-                }
-            } else if type == "midi_input" {
-                debugPrint("BridgeOutput: Received MIDI input from DAW")
-                DispatchQueue.main.async {
-                    self.handleMIDIInputFromDAW(json)
-                }
-            }
-        }
-    }
-    
-    // Handle MIDI input from DAW and update iPad faders
+    // MARK: - MIDI from the DAW
+
     private func handleMIDIInputFromDAW(_ json: [String: Any]) {
         guard let midiBytes = json["midi"] as? [Int], midiBytes.count >= 3 else {
             debugPrint("BridgeOutput: Invalid MIDI input data")
             return
         }
-        
+
         let statusByte = midiBytes[0]
         let data1 = midiBytes[1]
         let data2 = midiBytes[2]
-        
-        // Parse MIDI message
         let messageType = statusByte & 0xF0
         let channel = (statusByte & 0x0F) + 1 // Convert to 1-based channel
-        
-        debugPrint("BridgeOutput: MIDI input - Type: 0x\(String(format: "%02X", messageType)), Ch: \(channel), Data1: \(data1), Data2: \(data2)")
-        
+
         switch messageType {
         case 0xB0: // Control Change (CC)
-            debugPrint("BridgeOutput: MIDI CC Ch\(channel) CC\(data1)=\(data2)")
-            
-            // Post notification to update faders
             NotificationCenter.default.post(
                 name: Notification.Name("cbMIDIInputFromDAW"),
                 object: nil,
-                userInfo: [
-                    "type": "cc",
-                    "channel": channel,
-                    "cc": data1,
-                    "value": data2
-                ]
+                userInfo: ["type": "cc", "channel": channel, "cc": data1, "value": data2]
             )
-            
         case 0x90: // Note On
-            debugPrint("BridgeOutput: MIDI Note On Ch\(channel) Note\(data1) Vel\(data2)")
-            
-            // Post notification for note messages
             NotificationCenter.default.post(
                 name: Notification.Name("cbMIDIInputFromDAW"),
                 object: nil,
-                userInfo: [
-                    "type": "note",
-                    "channel": channel,
-                    "note": data1,
-                    "velocity": data2
-                ]
+                userInfo: ["type": "note", "channel": channel, "note": data1, "velocity": data2]
             )
-            
         default:
-            debugPrint("BridgeOutput: Unhandled MIDI message type: 0x\(String(format: "%02X", messageType))")
+            break
         }
     }
-    
-    // MARK: - Health Check
-    func checkConnectionHealth() {
-        // Check if connection state is healthy
-        // Note: We do NOT reconnect based on idle time - NWConnection handles actual failures
-        guard isConnected, let _ = connection else {
-            debugPrint("BridgeOutput: Health check - not connected, attempting reconnection")
-            if let current = current {
-                connect(to: current)
-            }
-            return
-        }
 
-        // Connection exists and isConnected is true - trust the NWConnection state monitoring
-        debugPrint("BridgeOutput: Health check - connection appears healthy")
+    // MARK: - Background
+
+    private func setupBackgroundTaskSupport() {
+        guard !backgroundSupportConfigured else { return }
+        backgroundSupportConfigured = true
+        NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground),
+                                               name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground),
+                                               name: UIApplication.willEnterForegroundNotification, object: nil)
     }
-    
-    func restartDiscovery() {
-        debugPrint("BridgeOutput: Manually restarting discovery")
-        restartBrowsing()
-    }   
-    
-    // MARK: - Connection Quality Monitoring
-    
-    private func updateConnectionQuality() {
-        let now = Date()
-        let timeSinceLastMessage = now.timeIntervalSince(lastSuccessfulMessage)
-        
-        // Update quality based on connection health and metrics
-        let quality: ConnectionQuality
-        if isConnected {
-            if timeSinceLastMessage < 5.0 && connectionLatency < 0.1 && packetLossCount == 0 {
-                quality = .excellent
-            } else if timeSinceLastMessage < 10.0 && connectionLatency < 0.2 && packetLossCount < 2 {
-                quality = .good
-            } else if timeSinceLastMessage < 30.0 && connectionLatency < 0.5 && packetLossCount < 5 {
-                quality = .fair
+
+    @objc private func appDidEnterBackground() {
+        // iOS allows roughly 30 s of background time before suspending the app.
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "CueBearWiFiConnection") { [weak self] in
+            self?.endBackgroundTask()
+        }
+    }
+
+    @objc private func appWillEnterForeground() {
+        endBackgroundTask()
+        DispatchQueue.main.async { [weak self] in
+            self?.checkWiFiConnectionAfterWake()
+        }
+    }
+
+    private func endBackgroundTask() {
+        if backgroundTaskID != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            backgroundTaskID = .invalid
+        }
+    }
+
+    private func checkWiFiConnectionAfterWake() {
+        if connection != nil {
+            if linkState == .authenticated, Date().timeIntervalSince(lastReceived) > staleAfter {
+                debugPrint("BridgeOutput: Link went stale while in background - reconnecting")
+                reconnectAttempt = 0
+                handleLinkLost()
             } else {
-                quality = .poor
+                sendControl(["type": SecureLink.MessageType.heartbeat, "timestamp": Date().timeIntervalSince1970])
             }
         } else {
-            quality = .disconnected
+            checkConnectionHealth()
         }
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.connectionQuality = quality
+    }
+
+    // MARK: - Identity
+
+    /// A random ID for this iPad, created once. Not the hardware identifier.
+    static var deviceID: String {
+        let key = "CueBearDeviceID"
+        if let existing = UserDefaults.standard.string(forKey: key) {
+            return existing
         }
-        
-        lastQualityUpdate = now
+        let created = UUID().uuidString
+        UserDefaults.standard.set(created, forKey: key)
+        return created
+    }
+}
+
+// MARK: - Keychain storage for Bridge link keys
+
+enum BridgeKeyStore {
+    private static let service = "com.studiobear.cuebear.bridge-link-key"
+
+    private static func baseQuery(for bridgeID: String) -> [String: Any] {
+        return [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: bridgeID
+        ]
+    }
+
+    static func key(for bridgeID: String) -> SymmetricKey? {
+        var query = baseQuery(for: bridgeID)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data, data.count == 32 else {
+            return nil
+        }
+        return SymmetricKey(data: data)
+    }
+
+    static func save(_ key: SymmetricKey, for bridgeID: String) {
+        delete(for: bridgeID)
+        var query = baseQuery(for: bridgeID)
+        query[kSecValueData as String] = SecureLink.keyData(key)
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status != errSecSuccess {
+            debugPrint("BridgeKeyStore: failed to save key (\(status))")
+        }
+    }
+
+    static func delete(for bridgeID: String) {
+        SecItemDelete(baseQuery(for: bridgeID) as CFDictionary)
+    }
+
+    static func deleteAll() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 }

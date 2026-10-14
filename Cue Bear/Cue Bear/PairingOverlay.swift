@@ -1,0 +1,107 @@
+//
+//  PairingOverlay.swift — Cue Bear
+//  v1.2.1: shown while the iPad pairs with a Mac running Cue Bear Bridge.
+//
+
+import SwiftUI
+
+struct PairingOverlay: View {
+    let prompt: BridgeOutput.PairingPrompt
+    let onCancel: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+
+            VStack(spacing: 18) {
+                content
+            }
+            .padding(.horizontal, 32)
+            .padding(.vertical, 28)
+            .frame(maxWidth: 440)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
+            .padding(24)
+        }
+        .transition(.opacity)
+        .accessibilityAddTraits(.isModal)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch prompt.stage {
+        case .contacting:
+            Image(systemName: "lock.shield")
+                .font(.system(size: 40, weight: .regular))
+                .foregroundStyle(.tint)
+            Text("Pairing with \(prompt.bridgeName)")
+                .font(.title3.weight(.semibold))
+                .multilineTextAlignment(.center)
+            ProgressView()
+            Button("Cancel", role: .cancel, action: onCancel)
+
+        case .confirmOnMac(let code):
+            Image(systemName: "lock.shield")
+                .font(.system(size: 40, weight: .regular))
+                .foregroundStyle(.tint)
+            Text("Pair with \(prompt.bridgeName)")
+                .font(.title3.weight(.semibold))
+                .multilineTextAlignment(.center)
+            Text("Your Mac is asking whether to allow this iPad. Click Allow on the Mac only if it shows this code:")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(SecureLink.formattedCode(code))
+                .font(.system(size: 44, weight: .semibold, design: .monospaced))
+                .monospacedDigit()
+                .padding(.vertical, 4)
+                .accessibilityLabel("Pairing code \(code.map { String($0) }.joined(separator: " "))")
+            Text("You only need to do this once for each Mac.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button("Cancel", role: .cancel, action: onCancel)
+
+        case .declined:
+            resultView(symbol: "xmark.circle",
+                       title: "Pairing Declined",
+                       message: "The Mac didn't allow this iPad. Connect again to retry.")
+
+        case .busy(let otherDevice):
+            resultView(symbol: "ipad.and.iphone",
+                       title: "Bridge In Use",
+                       message: "\(prompt.bridgeName) is connected to \(otherDevice). Disconnect it first, then try again.")
+
+        case .failed(let message):
+            resultView(symbol: "exclamationmark.triangle",
+                       title: "Couldn't Pair",
+                       message: message)
+        }
+    }
+
+    @ViewBuilder
+    private func resultView(symbol: String, title: String, message: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 40, weight: .regular))
+            .foregroundStyle(.secondary)
+        Text(title)
+            .font(.title3.weight(.semibold))
+        Text(message)
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+        Button("OK", action: onDismiss)
+            .buttonStyle(.borderedProminent)
+    }
+}
+
+#Preview {
+    PairingOverlay(
+        prompt: BridgeOutput.PairingPrompt(bridgeName: "Studio Mac", stage: .confirmOnMac(code: "482913")),
+        onCancel: {},
+        onDismiss: {}
+    )
+}
