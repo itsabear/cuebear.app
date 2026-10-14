@@ -31,15 +31,15 @@ struct AboutSheet: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 120, height: 120)
-                            .cornerRadius(26)
+                            .cornerRadius(CBRadius.panel)
                             .shadow(radius: 10)
 
                         Text("Cue Bear")
-                            .font(.custom("Sora-Bold", size: 36))
+                            .font(.cb(.heading, .bold))
 
                         VStack(spacing: 4) {
                             Text("Version \(appVersion) (\(buildNumber))")
-                                .font(.custom("Sora-Regular", size: 15))
+                                .font(.cb(.body))
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                         }
                     }
@@ -48,11 +48,11 @@ struct AboutSheet: View {
                     // Description
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Professional MIDI Cueing System")
-                            .font(.custom("Sora-Bold", size: 17))
+                            .font(.cb(.body, .bold))
                             .frame(maxWidth: .infinity, alignment: .center)
 
                         Text("Cue Bear is a powerful iPad app designed for live performers, theatrical productions, and studio musicians. Trigger MIDI cues seamlessly with your Mac using USB or WiFi connection.")
-                            .font(.custom("Sora-Regular", size: 17))
+                            .font(.cb(.body))
                             .multilineTextAlignment(.center)
                             .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                             .padding(.horizontal, 20)
@@ -64,10 +64,10 @@ struct AboutSheet: View {
                     // Credits
                     VStack(spacing: 12) {
                         Text("Created by")
-                            .font(.custom("Sora-Bold", size: 17))
+                            .font(.cb(.body, .bold))
 
                         Text("Omri Behr")
-                            .font(.custom("Sora-Bold", size: 20))
+                            .font(.cb(.large, .bold))
                     }
 
                     // Links
@@ -91,7 +91,7 @@ struct AboutSheet: View {
 
                     // Copyright
                     Text("© 2024 Omri Behr. All rights reserved.")
-                        .font(.custom("Sora-Regular", size: 12))
+                        .font(.cb(.caption))
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                         .padding(.top, 20)
                         .padding(.bottom, 40)
@@ -124,16 +124,16 @@ struct AboutSheet: View {
                 Image(systemName: "ladybug.fill")
                     .frame(width: 24)
                 Text("Report a Bug")
-                    .font(.custom("Sora-Bold", size: 17))
+                    .font(.cb(.body, .bold))
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
+                    .font(.cbIcon(.caption, .semibold))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .background(linkColor.opacity(0.1))
             .foregroundColor(linkColor)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
     }
 
@@ -158,14 +158,14 @@ struct AboutSheet: View {
                 Image(systemName: "arrow.counterclockwise")
                     .frame(width: 24)
                 Text("Reset Tutorials")
-                    .font(.custom("Sora-Bold", size: 17))
+                    .font(.cb(.body, .bold))
                 Spacer()
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .background(linkColor.opacity(0.1))
             .foregroundColor(linkColor)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
     }
 
@@ -187,16 +187,16 @@ struct AboutSheet: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .frame(width: 24)
                 Text("🧪 Test Crash (Debug Only)")
-                    .font(.custom("Sora-Bold", size: 17))
+                    .font(.cb(.body, .bold))
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
+                    .font(.cbIcon(.caption, .semibold))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .background(Color.red.opacity(0.1))
             .foregroundColor(.red)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
     }
     #endif
@@ -213,16 +213,16 @@ struct AboutSheet: View {
                 Image(systemName: icon)
                     .frame(width: 24)
                 Text(title)
-                    .font(.custom("Sora-Bold", size: 17))
+                    .font(.cb(.body, .bold))
                 Spacer()
                 Image(systemName: "arrow.up.forward")
-                    .font(.caption.weight(.semibold))
+                    .font(.cbIcon(.caption, .semibold))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .background(linkColor.opacity(0.1))
             .foregroundColor(linkColor)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
     }
 }
@@ -250,10 +250,10 @@ struct AppearanceSheet: View {
                     // Header
                     VStack(spacing: 8) {
                         Text("Choose Your Vibe")
-                            .font(.custom("Sora-Bold", size: 28))
+                            .font(.cb(.heading, .bold))
                             .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                         Text("Select a theme that matches your musical style")
-                            .font(.custom("Sora-Regular", size: 15))
+                            .font(.cb(.body))
                             .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                             .multilineTextAlignment(.center)
                     }
@@ -316,7 +316,7 @@ struct ThemePreviewCard: View {
         VStack(spacing: 12) {
             // Genre badge
             Text(theme.genre.uppercased())
-                .font(.custom("Sora-Bold", size: 9))
+                .font(.cb(.micro, .bold))
                 .foregroundColor(theme.accentColor(for: colorScheme))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -325,7 +325,7 @@ struct ThemePreviewCard: View {
 
             // Theme name
             Text(theme.name)
-                .font(.custom("Sora-Bold", size: 17))
+                .font(.cb(.body, .bold))
                 .foregroundColor(theme.primaryTextColor(for: colorScheme))
                 .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.8)
@@ -356,7 +356,7 @@ struct ThemePreviewCard: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(selectedTheme.successColor(for: colorScheme))
                 Text("ACTIVE")
-                    .font(.custom("Sora-Bold", size: 11))
+                    .font(.cb(.caption, .bold))
                     .foregroundColor(selectedTheme.successColor(for: colorScheme))
             }
             .opacity(isSelected ? 1 : 0)
@@ -364,9 +364,9 @@ struct ThemePreviewCard: View {
         .frame(maxWidth: .infinity)
         .padding(20)
         .background(theme.titleBarColor(for: colorScheme))
-        .cornerRadius(16)
+        .cornerRadius(CBRadius.card)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: CBRadius.card)
                 .stroke(isSelected ? theme.accentColor(for: colorScheme) : Color.clear, lineWidth: 3)
         )
         .shadow(color: isSelected ? theme.accentColor(for: colorScheme).opacity(0.3) : Color.black.opacity(0.1), radius: 6, x: 0, y: 3)
@@ -494,7 +494,7 @@ struct AppearanceSettingsSheet: View {
                             Spacer()
                             Text("\(Int(cueSize.wrappedValue * 100))%")
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
-                                .font(.system(.body, design: .monospaced))
+                                .font(.cbMono(.body, .regular))
                         }
 
                         Slider(value: cueSize, in: 0.7...1.5, step: 0.05)
@@ -502,11 +502,11 @@ struct AppearanceSettingsSheet: View {
 
                         HStack {
                             Text("70%")
-                                .font(.custom("Sora-Regular", size: 12))
+                                .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                             Spacer()
                             Text("150%")
-                                .font(.custom("Sora-Regular", size: 12))
+                                .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                         }
                     }
@@ -531,7 +531,7 @@ struct AppearanceSettingsSheet: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     } label: {
                         Text("Reset to Defaults")
-                            .font(.custom("Sora-Bold", size: 17))
+                            .font(.cb(.body, .bold))
                             .foregroundColor(selectedTheme.accentColor(for: colorScheme))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)

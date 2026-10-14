@@ -51,12 +51,12 @@ struct SongDetailsSheet: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(extra.title).foregroundColor(.primary)
                                     Text(extraSummary(extra))
-                                        .font(.caption)
+                                        .font(.cb(.caption))
                                         .foregroundColor(.secondary)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.caption)
+                                    .font(.cbIcon(.caption, .regular))
                                     .foregroundColor(.secondary)
                             }
                         }

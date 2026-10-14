@@ -34,7 +34,7 @@ struct BugReportView: View {
             Form {
                 Section {
                     Text("Help us improve Cue Bear by reporting any issues you've encountered.")
-                        .font(.subheadline)
+                        .font(.cb(.small))
                         .foregroundColor(.secondary)
                 } header: {
                     Text("Report a Bug")
@@ -57,12 +57,12 @@ struct BugReportView: View {
                     Text("Comments")
                 } footer: {
                     Text("Your comments help us understand and fix the issue faster. Device and app information will be included automatically.")
-                        .font(.caption)
+                        .font(.cb(.caption))
                 }
 
                 Section {
                     Text("The following information will be included: app version, device model and iOS version, memory usage, and crash logs (if available).\n\nNo personal data or project content will be shared.")
-                        .font(.caption)
+                        .font(.cb(.caption))
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                         .padding(.vertical, 4)
                 } header: {
@@ -193,16 +193,16 @@ struct CrashAlertView: View {
                 Spacer()
 
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 60))
+                    .font(.cbIcon(.hero, .regular))
                     .foregroundColor(selectedTheme.warningColor(for: colorScheme))
 
                 VStack(spacing: 12) {
                     Text("App Recovered")
-                        .font(.title2)
+                        .font(.cb(.title))
                         .fontWeight(.bold)
 
                     Text("Cue Bear encountered an issue during the last session. Would you like to send a bug report?")
-                        .font(.body)
+                        .font(.cb(.body))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
@@ -222,7 +222,7 @@ struct CrashAlertView: View {
                         .padding()
                         .background(selectedTheme.defaultCueColor(for: colorScheme))
                         .foregroundColor(buttonTextColor)
-                        .cornerRadius(12)
+                        .cornerRadius(CBRadius.card)
                     }
                     .padding(.horizontal)
 

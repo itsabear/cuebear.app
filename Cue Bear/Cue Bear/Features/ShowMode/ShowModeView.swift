@@ -180,7 +180,7 @@ struct ShowModeView: View {
     private var setlistColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("SETLIST")
-                .font(.system(size: 13, weight: .bold))
+                .font(.cb(.small, .bold))
                 .foregroundColor(.white.opacity(0.5))
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
@@ -201,7 +201,7 @@ struct ShowModeView: View {
                 }
             }
             Text("Tap a song to make it next")
-                .font(.system(size: 13))
+                .font(.cb(.small))
                 .foregroundColor(.white.opacity(0.45))
                 .padding(20)
         }
@@ -213,7 +213,7 @@ struct ShowModeView: View {
         return Button(action: { chooseNext(song) }) {
             HStack(spacing: 12) {
                 Text("\(index + 1)")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.cb(.body, .semibold))
                     .foregroundColor(.white.opacity(0.5))
                     .frame(width: 28, alignment: .trailing)
                 Text(song.name)
@@ -222,19 +222,19 @@ struct ShowModeView: View {
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 if isNow {
-                    Text("NOW").font(.system(size: 11, weight: .bold)).foregroundColor(accent)
+                    Text("NOW").font(.cb(.caption, .bold)).foregroundColor(accent)
                 } else if isNext {
-                    Text("NEXT").font(.system(size: 11, weight: .bold)).foregroundColor(.white.opacity(0.7))
+                    Text("NEXT").font(.cb(.caption, .bold)).foregroundColor(.white.opacity(0.7))
                 }
             }
             .padding(.horizontal, 12)
             .frame(height: 48)
             .background(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: CBRadius.control)
                     .fill(isNow ? accent.opacity(0.25) : Color.white.opacity(0.04))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: CBRadius.control)
                     .stroke(isNow ? accent : (isNext ? Color.white.opacity(0.5) : Color.clear), lineWidth: isNow ? 2 : 1)
             )
             .contentShape(Rectangle())
@@ -261,7 +261,7 @@ struct ShowModeView: View {
                         Button(action: { chooseNext(song) }) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("\(index + 1)")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.cb(.caption, .semibold))
                                     .foregroundColor(.white.opacity(0.5))
                                 Text(song.name)
                                     .font(.system(size: 15, weight: song.id == currentID ? .bold : .regular))
@@ -270,9 +270,9 @@ struct ShowModeView: View {
                             }
                             .padding(10)
                             .frame(width: 150, alignment: .leading)
-                            .background(RoundedRectangle(cornerRadius: 10)
+                            .background(RoundedRectangle(cornerRadius: CBRadius.control)
                                 .fill(song.id == currentID ? accent.opacity(0.25) : Color.white.opacity(0.05)))
-                            .overlay(RoundedRectangle(cornerRadius: 10)
+                            .overlay(RoundedRectangle(cornerRadius: CBRadius.control)
                                 .stroke(song.id == nextID ? Color.white.opacity(0.5) : Color.clear, lineWidth: 1))
                         }
                         .buttonStyle(.plain)
@@ -309,12 +309,12 @@ struct ShowModeView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(projectName)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.cb(.body, .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                 if let list = store.activeCueList {
                     Text(list.name)
-                        .font(.system(size: 13))
+                        .font(.cb(.small))
                         .foregroundColor(.white.opacity(0.55))
                         .lineLimit(1)
                 }
@@ -327,9 +327,9 @@ struct ShowModeView: View {
 
     private var exitButton: some View {
         HStack(spacing: 6) {
-            Image(systemName: "lock.fill").font(.system(size: 13, weight: .semibold))
+            Image(systemName: "lock.fill").font(.cbIcon(.small, .semibold))
             Text(showExitHint ? "Hold to exit" : "Exit")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.cb(.small, .semibold))
         }
         .foregroundColor(.white.opacity(0.85))
         .padding(.horizontal, 14)
@@ -354,83 +354,83 @@ struct ShowModeView: View {
     private var nowCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("NOW")
-                .font(.system(size: 13, weight: .bold))
+                .font(.cb(.small, .bold))
                 .foregroundColor(.white.opacity(0.55))
             if let song = currentSong {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     if let i = songs.firstIndex(where: { $0.id == song.id }) {
                         Text("\(i + 1)")
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .font(.cb(.heading, .bold))
                             .foregroundColor(.white.opacity(0.5))
                     }
                     Text(song.name)
-                        .font(.system(size: 40, weight: .bold))
+                        .font(.cb(.display, .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
                 if let sub = song.subtitle, !sub.isEmpty {
                     Text(sub)
-                        .font(.system(size: 20))
+                        .font(.cb(.large))
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(1)
                 }
                 if let notes = song.notes, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(notes)
-                        .font(.system(size: 20))
+                        .font(.cb(.large))
                         .foregroundColor(.white.opacity(0.65))
                         .lineLimit(3)
                 }
             } else {
                 Text("Ready")
-                    .font(.system(size: 40, weight: .bold))
+                    .font(.cb(.display, .bold))
                     .foregroundColor(.white.opacity(0.85))
                 Text("Press GO to start the first song")
-                    .font(.system(size: 20))
+                    .font(.cb(.large))
                     .foregroundColor(.white.opacity(0.6))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(RoundedRectangle(cornerRadius: 16).fill(accent.opacity(0.14)))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent, lineWidth: 2))
+        .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(accent.opacity(0.14)))
+        .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(accent, lineWidth: 2))
         .accessibilityElement(children: .combine)
     }
 
     private var nextCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("NEXT")
-                .font(.system(size: 13, weight: .bold))
+                .font(.cb(.small, .bold))
                 .foregroundColor(.white.opacity(0.55))
             if let song = nextSong {
                 Text(song.name)
-                    .font(.system(size: 26, weight: .semibold))
+                    .font(.cb(.title, .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             } else {
                 Text("End of the set")
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.cb(.title, .semibold))
                     .foregroundColor(.white.opacity(0.5))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.2), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(Color.white.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(Color.white.opacity(0.2), lineWidth: 1))
         .accessibilityElement(children: .combine)
     }
 
     private var goButton: some View {
         Button(action: go) {
             Text("GO")
-                .font(.system(size: 44, weight: .heavy, design: .rounded))
+                .font(.cb(.display, .heavy))
                 .foregroundColor(nextSong == nil ? .white.opacity(0.35) : .white)
                 .frame(width: 200)
                 .frame(maxHeight: .infinity)
-                .background(RoundedRectangle(cornerRadius: 16)
+                .background(RoundedRectangle(cornerRadius: CBRadius.card)
                     .fill(nextSong == nil ? Color.white.opacity(0.06) : accent.opacity(goPressed ? 0.95 : 0.6)))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent, lineWidth: 3))
+                .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(accent, lineWidth: 3))
                 .scaleEffect(goPressed ? 0.97 : 1)
         }
         .buttonStyle(.plain)
@@ -458,11 +458,11 @@ struct ShowModeView: View {
             VStack(alignment: .leading, spacing: 14) {
                 if controlButtons.isEmpty && songExtras.isEmpty {
                     Text("No controls yet. Add them in the main screen's control area.")
-                        .font(.system(size: 15))
+                        .font(.cb(.body))
                         .foregroundColor(.white.opacity(0.5))
                 } else {
                     Text("CONTROLS")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.cb(.small, .bold))
                         .foregroundColor(.white.opacity(0.5))
                     HStack(alignment: .top, spacing: 20) {
                         buttonGrid
@@ -587,26 +587,26 @@ private struct ShowControlTile: View {
             VStack(spacing: 6) {
                 if !symbol.isEmpty {
                     Image(systemName: symbol)
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.cbIcon(.large, .semibold))
                 }
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.cb(.body, .semibold))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                 if isExtra {
                     Text("this song")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.cb(.caption, .medium))
                         .foregroundColor(.white.opacity(0.6))
                 }
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity, minHeight: 72)
             .padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 12)
+            .background(RoundedRectangle(cornerRadius: CBRadius.card)
                 .fill(isOn ? accent.opacity(0.7) : (isExtra ? accent.opacity(0.16) : Color.white.opacity(0.08))))
-            .overlay(RoundedRectangle(cornerRadius: 12)
+            .overlay(RoundedRectangle(cornerRadius: CBRadius.card)
                 .stroke(isExtra ? accent : Color.white.opacity(0.2), lineWidth: isExtra ? 2 : 1))
-            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: CBRadius.card))
         }
         .buttonStyle(IOSPressButtonStyle())
         .accessibilityLabel(title)
@@ -624,16 +624,16 @@ private struct ShowFaderRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.cb(.body, .semibold))
                     .foregroundColor(.white.opacity(0.85))
                 if isExtra {
                     Text("this song")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.cb(.caption, .medium))
                         .foregroundColor(accent)
                 }
                 Spacer()
                 Text("\(Int((value * 127).rounded()))")
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .font(.cbMono(.small, .medium))
                     .foregroundColor(.white.opacity(0.5))
             }
             Slider(value: $value, in: 0...1)
@@ -641,8 +641,8 @@ private struct ShowFaderRow: View {
                 .accessibilityLabel(title)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(isExtra ? accent.opacity(0.12) : Color.white.opacity(0.05)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(isExtra ? accent : Color.clear, lineWidth: 1.5))
+        .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(isExtra ? accent.opacity(0.12) : Color.white.opacity(0.05)))
+        .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(isExtra ? accent : Color.clear, lineWidth: 1.5))
     }
 }
 
@@ -658,7 +658,7 @@ struct ShowStatusPill: View {
             HStack(spacing: 8) {
                 Circle().fill(status.color).frame(width: 10, height: 10)
                 Text(status.text)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.cb(.small, .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
             }

@@ -257,6 +257,8 @@ struct AppTheme: Identifiable, Codable, Equatable {
     func font(size: CGFloat, weight: Font.Weight = .regular) -> Font {
         if fontName == "System" {
             return .system(size: size, weight: weight)
+        } else if fontName.hasPrefix("Sora") {
+            return .cb(points: size, weight)   // the interface typeface: honor the weight
         } else {
             return .custom(fontName, size: size)
         }

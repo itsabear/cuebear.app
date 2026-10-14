@@ -34,13 +34,13 @@ struct ThemeAdminPanel: View {
                     // Header
                     VStack(spacing: 8) {
                         Image(systemName: "paintpalette.fill")
-                            .font(.system(size: 48))
+                            .font(.cbIcon(.display, .regular))
                             .foregroundColor(currentTheme.accentColor(for: colorScheme))
                         Text("Theme Admin Panel")
-                            .font(.title.bold())
+                            .font(.cb(.heading, .bold))
                             .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                         Text("🔒 Debug Mode Only")
-                            .font(.caption)
+                            .font(.cb(.caption))
                             .foregroundColor(.orange)
                     }
                     .padding(.top)
@@ -50,7 +50,7 @@ struct ThemeAdminPanel: View {
                     // Theme Selector
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Select Theme")
-                            .font(.headline)
+                            .font(.cb(.body, .semibold))
                             .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
 
                         Picker("Theme", selection: $selectedThemeIndex) {
@@ -63,18 +63,18 @@ struct ThemeAdminPanel: View {
                         // Theme Info
                         VStack(alignment: .leading, spacing: 4) {
                             Text("ID: \(selectedTheme.id)")
-                                .font(.system(size: 12, design: .monospaced))
+                                .font(.cbMono(.caption))
                             Text("Genre: \(selectedTheme.genre)")
-                                .font(.system(size: 12, design: .monospaced))
+                                .font(.cbMono(.caption))
                             Text("Font: \(selectedTheme.fontName)")
-                                .font(.system(size: 12, design: .monospaced))
+                                .font(.cbMono(.caption))
                             Text("Dark Mode: \(selectedTheme.darkModeBehavior.rawValue)")
-                                .font(.system(size: 12, design: .monospaced))
+                                .font(.cbMono(.caption))
                         }
                         .foregroundColor(currentTheme.secondaryTextColor(for: colorScheme))
                         .padding()
                         .background(currentTheme.titleBarColor(for: colorScheme))
-                        .cornerRadius(8)
+                        .cornerRadius(CBRadius.small)
                     }
                     .padding(.horizontal)
 
@@ -180,7 +180,7 @@ struct ColorDisplaySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Colors")
-                .font(.headline)
+                .font(.cb(.body, .semibold))
                 .foregroundColor(currentTheme.primaryTextColor(for: systemColorScheme))
                 .padding(.horizontal)
 
@@ -209,11 +209,11 @@ struct ColorRow: View {
     var body: some View {
         HStack {
             // Color swatch (tappable to open color picker only for base colors)
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: CBRadius.small)
                 .fill(Color(hex: hex))
                 .frame(width: 60, height: 40)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 )
                 .onTapGesture {
@@ -225,11 +225,11 @@ struct ColorRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(name)
-                    .font(.subheadline)
+                    .font(.cb(.small))
                     .italic(isDerived)
                     .foregroundColor(isDerived ? .secondary : .primary)
                 Text("#\(hex)")
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.cbMono(.caption))
                     .foregroundColor(.secondary)
             }
 
@@ -250,17 +250,17 @@ struct ColorRow: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(Color.gray.opacity(0.05))
-        .cornerRadius(8)
+        .cornerRadius(CBRadius.small)
         .padding(.horizontal)
         .popover(isPresented: $showColorPicker) {
             VStack(spacing: 16) {
                 Text("Color Picker (Preview Only)")
-                    .font(.headline)
+                    .font(.cb(.body, .semibold))
                 ColorPicker("Select Color", selection: $selectedColor)
                     .padding()
 
                 Text("New Hex: \(selectedColor.toHex() ?? hex)")
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.cbMono(.caption))
                     .foregroundColor(.secondary)
 
                 HStack {
@@ -279,7 +279,7 @@ struct ColorRow: View {
                 }
 
                 Text("Note: Changes are not saved. Copy the hex code and update AppTheme.swift manually.")
-                    .font(.caption)
+                    .font(.cb(.caption))
                     .foregroundColor(.orange)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
@@ -310,7 +310,7 @@ struct ContrastCheckerSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Contrast Ratios (WCAG)")
-                .font(.headline)
+                .font(.cb(.body, .semibold))
                 .padding(.horizontal)
 
             VStack(spacing: 8) {
@@ -325,11 +325,11 @@ struct ContrastCheckerSection: View {
             }
             .padding()
             .background(Color.gray.opacity(0.1))
-            .cornerRadius(12)
+            .cornerRadius(CBRadius.card)
             .padding(.horizontal)
 
             Text("Standards: AAA ≥7.0 | AA ≥4.5 | Large AA ≥3.0")
-                .font(.caption)
+                .font(.cb(.caption))
                 .foregroundColor(.secondary)
                 .padding(.horizontal)
         }
@@ -384,13 +384,13 @@ struct ContrastRow: View {
     var body: some View {
         HStack {
             Text(label)
-                .font(.subheadline)
+                .font(.cb(.small))
             Spacer()
             Text(String(format: "%.2f:1", ratio))
-                .font(.system(size: 14, design: .monospaced))
+                .font(.cbMono(.small))
                 .foregroundColor(.secondary)
             Text(rating.0)
-                .font(.caption.bold())
+                .font(.cb(.caption, .bold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -409,7 +409,7 @@ struct ExportSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Export")
-                .font(.headline)
+                .font(.cb(.body, .semibold))
                 .padding(.horizontal)
 
             Button(action: {
@@ -424,7 +424,7 @@ struct ExportSection: View {
                 .padding()
                 .background(Color.blue)
                 .foregroundColor(.white)
-                .cornerRadius(12)
+                .cornerRadius(CBRadius.card)
             }
             .padding(.horizontal)
 
@@ -440,7 +440,7 @@ struct ExportSection: View {
                 .padding()
                 .background(Color.purple)
                 .foregroundColor(.white)
-                .cornerRadius(12)
+                .cornerRadius(CBRadius.card)
             }
             .padding(.horizontal)
         }
@@ -494,7 +494,7 @@ struct ExportCodeView: View {
         NavigationView {
             ScrollView {
                 Text(code)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.cbMono(.caption))
                     .padding()
                     .textSelection(.enabled)
             }

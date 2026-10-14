@@ -50,7 +50,7 @@ private struct ColorTile: View {
             if let hex = colorHex {
                 Color(hex: hex)
                     .aspectRatio(1, contentMode: .fit)
-                    .cornerRadius(8)
+                    .cornerRadius(CBRadius.small)
             } else {
                 // Default/None tile - show checkered pattern
                 ZStack {
@@ -59,11 +59,11 @@ private struct ColorTile: View {
                         .foregroundColor(.secondary)
                 }
                 .aspectRatio(1, contentMode: .fit)
-                .cornerRadius(8)
+                .cornerRadius(CBRadius.small)
             }
 
             if isSelected {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: CBRadius.small)
                     .stroke(Color.white, lineWidth: 3)
             }
         }

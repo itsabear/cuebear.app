@@ -75,15 +75,15 @@ struct CBPerformanceList: View {
                     if songs.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "music.note.list")
-                                .font(.system(size: 60))
+                                .font(.cbIcon(.hero, .regular))
                                 .foregroundColor(.gray.opacity(0.5))
 
                             Text("You still have no cues in your cue list")
-                                .font(.title3)
+                                .font(.cb(.large))
                                 .foregroundColor(.gray)
 
                             Text("Cues are MIDI buttons arranged like a scrollable set list. Click \"Edit\" to add your first cues.")
-                                .font(.body)
+                                .font(.cb(.body))
                                 .foregroundColor(.gray.opacity(0.7))
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
@@ -424,7 +424,7 @@ struct CBPerformanceRow: View {
                     // Subtitle at top
                     if let sub = song.subtitle, !sub.isEmpty {
                         Text(sub)
-                            .font(.custom("Sora-Regular", size: 14 * fontSize))
+                            .font(.cb(points: 14 * fontSize))
                             .foregroundColor(adaptiveTextColor.opacity(0.6))
                             .lineLimit(1)
                     }
@@ -433,16 +433,16 @@ struct CBPerformanceRow: View {
                         if let originalCue = songLibrary.first(where: { $0.id == aliasedID }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "arrow.turn.down.right")
-                                    .font(.system(size: 12 * fontSize, weight: .semibold))
+                                    .font(.cbIcon(points: 12 * fontSize, .semibold))
                                 Text("Copy of \(originalCue.name)")
-                                    .font(.custom("Sora-Regular", size: 14 * fontSize))
+                                    .font(.cb(points: 14 * fontSize))
                             }
                             .foregroundColor(adaptiveTextColor.opacity(0.6))
                             .lineLimit(1)
                         }
                     } else if let subtitle = song.subtitle, subtitle.hasPrefix("copy of ") {
                         Image(systemName: "doc.on.doc")
-                            .font(.system(size: 12 * fontSize, weight: .semibold))
+                            .font(.cbIcon(points: 12 * fontSize, .semibold))
                             .foregroundColor(adaptiveTextColor.opacity(0.6))
                     }
 
@@ -451,13 +451,13 @@ struct CBPerformanceRow: View {
                     // Name large at bottom
                     HStack(spacing: 6) {
                         Text(song.name)
-                            .font(.custom("Sora-Bold", size: 21 * fontSize))
+                            .font(.cb(points: 21 * fontSize, .bold))
                             .foregroundColor(adaptiveTextColor)
                             .lineLimit(1)
                         // v1.3 (Cue Bear Next): this song has notes, extras or remembered levels
                         if song.hasSongDetails {
                             Image(systemName: "music.note.list")
-                                .font(.system(size: 13 * fontSize, weight: .semibold))
+                                .font(.cbIcon(points: 13 * fontSize, .semibold))
                                 .foregroundColor(adaptiveTextColor.opacity(0.7))
                                 .accessibilityLabel("Has notes or extras")
                         }
@@ -478,13 +478,13 @@ struct CBPerformanceRow: View {
                             }
                         }()
                         Text(midiText)
-                            .font(.custom("Sora-Regular", size: 13 * fontSize))
+                            .font(.cb(points: 13 * fontSize))
                             .foregroundColor(adaptiveTextColor.opacity(0.6))
 
                         // Show conflict warning below MIDI data
                         if let owner = takenBy {
                             Text("⚠️ MIDI taken by: \(owner)")
-                                .font(.caption2)
+                                .font(.cb(.micro))
                                 .foregroundColor(adaptiveTextColor.opacity(0.8))
                                 .lineLimit(1)
                         }
@@ -494,7 +494,7 @@ struct CBPerformanceRow: View {
                 // Drag handle - show only in reorder mode with slide-in animation
                 if reorderMode {
                     Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 20 * fontSize, weight: .semibold))
+                        .font(.cbIcon(points: 20 * fontSize, .semibold))
                         .foregroundColor(adaptiveTextColor.opacity(0.5))
                         .padding(.leading, 8)
                         .padding(.vertical, 8)
@@ -637,12 +637,12 @@ struct CBSetlistRow: View {
                     .truncationMode(.tail)
                 if let sub = song.subtitle, !sub.isEmpty {
                     Text(sub)
-                        .font(.caption)
+                        .font(.cb(.caption))
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                         .lineLimit(1)
                         .truncationMode(.tail)
                 } else {
-                    Text(" ").font(.caption).foregroundColor(.clear)
+                    Text(" ").font(.cb(.caption)).foregroundColor(.clear)
                 }
             }
             Spacer()
@@ -660,7 +660,7 @@ struct CBSetlistRow: View {
                         }
                     }()
                     Text(midiInfo)
-                        .font(.caption2)
+                        .font(.cb(.micro))
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
 
                     // Color indicator circle (always reserve space for alignment)
@@ -680,7 +680,7 @@ struct CBSetlistRow: View {
                 // Show conflict warning below MIDI info
                 if let owner = filteredTakenBy() {
                     Text("⚠️ MIDI taken by: \(owner)")
-                        .font(.caption2)
+                        .font(.cb(.micro))
                         .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                         .lineLimit(1)
                 }
@@ -736,25 +736,25 @@ struct CBSetlistDragPreview: View {
                     .truncationMode(.tail)
                 if let sub = song.subtitle, !sub.isEmpty {
                     Text(sub)
-                        .font(.caption)
+                        .font(.cb(.caption))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 } else {
-                    Text(" ").font(.caption).foregroundColor(.clear)
+                    Text(" ").font(.cb(.caption)).foregroundColor(.clear)
                 }
             }
             Spacer()
             // Show drag handle on the right during drag
             Image(systemName: "line.3.horizontal")
                 .foregroundColor(.secondary)
-                .font(.title3)
+                .font(.cbIcon(.large, .regular))
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 14)
         .frame(width: 300, alignment: .leading) // Fixed width for preview
         .background(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: CBRadius.control)
                 .fill(Color.accentColor.opacity(0.15))
                 .shadow(color: Color.accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
         )
@@ -808,7 +808,7 @@ struct CBSetlistColumn: View {
                     }
                 } label: {
                     Image(systemName: reorderMode ? "checkmark" : "list.dash")
-                        .font(.system(size: 17))
+                        .font(.cbIcon(.body, .regular))
                         .frame(width: 24, height: 24)
                         .foregroundStyle(selectedTheme.accentColor(for: colorScheme))
                 }
@@ -826,7 +826,7 @@ struct CBSetlistColumn: View {
                     }
                 } label: {
                     Image(systemName: batchMode ? "xmark" : "checkmark.circle")
-                        .font(.system(size: 17))
+                        .font(.cbIcon(.body, .regular))
                         .frame(width: 24, height: 24)
                         .foregroundStyle(selectedTheme.accentColor(for: colorScheme))
                 }
@@ -864,7 +864,7 @@ struct CBSetlistColumn: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.gray)
-                        .font(.body)
+                        .font(.cbIcon(.body, .regular))
 
                     TextField("Search cues...", text: $searchText)
                         .textFieldStyle(.plain)
@@ -877,7 +877,7 @@ struct CBSetlistColumn: View {
                         }) {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.gray)
-                                .font(.body)
+                                .font(.cbIcon(.body, .regular))
                         }
                         .buttonStyle(.plain)
                     }
@@ -885,7 +885,7 @@ struct CBSetlistColumn: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(selectedTheme.titleBarColor(for: colorScheme).opacity(0.8))
-                .cornerRadius(10)
+                .cornerRadius(CBRadius.control)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
             }
@@ -904,7 +904,7 @@ struct CBSetlistColumn: View {
                                         .fill(Color.accentColor)
                                         .frame(width: 24, height: 24)
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(.cbIcon(.caption, .bold))
                                         .foregroundColor(.white)
                                 }
                             }
@@ -1023,7 +1023,7 @@ struct CBLibraryColumn: View {
                     .tint(selectedTheme.accentColor(for: colorScheme))
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 17))
+                        .font(.cbIcon(.body, .regular))
                         .frame(width: 24, height: 24)
                         .foregroundStyle(selectedTheme.accentColor(for: colorScheme))
                 }
@@ -1034,7 +1034,7 @@ struct CBLibraryColumn: View {
                     if !batchMode { selected.removeAll() }
                 } label: {
                     Image(systemName: batchMode ? "xmark" : "checkmark.circle")
-                        .font(.system(size: 17))
+                        .font(.cbIcon(.body, .regular))
                         .frame(width: 24, height: 24)
                         .foregroundStyle(selectedTheme.accentColor(for: colorScheme))
                 }
@@ -1079,7 +1079,7 @@ struct CBLibraryColumn: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.gray)
-                        .font(.body)
+                        .font(.cbIcon(.body, .regular))
 
                     TextField("Search songs...", text: $searchText)
                         .textFieldStyle(.plain)
@@ -1092,7 +1092,7 @@ struct CBLibraryColumn: View {
                         }) {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.gray)
-                                .font(.body)
+                                .font(.cbIcon(.body, .regular))
                         }
                         .buttonStyle(.plain)
                     }
@@ -1100,7 +1100,7 @@ struct CBLibraryColumn: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(selectedTheme.titleBarColor(for: colorScheme).opacity(0.8))
-                .cornerRadius(10)
+                .cornerRadius(CBRadius.control)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
             }
@@ -1119,7 +1119,7 @@ struct CBLibraryColumn: View {
                                         .fill(Color.accentColor)
                                         .frame(width: 24, height: 24)
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(.cbIcon(.caption, .bold))
                                         .foregroundColor(.white)
                                 }
                             }
@@ -1134,12 +1134,12 @@ struct CBLibraryColumn: View {
                                 .truncationMode(.tail)
                             if let sub = row.song.subtitle, !sub.isEmpty {
                                 Text(sub)
-                                    .font(.caption)
+                                    .font(.cb(.caption))
                                     .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                                     .lineLimit(1)
                                     .truncationMode(.tail)
                             } else {
-                                Text(" ").font(.caption).foregroundColor(.clear)
+                                Text(" ").font(.cb(.caption)).foregroundColor(.clear)
                             }
                         }
                         Spacer()
@@ -1157,7 +1157,7 @@ struct CBLibraryColumn: View {
                                     }
                                 }()
                                 Text(midiInfo)
-                                    .font(.caption2)
+                                    .font(.cb(.micro))
                                     .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
 
                                 // Color indicator circle (always reserve space for alignment)
@@ -1177,7 +1177,7 @@ struct CBLibraryColumn: View {
                             // Show conflict warning below MIDI info
                             if let owner = filteredTakenBy(for: row.song) {
                                 Text("⚠️ MIDI taken by: \(owner)")
-                                    .font(.caption2)
+                                    .font(.cb(.micro))
                                     .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                     .lineLimit(1)
                             }
@@ -1276,11 +1276,11 @@ struct CBRowLikeLibrary<Leading: View, Trailing: View>: View {
         HStack(spacing: 12) {
             leading()
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.body.bold()).foregroundColor(.primary)
+                Text(title).font(.cb(.body, .bold)).foregroundColor(.primary)
                 if let sub = subtitle, !sub.isEmpty {
-                    Text(sub).font(.caption).foregroundColor(.secondary)
+                    Text(sub).font(.cb(.caption)).foregroundColor(.secondary)
                 } else {
-                    Text(" ").font(.caption).foregroundColor(.clear)
+                    Text(" ").font(.cb(.caption)).foregroundColor(.clear)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1400,13 +1400,13 @@ private struct BridgeDeviceCard: View {
             // Computer name
             VStack(alignment: .leading, spacing: 2) {
                 Text(computerName)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.cb(.body, .medium))
                     .foregroundColor(isConnected ? connectionType.connectedColor : connectionType.color)
                     .lineLimit(2)
                     .truncationMode(.tail)
                 
                 Text(connectionType == .usb ? "USB Bridge" : "WiFi Bridge")
-                    .font(.system(size: 12, weight: .regular))
+                    .font(.cb(.caption, .regular))
                     .foregroundColor(.secondary)
             }
             
@@ -1422,7 +1422,7 @@ private struct BridgeDeviceCard: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: CBRadius.card)
                 .fill(isConnected ? 
                     LinearGradient(
                         colors: [connectionType.connectedColor.opacity(0.08), connectionType.connectedColor.opacity(0.04)],
@@ -1437,7 +1437,7 @@ private struct BridgeDeviceCard: View {
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: CBRadius.card)
                 .stroke(
                     isConnected ? 
                         LinearGradient(
@@ -1561,11 +1561,11 @@ struct CBConnectionsSheet: View {
                 .tint(selectedTheme.accentColor(for: colorScheme))
 
             Text("Searching for bridges...")
-                .font(.headline)
+                .font(.cb(.body, .semibold))
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
 
             Text("Looking for USB and Wi-Fi connections")
-                .font(.subheadline)
+                .font(.cb(.small))
                 .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1608,7 +1608,7 @@ struct CBConnectionsSheet: View {
                     } else {
                         Text("Bridge app not running")
                             .foregroundColor(.secondary)
-                            .font(.caption)
+                            .font(.cb(.caption))
                             .transition(.opacity)
                             .animation(.easeInOut(duration: 0.2), value: usbServer.usbBridgeAvailable)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
@@ -1670,20 +1670,20 @@ struct CBConnectionsSheet: View {
             VStack(spacing: 20) {
                 // Icon - matching onboarding style (72pt, light weight)
                 Image(systemName: "laptopcomputer.and.arrow.down")
-                    .font(.system(size: 72, weight: .light))
+                    .font(.cbIcon(.hero, .light))
                     .foregroundColor(accentColor)
                     .frame(height: 72)
 
                 // Title - matching onboarding style (28pt, bold, rounded)
                 Text("Ready to Connect?")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.cb(.heading, .bold))
                     .multilineTextAlignment(.center)
                     .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                     .padding(.horizontal, 40)
 
                 // Description - matching onboarding style (17pt, secondary)
                 Text("Download Cue Bear Bridge for your Mac to start sending MIDI to your DAW.")
-                    .font(.system(size: 17, weight: .regular))
+                    .font(.cb(.body, .regular))
                     .multilineTextAlignment(.center)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 50)
@@ -1698,20 +1698,20 @@ struct CBConnectionsSheet: View {
                             .frame(width: 160, height: 160)
                             .padding(12)
                             .background(selectedTheme.titleBarColor(for: colorScheme))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
                     } else {
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: CBRadius.card)
                             .fill(selectedTheme.titleBarColor(for: colorScheme))
                             .frame(width: 160, height: 160)
                             .overlay(
                                 Image(systemName: "qrcode")
-                                    .font(.system(size: 60))
+                                    .font(.cbIcon(.hero, .regular))
                                     .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.5))
                             )
                     }
 
                     Text("Scan to download")
-                        .font(.system(size: 14))
+                        .font(.cb(.small))
                         .foregroundColor(.secondary)
                 }
                 .padding(.top, 8)
@@ -1729,21 +1729,21 @@ struct CBConnectionsSheet: View {
                 }) {
                     HStack(spacing: 8) {
                         Text("cuebear.app/bridge")
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.cb(.body, .semibold))
                         Image(systemName: "arrow.up.forward")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.cbIcon(.small, .semibold))
                     }
                     .foregroundColor(selectedTheme.accentContrastColor(for: colorScheme))
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(accentColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
                 }
                 .padding(.horizontal, 40)
 
                 // Footer text
                 Text("Once installed, connections will appear here automatically")
-                    .font(.system(size: 14))
+                    .font(.cb(.small))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -1989,7 +1989,7 @@ struct CBAddEditCueSheet: View {
                 Section(header: Text("MIDI").foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))) {
                     if midiFiltersEnabled && !midiFilter.isEmpty {
                         Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
-                            .font(.caption)
+                            .font(.cb(.caption))
                             .foregroundColor(.secondary)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
@@ -2149,18 +2149,16 @@ struct CBAddEditCueSheet: View {
         let isDisabled = (midiEnabled && conflictOwner() != nil) || (midiEnabled && midiFiltersEnabled && isFilteredMIDI())
         return HStack {
             Button("Cancel") { onCancel() }
-                .font(.custom("Sora-Regular", size: 15))
+                .font(.cb(.body))
                 .foregroundColor(.white)
                 .padding(.horizontal, 14)
                 .frame(height: 44)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
 
             Spacer()
 
             Text(editingSong == nil ? "Add Cue" : "Edit Cue")
-                .font(.custom("Sora-Bold", size: 17))
+                .font(.cb(.body, .bold))
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
 
             Spacer()
@@ -2210,29 +2208,25 @@ struct CBAddEditCueSheet: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.cbIcon(.large, .medium))
                         .foregroundColor(.white)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
 
                 // Primary action button (checkmark)
                 Button {
                     save(andAddAnother: false)
                 } label: {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.cbIcon(.large, .semibold))
                         .foregroundColor(isDisabled ? .white.opacity(0.3) : .white)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .disabled(isDisabled)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
             }
         }
         .padding(.horizontal, 16)
@@ -2862,19 +2856,19 @@ struct SongLibraryPopover: View {
                 // Search bar — always present, animates between full width and circular icon
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: batchSelectMode ? 18 : 16))
+                        .font(.cbIcon(points: batchSelectMode ? 18 : 16, .regular))
                         .foregroundColor(defaultCueColor)
 
                     if !batchSelectMode {
                         TextField("Search songs...", text: $searchQuery)
-                            .font(.system(size: 15))
+                            .font(.cb(.body))
                             .foregroundColor(textColor)
                             .focused($isSearchFocused)
 
                         if !searchQuery.isEmpty {
                             Button(action: { searchQuery = "" }) {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 16))
+                                    .font(.cbIcon(.body, .regular))
                                     .foregroundColor(defaultCueColor.opacity(0.6))
                             }
                             .buttonStyle(.plain)
@@ -2884,9 +2878,7 @@ struct SongLibraryPopover: View {
                 .padding(.horizontal, batchSelectMode ? 0 : 14)
                 .frame(width: batchSelectMode ? 44 : nil, height: 44)
                 .frame(maxWidth: batchSelectMode ? nil : .infinity)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
                 .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                 .onTapGesture {
                     if batchSelectMode {
@@ -2922,16 +2914,16 @@ struct SongLibraryPopover: View {
                         }
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
-                            .font(.system(size: 18))
+                            .font(.cbIcon(.large, .regular))
                             .foregroundColor(.white.opacity(0.9))
                             .frame(width: 44, height: 44)
                             .background(
-                                RoundedRectangle(cornerRadius: 10)
+                                RoundedRectangle(cornerRadius: CBRadius.control)
                                     .fill(Color.black.opacity(0.5))
                                     .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                             )
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
                     }
                 }
 
@@ -2942,7 +2934,7 @@ struct SongLibraryPopover: View {
                             selectedSongs = Set(filteredSongs.map { $0.id })
                         }) {
                             Text("All")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.cb(.small, .medium))
                                 .foregroundColor(defaultCueColor)
                                 .padding(.horizontal, 10)
                                 .frame(height: 44)
@@ -2953,7 +2945,7 @@ struct SongLibraryPopover: View {
                             selectedSongs.removeAll()
                         }) {
                             Text("Clear")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.cb(.small, .medium))
                                 .foregroundColor(defaultCueColor)
                                 .padding(.horizontal, 10)
                                 .frame(height: 44)
@@ -2971,7 +2963,7 @@ struct SongLibraryPopover: View {
                             UIImpactFeedbackGenerator().impactOccurred(intensity: 0.7)
                         }) {
                             Text("Add")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.cb(.small, .medium))
                                 .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .green)
                                 .padding(.horizontal, 10)
                                 .frame(height: 44)
@@ -2985,7 +2977,7 @@ struct SongLibraryPopover: View {
                             }
                         }) {
                             Text("Delete")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.cb(.small, .medium))
                                 .foregroundColor(selectedSongs.isEmpty ? textColor.opacity(0.3) : .red)
                                 .padding(.horizontal, 10)
                                 .frame(height: 44)
@@ -3005,7 +2997,7 @@ struct SongLibraryPopover: View {
                             }
                         }) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.cbIcon(.small, .medium))
                                 .foregroundColor(defaultCueColor)
                                 .frame(width: 36, height: 44)
                         }
@@ -3018,16 +3010,14 @@ struct SongLibraryPopover: View {
                             }
                         }) {
                             Image(systemName: "checklist")
-                                .font(.system(size: 18))
+                                .font(.cbIcon(.large, .regular))
                                 .foregroundColor(defaultCueColor)
                                 .frame(width: 44, height: 44)
                         }
                         .buttonStyle(IOSPressButtonStyle())
                     }
                 }
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
                 .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: batchSelectMode)
             }
@@ -3083,12 +3073,12 @@ struct SongLibraryPopover: View {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(song.name)
-                            .font(.system(size: 17, weight: .medium))
+                            .font(.cb(.body, .medium))
                             .foregroundColor(isInCueList ? textColor.opacity(0.4) : textColor)
 
                         if let subtitle = song.subtitle, !subtitle.isEmpty {
                             Text(subtitle)
-                                .font(.system(size: 14))
+                                .font(.cb(.small))
                                 .foregroundColor(isInCueList ? textColor.opacity(0.3) : textColor.opacity(0.6))
                         }
                     }
@@ -3106,12 +3096,12 @@ struct SongLibraryPopover: View {
                         }()
 
                         Text(midiText)
-                            .font(.caption2)
+                            .font(.cb(.micro))
                             .foregroundColor(textColor.opacity(0.6))
                             .padding(.trailing, 8)
                     } else {
                         Text("No MIDI")
-                            .font(.caption2)
+                            .font(.cb(.micro))
                             .foregroundColor(textColor.opacity(0.4))
                             .padding(.trailing, 8)
                     }
@@ -3147,7 +3137,7 @@ struct SongLibraryPopover: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.cbIcon(.body, .semibold))
                                 .foregroundColor(textColor.opacity(0.6))
                                 .frame(width: 32, height: 32)
                                 .contentShape(Rectangle())
@@ -3287,10 +3277,10 @@ struct CueListChooserPopover: View {
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "tray")
-                .font(.system(size: 48))
+                .font(.cbIcon(.display, .regular))
                 .foregroundColor(textColor.opacity(0.3))
             Text("No Cue Lists")
-                .font(.system(size: 20, weight: .medium))
+                .font(.cb(.large, .medium))
                 .foregroundColor(textColor)
         }
         .frame(maxWidth: .infinity, maxHeight: 400)
@@ -3358,21 +3348,21 @@ struct CueListChooserPopover: View {
             HStack(spacing: 8) {
                 Button(action: onCreateNew) {
                     Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.cbIcon(.large, .medium))
                         .foregroundColor(.white.opacity(0.9))
                         .frame(width: 44, height: 44)
                         .background(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: CBRadius.control)
                                 .fill(Color.black.opacity(0.5))
                                 .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                         )
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
                 }
 
                 Button(action: onRenameProject) {
                     Text(projectName)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.cb(.body, .semibold))
                         .foregroundColor(textColor)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -3384,7 +3374,7 @@ struct CueListChooserPopover: View {
 
             // "CUE LISTS" label
             Text("CUE LISTS")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.cb(.caption, .semibold))
                 .foregroundColor(textColor.opacity(0.5))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
@@ -3395,19 +3385,19 @@ struct CueListChooserPopover: View {
                 // Search bar — animates between full width and circular icon
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: batchSelectMode ? 18 : 16))
+                        .font(.cbIcon(points: batchSelectMode ? 18 : 16, .regular))
                         .foregroundColor(defaultCueColor)
 
                     if !batchSelectMode {
                         TextField("Search cue lists...", text: $searchQuery)
-                            .font(.system(size: 15))
+                            .font(.cb(.body))
                             .foregroundColor(textColor)
                             .focused($isSearchFocused)
 
                         if !searchQuery.isEmpty {
                             Button(action: { searchQuery = "" }) {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 16))
+                                    .font(.cbIcon(.body, .regular))
                                     .foregroundColor(defaultCueColor.opacity(0.6))
                             }
                             .buttonStyle(.plain)
@@ -3417,9 +3407,7 @@ struct CueListChooserPopover: View {
                 .padding(.horizontal, batchSelectMode ? 0 : 14)
                 .frame(width: batchSelectMode ? 44 : nil, height: 44)
                 .frame(maxWidth: batchSelectMode ? nil : .infinity)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
                 .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                 .onTapGesture {
                     if batchSelectMode {
@@ -3455,16 +3443,16 @@ struct CueListChooserPopover: View {
                         }
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
-                            .font(.system(size: 18))
+                            .font(.cbIcon(.large, .regular))
                             .foregroundColor(.white.opacity(0.9))
                             .frame(width: 44, height: 44)
                             .background(
-                                RoundedRectangle(cornerRadius: 10)
+                                RoundedRectangle(cornerRadius: CBRadius.control)
                                     .fill(Color.black.opacity(0.5))
                                     .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                             )
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
                     }
                 }
 
@@ -3475,7 +3463,7 @@ struct CueListChooserPopover: View {
                             selectedCueLists = Set(filteredCueLists.map { $0.id })
                         }) {
                             Text("All")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.cb(.small, .medium))
                                 .foregroundColor(defaultCueColor)
                                 .padding(.horizontal, 10)
                                 .frame(height: 44)
@@ -3486,7 +3474,7 @@ struct CueListChooserPopover: View {
                             selectedCueLists.removeAll()
                         }) {
                             Text("Clear")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.cb(.small, .medium))
                                 .foregroundColor(defaultCueColor)
                                 .padding(.horizontal, 10)
                                 .frame(height: 44)
@@ -3499,7 +3487,7 @@ struct CueListChooserPopover: View {
                             }
                         }) {
                             Text("Delete")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.cb(.small, .medium))
                                 .foregroundColor(selectedCueLists.isEmpty ? textColor.opacity(0.3) : .red)
                                 .padding(.horizontal, 10)
                                 .frame(height: 44)
@@ -3520,7 +3508,7 @@ struct CueListChooserPopover: View {
                             }
                         }) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.cbIcon(.small, .medium))
                                 .foregroundColor(defaultCueColor)
                                 .frame(width: 36, height: 44)
                         }
@@ -3533,16 +3521,14 @@ struct CueListChooserPopover: View {
                             }
                         }) {
                             Image(systemName: "checklist")
-                                .font(.system(size: 18))
+                                .font(.cbIcon(.large, .regular))
                                 .foregroundColor(defaultCueColor)
                                 .frame(width: 44, height: 44)
                         }
                         .buttonStyle(IOSPressButtonStyle())
                     }
                 }
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
                 .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: batchSelectMode)
             }
@@ -3566,7 +3552,7 @@ struct CueListChooserPopover: View {
                     }
                 }) {
                     Image(systemName: selectedCueLists.contains(cueList.id) ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22))
+                        .font(.cbIcon(.title, .regular))
                         .foregroundColor(selectedCueLists.contains(cueList.id) ? .white : textColor.opacity(0.3))
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
@@ -3593,19 +3579,19 @@ struct CueListChooserPopover: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
                             Text(cueList.name)
-                                .font(.system(size: 17, weight: .medium))
+                                .font(.cb(.body, .medium))
                                 .foregroundColor(textColor)
 
                             // Active indicator
                             if cueList.id == activeCueListID {
                                 Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.cbIcon(.small, .semibold))
                                     .foregroundColor(.green)
                             }
                         }
 
                         Text("\(cueList.songs.count) cue\(cueList.songs.count == 1 ? "" : "s")")
-                            .font(.system(size: 14))
+                            .font(.cb(.small))
                             .foregroundColor(textColor.opacity(0.6))
                     }
 
@@ -3700,18 +3686,18 @@ struct SwipeableCueListRow: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 8) {
                                     Text(cueList.name)
-                                        .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                                        .font(.cb(.body, isActive ? .semibold : .regular))
                                         .foregroundColor(textColor)
 
                                     if isActive {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 14))
+                                            .font(.cbIcon(.small, .regular))
                                             .foregroundColor(selectedTheme.accentColor(for: colorScheme))
                                     }
                                 }
 
                                 Text("\(cueList.songs.count) cue\(cueList.songs.count == 1 ? "" : "s")")
-                                    .font(.system(size: 14))
+                                    .font(.cb(.small))
                                     .foregroundColor(textColor.opacity(0.6))
                             }
 
@@ -3733,7 +3719,7 @@ struct SwipeableCueListRow: View {
                                 }
                             } label: {
                                 Image(systemName: "ellipsis")
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .font(.cbIcon(.body, .semibold))
                                     .foregroundColor(textColor.opacity(0.6))
                                     .frame(width: 32, height: 32)
                                     .contentShape(Rectangle())

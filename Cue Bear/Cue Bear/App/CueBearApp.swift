@@ -18,6 +18,7 @@
         init() {
             // Setup crash handlers as early as possible
             CrashReporter.shared.setupCrashHandlers()
+            CBAppearance.apply()   // design foundation: UIKit fonts and colors (Design/CBTokens.swift)
         }
 
         var body: some Scene {
@@ -100,8 +101,6 @@
             .windowResizability(.contentMinSize)
         }
 
-        // MARK: - Demo Project Installation
-
     }
 
     // Wrapper to apply theme-based tint at root level (needs @Environment for colorScheme)
@@ -117,6 +116,7 @@
 
         var body: some View {
             ContentView(crashAlertActive: $crashAlertActive)
+                .font(.cb(.body))   // the interface typeface everywhere, unless a view sets its own
                 .tint(selectedTheme.accentColor(for: colorScheme))
                 // v1.2.1: pairing with the Mac Bridge, shown in its own top-level window
                 // so it appears above sheets and popovers (see PairingOverlay.swift).

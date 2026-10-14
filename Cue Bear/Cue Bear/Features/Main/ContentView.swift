@@ -105,17 +105,17 @@ struct SwipeableCapsuleTutorial: View {
             VStack(spacing: 4) {
                 HStack(spacing: 8) {
                     Image(systemName: "hand.draw")
-                        .font(.system(size: 20))
+                        .font(.cbIcon(.large, .regular))
                         .foregroundColor(.white)
 
                     Text(text)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.cb(.small, .medium))
                         .foregroundColor(.white)
                 }
 
                 if let onSkip = onSkip {
                     Button("Skip") { onSkip() }
-                        .font(.system(size: 12, weight: .regular))
+                        .font(.cb(.caption, .regular))
                         .foregroundColor(.white.opacity(0.7))
                 }
             }
@@ -128,12 +128,12 @@ struct SwipeableCapsuleTutorial: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
             .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 4)
 
             // Arrow pointing to capsule
             Image(systemName: "arrowtriangle.right.fill")
-                .font(.system(size: 20))
+                .font(.cbIcon(.large, .regular))
                 .foregroundColor(.blue)
                 .offset(x: -2)
         }
@@ -187,7 +187,7 @@ struct UpwardTutorial: View {
             VStack(spacing: 0) {
                 // Arrow pointing up - offset horizontally to point at target
                 Image(systemName: "arrowtriangle.up.fill")
-                    .font(.system(size: 16))
+                    .font(.cbIcon(.body, .regular))
                     .foregroundColor(.blue)
                     .offset(x: arrowOffset, y: 2)
 
@@ -195,18 +195,18 @@ struct UpwardTutorial: View {
                 VStack(spacing: 4) {
                     HStack(spacing: 8) {
                         Image(systemName: "hand.tap")
-                            .font(.system(size: 18))
+                            .font(.cbIcon(.large, .regular))
                             .foregroundColor(.white)
 
                         Text(message)
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.cb(.small, .medium))
                             .foregroundColor(.white)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
                     if let onSkip = onSkip {
                         Button("Skip") { onSkip() }
-                            .font(.system(size: 12, weight: .regular))
+                            .font(.cb(.caption, .regular))
                             .foregroundColor(.white.opacity(0.7))
                     }
                 }
@@ -219,7 +219,7 @@ struct UpwardTutorial: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
                 .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 4)
                 .background(
                     GeometryReader { bubbleGeo in
@@ -279,18 +279,18 @@ struct DownwardTutorial: View {
                 VStack(spacing: 4) {
                     HStack(spacing: 8) {
                         Image(systemName: "hand.tap")
-                            .font(.system(size: 18))
+                            .font(.cbIcon(.large, .regular))
                             .foregroundColor(.white)
 
                         Text(message)
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.cb(.small, .medium))
                             .foregroundColor(.white)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
                     if let onSkip = onSkip {
                         Button("Skip") { onSkip() }
-                            .font(.system(size: 12, weight: .regular))
+                            .font(.cb(.caption, .regular))
                             .foregroundColor(.white.opacity(0.7))
                     }
                 }
@@ -303,7 +303,7 @@ struct DownwardTutorial: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
                 .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 4)
                 .background(
                     GeometryReader { bubbleGeo in
@@ -315,7 +315,7 @@ struct DownwardTutorial: View {
 
                 // Arrow pointing down - offset horizontally to point at target
                 Image(systemName: "arrowtriangle.down.fill")
-                    .font(.system(size: 16))
+                    .font(.cbIcon(.body, .regular))
                     .foregroundColor(.blue)
                     .offset(x: arrowOffset, y: -2)
             }
@@ -495,7 +495,7 @@ struct DestructiveWideButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.headline)
+                .font(.cb(.body, .semibold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -508,7 +508,7 @@ struct DestructiveWideButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: CBRadius.control)
                     .fill(configuration.isPressed ? Color.red.opacity(0.7) : Color.red)
             )
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
@@ -792,7 +792,7 @@ struct MIDINumberPicker: View {
                 // Note name (for MIDI notes only)
                 if kind == .note {
                     Text(number.midiNoteName)
-                        .font(.system(size: 14))
+                        .font(.cb(.small))
                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                 }
 
@@ -803,11 +803,11 @@ struct MIDINumberPicker: View {
                     }
                 }) {
                     Image(systemName: "minus")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.cbIcon(.small, .semibold))
                         .foregroundColor(number > 0 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                         .frame(width: 28, height: 28)
                         .background(selectedTheme.titleBarColor(for: colorScheme))
-                        .cornerRadius(6)
+                        .cornerRadius(CBRadius.small)
                 }
                 .buttonStyle(.plain)
                 .disabled(disabled || number <= 0)
@@ -821,9 +821,9 @@ struct MIDINumberPicker: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
                     .background(selectedTheme.backgroundColor(for: colorScheme))
-                    .cornerRadius(6)
+                    .cornerRadius(CBRadius.small)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: CBRadius.small)
                             .stroke(isFocused ? selectedTheme.accentColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
                     )
                     .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
@@ -861,11 +861,11 @@ struct MIDINumberPicker: View {
                     }
                 }) {
                     Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.cbIcon(.small, .semibold))
                         .foregroundColor(number < 127 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                         .frame(width: 28, height: 28)
                         .background(selectedTheme.titleBarColor(for: colorScheme))
-                        .cornerRadius(6)
+                        .cornerRadius(CBRadius.small)
                 }
                 .buttonStyle(.plain)
                 .disabled(disabled || number >= 127)
@@ -874,7 +874,7 @@ struct MIDINumberPicker: View {
             // Show "MIDI taken by" warning if number is taken
             if let owner = ownerFor(kind: kind, number: number, channel: channel) {
                 Text("⚠️ MIDI taken by: \(owner)")
-                    .font(.caption)
+                    .font(.cb(.caption))
                     .foregroundColor(selectedTheme.warningColor(for: colorScheme))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -882,7 +882,7 @@ struct MIDINumberPicker: View {
             // Show filtered MIDI warning only when filters are active
             if midiFiltersEnabled && !midiFilter.isEmpty && kind == .cc && midiFilter.contains(number) {
                 Text("⚠️ This CC is filtered. Turn off filter to use it.")
-                    .font(.caption)
+                    .font(.cb(.caption))
                     .foregroundColor(selectedTheme.warningColor(for: colorScheme))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -1021,7 +1021,7 @@ struct IconGridView: View {
             // Header
             HStack {
                 Text("Icon")
-                    .font(.headline)
+                    .font(.cb(.body, .semibold))
                     .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
                 Spacer()
                 Button(action: { showingPopover = false }) {
@@ -1045,9 +1045,9 @@ struct IconGridView: View {
                         }) {
                             VStack(spacing: 4) {
                                 Text("Aa")
-                                    .font(.system(size: 20, weight: .medium))
+                                    .font(.cb(.large, .medium))
                                 Text("Text only")
-                                    .font(.system(size: 10))
+                                    .font(.cb(.micro))
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 60)
@@ -1059,9 +1059,9 @@ struct IconGridView: View {
                             .foregroundColor(
                                 symbol.isEmpty ? .white : selectedTheme.primaryTextColor(for: colorScheme)
                             )
-                            .cornerRadius(8)
+                            .cornerRadius(CBRadius.small)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8)
+                                RoundedRectangle(cornerRadius: CBRadius.small)
                                     .stroke(
                                         symbol.isEmpty ? selectedTheme.accentColor(for: colorScheme) : Color.clear,
                                         lineWidth: 2
@@ -1079,7 +1079,7 @@ struct IconGridView: View {
                                 showingPopover = false
                             }) {
                                 Image(systemName: icon)
-                                    .font(.system(size: 24))
+                                    .font(.cbIcon(.title, .regular))
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 60)
                                     .background(
@@ -1090,9 +1090,9 @@ struct IconGridView: View {
                                     .foregroundColor(
                                         isSelected ? .white : selectedTheme.primaryTextColor(for: colorScheme)
                                     )
-                                    .cornerRadius(8)
+                                    .cornerRadius(CBRadius.small)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: CBRadius.small)
                                             .stroke(
                                                 isSelected ? selectedTheme.accentColor(for: colorScheme) : Color.clear,
                                                 lineWidth: 2
@@ -1151,11 +1151,11 @@ struct VelocityPicker: View {
                 }
             }) {
                 Image(systemName: "minus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.cbIcon(.small, .semibold))
                     .foregroundColor(velocity > 0 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                     .frame(width: 28, height: 28)
                     .background(selectedTheme.titleBarColor(for: colorScheme))
-                    .cornerRadius(6)
+                    .cornerRadius(CBRadius.small)
             }
             .buttonStyle(.plain)
             .disabled(disabled || velocity <= 0)
@@ -1169,9 +1169,9 @@ struct VelocityPicker: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(selectedTheme.backgroundColor(for: colorScheme))
-                .cornerRadius(6)
+                .cornerRadius(CBRadius.small)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .stroke(isFocused ? selectedTheme.accentColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
                 )
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
@@ -1209,11 +1209,11 @@ struct VelocityPicker: View {
                 }
             }) {
                 Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.cbIcon(.small, .semibold))
                     .foregroundColor(velocity < 127 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                     .frame(width: 28, height: 28)
                     .background(selectedTheme.titleBarColor(for: colorScheme))
-                    .cornerRadius(6)
+                    .cornerRadius(CBRadius.small)
             }
             .buttonStyle(.plain)
             .disabled(disabled || velocity >= 127)
@@ -1257,11 +1257,11 @@ struct ChannelPicker: View {
                 }
             }) {
                 Image(systemName: "minus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.cbIcon(.small, .semibold))
                     .foregroundColor(channel > 1 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                     .frame(width: 28, height: 28)
                     .background(selectedTheme.titleBarColor(for: colorScheme))
-                    .cornerRadius(6)
+                    .cornerRadius(CBRadius.small)
             }
             .buttonStyle(.plain)
             .disabled(disabled || channel <= 1)
@@ -1275,9 +1275,9 @@ struct ChannelPicker: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(selectedTheme.backgroundColor(for: colorScheme))
-                .cornerRadius(6)
+                .cornerRadius(CBRadius.small)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .stroke(isFocused ? selectedTheme.accentColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
                 )
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
@@ -1315,11 +1315,11 @@ struct ChannelPicker: View {
                 }
             }) {
                 Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.cbIcon(.small, .semibold))
                     .foregroundColor(channel < 16 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                     .frame(width: 28, height: 28)
                     .background(selectedTheme.titleBarColor(for: colorScheme))
-                    .cornerRadius(6)
+                    .cornerRadius(CBRadius.small)
             }
             .buttonStyle(.plain)
             .disabled(disabled || channel >= 16)
@@ -1363,11 +1363,11 @@ struct CCNumberPicker: View {
                 }
             }) {
                 Image(systemName: "minus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.cbIcon(.small, .semibold))
                     .foregroundColor(ccNumber > 0 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                     .frame(width: 28, height: 28)
                     .background(selectedTheme.titleBarColor(for: colorScheme))
-                    .cornerRadius(6)
+                    .cornerRadius(CBRadius.small)
             }
             .buttonStyle(.plain)
             .disabled(disabled || ccNumber <= 0)
@@ -1381,9 +1381,9 @@ struct CCNumberPicker: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(selectedTheme.backgroundColor(for: colorScheme))
-                .cornerRadius(6)
+                .cornerRadius(CBRadius.small)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .stroke(isFocused ? selectedTheme.accentColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
                 )
                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
@@ -1416,11 +1416,11 @@ struct CCNumberPicker: View {
                 }
             }) {
                 Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.cbIcon(.small, .semibold))
                     .foregroundColor(ccNumber < 127 && !disabled ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                     .frame(width: 28, height: 28)
                     .background(selectedTheme.titleBarColor(for: colorScheme))
-                    .cornerRadius(6)
+                    .cornerRadius(CBRadius.small)
             }
             .buttonStyle(.plain)
             .disabled(disabled || ccNumber >= 127)
@@ -1637,7 +1637,7 @@ struct CBControlEditorSheet: View {
                 // Custom header — bypasses iOS 18+/26 toolbar chrome and gesture caching
                 ZStack {
                     Text(titleForSheet())
-                        .font(.custom("Sora-Bold", size: 17))
+                        .font(.cb(.body, .bold))
                         .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
 
                     HStack(spacing: 8) {
@@ -1682,7 +1682,7 @@ struct CBControlEditorSheet: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                             Text(outOfRoomMessage())
-                                .font(.caption)
+                                .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                         }
                         .padding(.vertical, 4)
@@ -1720,7 +1720,7 @@ struct CBControlEditorSheet: View {
                         // Show space warning if button type change won't fit
                         if showSpaceWarning {
                             Text("You're out of room! Try removing other controllers to change button size")
-                                .font(.caption)
+                                .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 .padding(.top, 4)
                                 .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
@@ -1769,7 +1769,7 @@ struct CBControlEditorSheet: View {
                         // Show space warning if orientation change won't fit
                         if showSpaceWarning {
                             Text("You're out of room! Try removing other controllers to add this one")
-                                .font(.caption)
+                                .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 .padding(.top, 4)
                                 .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
@@ -1829,7 +1829,7 @@ struct CBControlEditorSheet: View {
                 Section(header: Text("MIDI")) {
                     if midiFiltersEnabled && !midiFilter.isEmpty {
                         Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
-                            .font(.caption)
+                            .font(.cb(.caption))
                             .foregroundColor(.secondary)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
@@ -2586,7 +2586,7 @@ struct CBEditControlSheet: View {
                 Section(header: Text("MIDI")) {
                     if midiFiltersEnabled && !midiFilter.isEmpty {
                         Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
-                            .font(.caption)
+                            .font(.cb(.caption))
                             .foregroundColor(.secondary)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
@@ -2879,29 +2879,29 @@ struct ControlButtonPreview: View {
             if symbol.isEmpty {
                 // Text only
                 Text(title.isEmpty ? "Custom" : title)
-                    .font(.custom("Sora-Bold", size: 14))
+                    .font(.cb(.small, .bold))
                     .foregroundColor(textColor)
                 Text(midiLabel)
-                    .font(.custom("Sora-Regular", size: 9))
+                    .font(.cb(.micro))
                     .foregroundColor(textColor.opacity(0.5))
             } else if title.isEmpty {
                 // Icon only
                 Image(systemName: symbol)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.cbIcon(.title, .semibold))
                     .foregroundColor(textColor)
                 Text(midiLabel)
-                    .font(.custom("Sora-Regular", size: 9))
+                    .font(.cb(.micro))
                     .foregroundColor(textColor.opacity(0.5))
             } else {
                 // Icon + text
                 Image(systemName: symbol)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.cbIcon(.title, .semibold))
                     .foregroundColor(textColor)
                 Text(title)
-                    .font(.custom("Sora-Bold", size: 12))
+                    .font(.cb(.caption, .bold))
                     .foregroundColor(textColor)
                 Text(midiLabel)
-                    .font(.custom("Sora-Regular", size: 9))
+                    .font(.cb(.micro))
                     .foregroundColor(textColor.opacity(0.5))
             }
             Spacer(minLength: 0)
@@ -2956,14 +2956,14 @@ struct ControlFaderPreview: View {
 
             ZStack(alignment: fillAlignment) {
                 // Track background
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: CBRadius.small)
                     .fill(faderColor.opacity(0.2))
 
                 // Fill level
                 GeometryReader { geo in
                     HStack {
                         if direction != "right" { Spacer() }
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: CBRadius.small)
                             .fill(faderColor.opacity(0.85))
                             .frame(width: geo.size.width * previewValue)
                         if direction == "right" { Spacer() }
@@ -2973,30 +2973,30 @@ struct ControlFaderPreview: View {
                 // Labels overlay
                 HStack {
                     Text(title.isEmpty ? "Fader" : title)
-                        .font(.custom("Sora-Bold", size: 11))
+                        .font(.cb(.caption, .bold))
                         .foregroundColor(textColor)
                         .padding(.leading, 8)
                     Spacer()
                     Text("\(channel)•\(cc)")
-                        .font(.custom("Sora-Regular", size: 9))
+                        .font(.cb(.micro))
                         .foregroundColor(textColor.opacity(0.5))
                         .padding(.trailing, 8)
                 }
             }
             .frame(width: 156, height: 72)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: CBRadius.small))
         } else {
             // VERTICAL FADER PREVIEW — filled style with 8pt corners
             ZStack(alignment: .bottom) {
                 // Track background
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: CBRadius.small)
                     .fill(faderColor.opacity(0.2))
 
                 // Fill level
                 GeometryReader { geo in
                     VStack {
                         if direction == "up" { Spacer() }
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: CBRadius.small)
                             .fill(faderColor.opacity(0.85))
                             .frame(height: geo.size.height * previewValue)
                         if direction != "up" { Spacer() }
@@ -3006,16 +3006,16 @@ struct ControlFaderPreview: View {
                 // Labels overlay
                 VStack(spacing: 2) {
                     Text(title.isEmpty ? "Fader" : title)
-                        .font(.custom("Sora-Bold", size: 11))
+                        .font(.cb(.caption, .bold))
                         .foregroundColor(textColor)
                     Text("\(channel)•\(cc)")
-                        .font(.custom("Sora-Regular", size: 9))
+                        .font(.cb(.micro))
                         .foregroundColor(textColor.opacity(0.5))
                 }
                 .padding(.bottom, 8)
             }
             .frame(width: 72, height: 120)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: CBRadius.small))
         }
     }
 }
@@ -3417,7 +3417,7 @@ internal struct ContentView: View {
                 buttonColor: .white,
                 textColor: .white,
                 lightButtonBackgroundColor: currentTheme.lightButtonBackgroundColor(for: colorScheme),
-                themeFont: { size, weight in .custom("Sora-Regular", size: size) },
+                themeFont: { size, weight in .cb(points: size, weight) },
                 // Core actions
                 onConnections: {
                     if isEditing { isEditing = false }
@@ -3719,19 +3719,19 @@ internal struct ContentView: View {
                             // Search bar — always present, animates between full width and circular icon
                             HStack(spacing: 8) {
                                 Image(systemName: "magnifyingglass")
-                                    .font(.system(size: setlistBatchMode ? 18 : 16))
+                                    .font(.cbIcon(points: setlistBatchMode ? 18 : 16, .regular))
                                     .foregroundColor(.white)
 
                                 if !setlistBatchMode {
                                     TextField("Search cues...", text: $setlistQuery)
-                                        .font(.system(size: 15))
+                                        .font(.cb(.body))
                                         .foregroundColor(currentTheme.primaryTextColor(for: colorScheme))
                                         .focused($isSetlistSearchFocused)
 
                                     if !setlistQuery.isEmpty {
                                         Button(action: { setlistQuery = "" }) {
                                             Image(systemName: "xmark.circle.fill")
-                                                .font(.system(size: 16))
+                                                .font(.cbIcon(.body, .regular))
                                                 .foregroundColor(.white.opacity(0.6))
                                         }
                                         .buttonStyle(.plain)
@@ -3741,9 +3741,7 @@ internal struct ContentView: View {
                             .padding(.horizontal, setlistBatchMode ? 0 : 14)
                             .frame(width: setlistBatchMode ? 44 : nil, height: 44)
                             .frame(maxWidth: setlistBatchMode ? nil : .infinity)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .cbChip()
                             .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                             .onTapGesture {
                                 if setlistBatchMode {
@@ -3772,16 +3770,16 @@ internal struct ContentView: View {
                                     }
                                 }) {
                                     Image(systemName: reorderMode ? "checkmark" : "list.bullet")
-                                        .font(.system(size: 18))
+                                        .font(.cbIcon(.large, .regular))
                                         .foregroundColor(.white)
                                         .frame(width: 44, height: 44)
                                         .background(
-                                            RoundedRectangle(cornerRadius: 10)
+                                            RoundedRectangle(cornerRadius: CBRadius.control)
                                                 .fill(Color.black.opacity(0.5))
                                                 .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                                         )
-                                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: CBRadius.control))
                                 }
                                 .buttonStyle(IOSPressButtonStyle())
                             }
@@ -3793,7 +3791,7 @@ internal struct ContentView: View {
                                         setlistSelected = Set(filteredActiveSongs.map { $0.id })
                                     }) {
                                         Text("All")
-                                            .font(.system(size: 14, weight: .medium))
+                                            .font(.cb(.small, .medium))
                                             .foregroundColor(.white)
                                             .padding(.horizontal, 10)
                                             .frame(height: 44)
@@ -3804,7 +3802,7 @@ internal struct ContentView: View {
                                         setlistSelected.removeAll()
                                     }) {
                                         Text("Clear")
-                                            .font(.system(size: 14, weight: .medium))
+                                            .font(.cb(.small, .medium))
                                             .foregroundColor(.white)
                                             .padding(.horizontal, 10)
                                             .frame(height: 44)
@@ -3820,7 +3818,7 @@ internal struct ContentView: View {
                                         isDirty = true
                                     }) {
                                         Text("Remove")
-                                            .font(.system(size: 14, weight: .medium))
+                                            .font(.cb(.small, .medium))
                                             .foregroundColor(setlistSelected.isEmpty ? currentTheme.primaryTextColor(for: colorScheme).opacity(0.3) : .red)
                                             .padding(.horizontal, 10)
                                             .frame(height: 44)
@@ -3840,7 +3838,7 @@ internal struct ContentView: View {
                                         }
                                     }) {
                                         Image(systemName: "xmark")
-                                            .font(.system(size: 14, weight: .medium))
+                                            .font(.cbIcon(.small, .medium))
                                             .foregroundColor(.white)
                                             .frame(width: 36, height: 44)
                                     }
@@ -3854,16 +3852,14 @@ internal struct ContentView: View {
                                         }
                                     }) {
                                         Image(systemName: "checklist")
-                                            .font(.system(size: 18))
+                                            .font(.cbIcon(.large, .regular))
                                             .foregroundColor(.white)
                                             .frame(width: 44, height: 44)
                                     }
                                     .buttonStyle(IOSPressButtonStyle())
                                 }
                             }
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .cbChip()
                             .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                             .animation(.spring(response: 0.3, dampingFraction: 0.85), value: setlistBatchMode)
                         }
@@ -3892,15 +3888,15 @@ internal struct ContentView: View {
     private var collapsedControlCapsule: some View {
         // Floating action button with rounded rectangle to match app button style
         Image(systemName: "slider.horizontal.3")
-            .font(.system(size: 24, weight: .medium))
+            .font(.cbIcon(.title, .medium))
             .foregroundColor(.white)
             .frame(width: 56, height: 56)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.8)))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.2), lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(Color.black.opacity(0.8)))
+            .overlay(RoundedRectangle(cornerRadius: CBRadius.card).stroke(Color.white.opacity(0.2), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
             .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 4)
             .opacity(controlsCapsulePressed ? 0.5 : 1.0)
-            .contentShape(RoundedRectangle(cornerRadius: 14))
+            .contentShape(RoundedRectangle(cornerRadius: CBRadius.card))
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
@@ -5036,7 +5032,7 @@ internal struct ContentView: View {
                 },
                 onCancel: { songForDetails = nil }
             )
-            .presentationCornerRadius(20)
+            .presentationCornerRadius(CBRadius.panel)
         }
     }
 
@@ -5054,7 +5050,7 @@ internal struct ContentView: View {
                 }
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-            .presentationCornerRadius(20)
+            .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showMidiTable) {
             MidiTableSheet(
@@ -5098,7 +5094,7 @@ internal struct ContentView: View {
                 }
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-            .presentationCornerRadius(20)
+            .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showAddEdit, onDismiss: {
             // Tutorial 2b: Show Library tutorial after adding a cue
@@ -5165,7 +5161,7 @@ internal struct ContentView: View {
                 midiFilter: midiFilter
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-            .presentationCornerRadius(20)
+            .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showAddEditMIDIOnly) {
             CBMIDIPickerSheet(
@@ -5189,7 +5185,7 @@ internal struct ContentView: View {
                 editingSongName: editingSong?.name
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-            .presentationCornerRadius(20)
+            .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showControlEditor) {
             CBControlEditorSheet(
@@ -5304,7 +5300,7 @@ internal struct ContentView: View {
                 draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-            .presentationCornerRadius(20)
+            .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showEditControlSheet) {
             CBControlEditorSheet(
@@ -5351,7 +5347,7 @@ internal struct ContentView: View {
                 draft: controlEditorDraft  // v1.0.8: Pass draft manager
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-            .presentationCornerRadius(20)
+            .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showProjects) {
             CBProjectsSheet(
@@ -5376,7 +5372,7 @@ internal struct ContentView: View {
                 }
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-            .presentationCornerRadius(20)
+            .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showOnboarding, onDismiss: {
             // v1.3 (Cue Bear Next): the step-by-step tutorials are retired; the demo show
@@ -5402,30 +5398,30 @@ internal struct ContentView: View {
                 onDone: { showOnboarding = false }
             )
             .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-            .presentationCornerRadius(20)
+            .presentationCornerRadius(CBRadius.panel)
             .interactiveDismissDisabled(false)
         }
 
         .sheet(isPresented: $showAboutSheet) {
             AboutSheet()
                 .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-                .presentationCornerRadius(20)
+                .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showAppearanceSheet) {
             AppearanceSheet()
                 .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-                .presentationCornerRadius(20)
+                .presentationCornerRadius(CBRadius.panel)
         }
         .sheet(isPresented: $showAppearanceSettingsSheet) {
             AppearanceSettingsSheet()
                 .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-                .presentationCornerRadius(20)
+                .presentationCornerRadius(CBRadius.panel)
         }
         #if DEBUG
         .sheet(isPresented: $showAdminPanel) {
             ThemeAdminPanel()
                 .presentationBackground(currentTheme.sheetBackgroundColor(for: colorScheme))
-                .presentationCornerRadius(20)
+                .presentationCornerRadius(CBRadius.panel)
         }
         #endif
         // Force default theme on every app launch
@@ -7327,7 +7323,7 @@ private struct SplashScreen: View {
                 
                 // App name
                 Text("Cue Bear")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.cb(.display, .bold))
                     .foregroundColor(.white)
 
                 // Subtle loading indicator
@@ -7421,16 +7417,12 @@ private struct CBTopBar: View {
                 HStack(spacing: 8) {
                     // Hamburger menu capsule
                     mainMenuButton
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .cbChip()
                         .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
 
                     // Cue list name capsule
                     projectNameButton
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .cbChip()
                         .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                         .background(
                             GeometryReader { geo in
@@ -7462,17 +7454,15 @@ private struct CBTopBar: View {
                     Button(action: onShowMode) {
                         HStack(spacing: 6) {
                             Image(systemName: "play.rectangle.fill")
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.cbIcon(.body, .semibold))
                             Text("Show")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.cb(.body, .semibold))
                         }
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)
                         .frame(height: 44)
-                        .contentShape(RoundedRectangle(cornerRadius: 10))
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
+                        .cbChip()
                         .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                     }
                     .buttonStyle(IOSPressButtonStyle())
@@ -7487,14 +7477,14 @@ private struct CBTopBar: View {
                         // All visual styling inside label so ButtonStyle animates the whole capsule
                         HStack(spacing: 6) {
                             Image(systemName: "antenna.radiowaves.left.and.right")
-                                .font(.system(size: 18))
+                                .font(.cbIcon(.large, .regular))
                                 .symbolRenderingMode(.hierarchical)
                                 .foregroundStyle(connectionTint)
 
                             // Show connection type chip when connected
                             if connectionCoordinator.activeConnection == .usb {
                                 Text("USB")
-                                    .font(.caption2.weight(.semibold))
+                                    .font(.cb(.micro, .semibold))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -7502,7 +7492,7 @@ private struct CBTopBar: View {
                                     .clipShape(Capsule())
                             } else if connectionCoordinator.activeConnection == .wifi {
                                 Text("WiFi")
-                                    .font(.caption2.weight(.semibold))
+                                    .font(.cb(.micro, .semibold))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -7512,10 +7502,8 @@ private struct CBTopBar: View {
                         }
                         .padding(.horizontal, 14)
                         .frame(height: 44)
-                        .contentShape(RoundedRectangle(cornerRadius: 10))
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
+                        .cbChip()
                         .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                     }
                     .buttonStyle(IOSPressButtonStyle())
@@ -7526,10 +7514,8 @@ private struct CBTopBar: View {
                 rightCapsuleControls
                 .padding(.horizontal, isEditing ? 4 : 0)
                 .frame(height: 44)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
+                .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
                 .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                 .background(
                     GeometryReader { geo in
@@ -7567,12 +7553,12 @@ private struct CBTopBar: View {
                     .truncationMode(.tail)
 
                 Image(systemName: showCueListChooser ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.cbIcon(.caption, .semibold))
                     .foregroundStyle(.white.opacity(0.7))
             }
             .padding(.horizontal, 14)
             .frame(height: 44)
-            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
         .buttonStyle(IOSPressButtonStyle())
         .popover(isPresented: $showCueListChooser, arrowEdge: .top) {
@@ -7608,12 +7594,12 @@ private struct CBTopBar: View {
     private var mainMenuButton: some View {
         Button(action: onMenuToggle) {
             Image(systemName: showSideMenu ? "xmark" : "line.3.horizontal")
-                .font(.system(size: 18, weight: .medium))
+                .font(.cbIcon(.large, .medium))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
                 .rotationEffect(.degrees(showSideMenu ? 90 : 0))
                 .contentTransition(.symbolEffect(.replace))
-                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
         .buttonStyle(IOSPressButtonStyle())
     }
@@ -7747,7 +7733,7 @@ private struct CBTopBar: View {
                     // Show connection type chip when connected
                     if connectionCoordinator.activeConnection == .usb {
                         Text("USB")
-                            .font(.caption2.weight(.semibold))
+                            .font(.cb(.micro, .semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -7755,7 +7741,7 @@ private struct CBTopBar: View {
                             .clipShape(Capsule())
                     } else if connectionCoordinator.activeConnection == .wifi {
                         Text("WiFi")
-                            .font(.caption2.weight(.semibold))
+                            .font(.cb(.micro, .semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -7799,7 +7785,7 @@ private struct CBTopBar: View {
                     // Show connection type chip when connected
                     if connectionCoordinator.activeConnection == .usb {
                         Text("USB")
-                            .font(.caption2.weight(.semibold))
+                            .font(.cb(.micro, .semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -7807,7 +7793,7 @@ private struct CBTopBar: View {
                             .clipShape(Capsule())
                     } else if connectionCoordinator.activeConnection == .wifi {
                         Text("WiFi")
-                            .font(.caption2.weight(.semibold))
+                            .font(.cb(.micro, .semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -8315,15 +8301,13 @@ private struct CBControlSection: View {
                             }
                         }) {
                             Text("Edit")
-                                .font(.system(size: 16, weight: .medium))
+                                .font(.cb(.body, .medium))
                                 .foregroundStyle(standardButtonColor)
                         }
                         .buttonStyle(.plain)
                         .padding(.horizontal, 14)
                         .frame(height: 44)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .cbChip()
                         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         .padding(.trailing, 16)
                         .padding(.bottom, 8)
@@ -8348,7 +8332,7 @@ private struct CBControlSection: View {
                                 }
                             }) {
                                 Text(isEditing ? "Done" : "Edit")
-                                    .font(.system(size: 15, weight: .medium))
+                                    .font(.cb(.body, .medium))
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 12)
                                     .frame(height: 44)
@@ -8362,16 +8346,14 @@ private struct CBControlSection: View {
                                     }
                                 }) {
                                     Image(systemName: "chevron.up")
-                                        .font(.system(size: 16, weight: .semibold))
+                                        .font(.cbIcon(.body, .semibold))
                                         .foregroundColor(.white)
                                         .frame(width: 44, height: 44)
                                 }
                                 .buttonStyle(IOSPressButtonStyle())
                             }
                         }
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .cbChip()
                         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
                         .padding(.trailing, 16)
                         .padding(.bottom, 8)
@@ -8434,7 +8416,7 @@ private struct CBControlSection: View {
                         }
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.cbIcon(.body, .medium))
                             .foregroundColor(previousPage != nil ? .white : .white.opacity(0.3))
                             .frame(width: 36, height: 44)
                     }
@@ -8442,7 +8424,7 @@ private struct CBControlSection: View {
 
                     // Page indicator
                     Text(pageIndicatorText)
-                        .font(.custom("Sora-Regular", size: 14))
+                        .font(.cb(.small))
                         .foregroundColor(.white)
                         .frame(minWidth: 32)
 
@@ -8455,17 +8437,15 @@ private struct CBControlSection: View {
                         }
                     }) {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.cbIcon(.body, .medium))
                             .foregroundColor(nextPage != nil ? .white : .white.opacity(0.3))
                             .frame(width: 36, height: 44)
                     }
                     .disabled(nextPage == nil)
                 }
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
                 .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
-                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
                 .gesture(
                     DragGesture(minimumDistance: 20)
                         .onEnded { value in
@@ -8494,7 +8474,7 @@ private struct CBControlSection: View {
                 HStack(spacing: 0) {
                     Button(action: onUndo) {
                         Image(systemName: "arrow.uturn.backward")
-                            .font(.system(size: 18, weight: .medium))
+                            .font(.cbIcon(.large, .medium))
                             .foregroundColor(canUndo ? .white : .white.opacity(0.3))
                             .frame(width: 44, height: 44)
                     }
@@ -8502,15 +8482,13 @@ private struct CBControlSection: View {
 
                     Button(action: onRedo) {
                         Image(systemName: "arrow.uturn.forward")
-                            .font(.system(size: 18, weight: .medium))
+                            .font(.cbIcon(.large, .medium))
                             .foregroundColor(canRedo ? .white : .white.opacity(0.3))
                             .frame(width: 44, height: 44)
                     }
                     .disabled(!canRedo)
                 }
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
                 .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                 .transition(.scale.combined(with: .opacity))
 
@@ -8530,7 +8508,7 @@ private struct CBControlSection: View {
                         .frame(width: 44, height: 44)
                         .overlay {
                             Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .medium))
+                                .font(.cbIcon(.large, .medium))
                                 .foregroundColor((canAddMoreControls || canAddFader) ? .white : .white.opacity(0.3))
                         }
                         .contentShape(Rectangle())
@@ -8538,9 +8516,7 @@ private struct CBControlSection: View {
                 .buttonStyle(.plain)
                 .disabled(!canAddMoreControls && !canAddFader)
                 .frame(width: 44, height: 44)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
                 .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
                 .transition(.scale.combined(with: .opacity))
             }
@@ -8565,7 +8541,7 @@ private struct CBControlSection: View {
                         }
                     }) {
                         Image(systemName: buttons.isEmpty ? "chevron.down" : "checkmark")
-                            .font(.system(size: 18, weight: .medium))
+                            .font(.cbIcon(.large, .medium))
                             .foregroundColor(.white)
                             .frame(width: 44, height: 44)
                     }
@@ -8582,7 +8558,7 @@ private struct CBControlSection: View {
                         }
                     }) {
                         Text("Edit")
-                            .font(.custom("Sora-Regular", size: 15))
+                            .font(.cb(.body))
                             .foregroundColor(.white)
                             .padding(.horizontal, 14)
                             .frame(height: 44)
@@ -8602,7 +8578,7 @@ private struct CBControlSection: View {
                             }
                         }) {
                             Image(systemName: "chevron.down")
-                                .font(.system(size: 16, weight: .medium))
+                                .font(.cbIcon(.body, .medium))
                                 .foregroundColor(.white)
                                 .frame(width: 40, height: 44)
                         }
@@ -8610,9 +8586,7 @@ private struct CBControlSection: View {
                     }
                 }
             }
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .cbChip()
             .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
         }
         .padding(.horizontal, 12)
@@ -8881,10 +8855,10 @@ private struct CBControlSection: View {
                     .zIndex(1)  // Grid (with X buttons) renders on top
             }
             .background(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: CBRadius.panel)
                     .fill(Color.black.opacity(0.8))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: CBRadius.panel)
                             .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
                     .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 4)
@@ -10134,7 +10108,7 @@ private struct CBControlSection: View {
                 let (row, col) = overlayCells[idx]
                         let x = CGFloat(col) * (cellSize + columnSpacing)
                         let y = CGFloat(row) * (cellSize + rowSpacing)
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: CBRadius.small)
                             .stroke(Color.gray.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                             .frame(width: cellSize, height: cellSize)
                             .offset(x: x, y: y)
@@ -10343,22 +10317,22 @@ private struct ControlButtonTile: View {
                         if button.symbol.isEmpty {
                             // No icon: show title only
                             Text(button.title)
-                                .font(.custom("Sora-Bold", size: isPhone ? 11 : 12))
+                                .font(.cb(points: isPhone ? 11 : 12, .bold))
                         } else if button.title.trimmingCharacters(in: .whitespaces).isEmpty {
                             // Icon-only mode: center the icon without title or MIDI label
                             Image(systemName: button.symbol)
-                                .font(.system(size: 22, weight: .semibold))
+                                .font(.cbIcon(.title, .semibold))
                                 .foregroundColor(textColor)
                         } else {
                             // Icon + title mode: show all elements
                             Image(systemName: button.symbol)
-                                .font(.system(size: 22, weight: .semibold))
+                                .font(.cbIcon(.title, .semibold))
                                 .foregroundColor(textColor)
                             Text(button.title)
-                                .font(.custom("Sora-Bold", size: 12))
+                                .font(.cb(.caption, .bold))
                                 .lineLimit(1)
                             Text(midiLabel())
-                                .font(.custom("Sora-Regular", size: 9))
+                                .font(.cb(.micro))
                                 .foregroundColor(textColor.opacity(0.5))
                         }
 
@@ -10367,7 +10341,7 @@ private struct ControlButtonTile: View {
                 .foregroundColor(textColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .fill(buttonColor)
                 )
                     .overlay(alignment: .topLeading) {
@@ -10378,7 +10352,7 @@ private struct ControlButtonTile: View {
                                         .fill(Color.gray.opacity(0.9))
                                         .frame(width: isPhone ? 20 : 30, height: isPhone ? 20 : 30)
                                     Image(systemName: "xmark")
-                                        .font(.system(size: isPhone ? 10 : 13, weight: .bold))
+                                        .font(.cbIcon(points: isPhone ? 10 : 13, .bold))
                                         .foregroundColor(Color(uiColor: .systemBackground))
                                 }
                         }
@@ -10472,7 +10446,7 @@ private struct ControlButtonTile: View {
                             let x = CGFloat(c) * (cellWidth + columnSpacing)
                             let y = CGFloat(r) * (cellHeight + rowSpacing)
                             let rect = CGRect(x: x, y: y, width: cellWidth, height: cellHeight)
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: CBRadius.control)
                                 .inset(by: 4)
                                 .stroke(style: dashed)
                                 .foregroundColor(color)
@@ -10546,17 +10520,17 @@ private struct ControlButtonTile: View {
 
                         ZStack(alignment: fillAlignment) {
                             // Main fader track background - filled style with 8pt corners
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: CBRadius.small)
                                 .fill(faderColor.opacity(0.2))
 
                             // Fader fill (dynamic based on value) - alignment handles the direction
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: CBRadius.small)
                                 .fill(faderColor.opacity(0.85))
                                 .frame(width: w * value)
                                 .padding(3)
 
                             // Fader head (dynamic position) - conditional offset for direction
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: CBRadius.small)
                                 .fill(faderColor)
                                 .frame(width: headWidth)
                                 .offset(x: (direction == "right") ? (w * value) : -(w * value))
@@ -10571,15 +10545,15 @@ private struct ControlButtonTile: View {
                                 let textOnFill = (direction == "right") ? value > 0.1 : value > 0.85
                                 let faderTextColor = textOnFill ? filledTextColor : emptyTextColor
                                 Text(button.title)
-                                    .font(.custom("Sora-Bold", size: 11))
+                                    .font(.cb(.caption, .bold))
                                     .lineLimit(1)
                                     .foregroundColor(faderTextColor)
                                     .minimumScaleFactor(0.7)
                                 Text("CC\(button.number)")
-                                    .font(.custom("Sora-Regular", size: 9))
+                                    .font(.cb(.micro))
                                     .foregroundColor(faderTextColor.opacity(0.5))
                                 Text("Ch\(button.channel)")
-                                    .font(.custom("Sora-Regular", size: 9))
+                                    .font(.cb(.micro))
                                     .foregroundColor(faderTextColor.opacity(0.5))
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -10618,17 +10592,17 @@ private struct ControlButtonTile: View {
 
                         ZStack(alignment: fillAlignment) {
                             // Main fader track background - filled style with 8pt corners
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: CBRadius.small)
                                 .fill(faderColor.opacity(0.2))
 
                             // Fader fill (dynamic based on value) - alignment handles the direction
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: CBRadius.small)
                                 .fill(faderColor.opacity(0.85))
                                 .frame(height: h * value)
                                 .padding(3)
 
                             // Fader head (dynamic position) - conditional offset for direction
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: CBRadius.small)
                                 .fill(faderColor)
                                 .frame(height: headHeight)
                                 .offset(y: (direction == "up") ? -(h * value) : (h * value))
@@ -10642,15 +10616,15 @@ private struct ControlButtonTile: View {
                                 let titleOnFill = (direction == "up") ? value > 0.75 : value > 0.15
                                 let midiOnFill = (direction == "up") ? value > 0.15 : value > 0.75
                                 Text(button.title)
-                                    .font(.custom("Sora-Bold", size: 11))
+                                    .font(.cb(.caption, .bold))
                                     .lineLimit(1)
                                     .foregroundColor(titleOnFill ? filledTextColor : emptyTextColor)
                                     .minimumScaleFactor(0.7)
                                 Text("CC\(button.number)")
-                                    .font(.custom("Sora-Regular", size: 9))
+                                    .font(.cb(.micro))
                                     .foregroundColor((midiOnFill ? filledTextColor : emptyTextColor).opacity(0.5))
                                 Text("Ch\(button.channel)")
-                                    .font(.custom("Sora-Regular", size: 9))
+                                    .font(.cb(.micro))
                                     .foregroundColor((midiOnFill ? filledTextColor : emptyTextColor).opacity(0.5))
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -10682,7 +10656,7 @@ private struct ControlButtonTile: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 // FIX: Removed padding to make faders fill grid cells like buttons
                 .background(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: CBRadius.card)
                         .fill(Color.clear)
                 )
                 if isEditing {
@@ -10692,7 +10666,7 @@ private struct ControlButtonTile: View {
                                 .fill(Color.gray.opacity(0.9))
                                 .frame(width: 30, height: 30)
                             Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.cbIcon(.small, .bold))
                                 .foregroundColor(Color(uiColor: .systemBackground))
                         }
                     }
@@ -10838,7 +10812,7 @@ private struct ControlButtonTile: View {
             let x = CGFloat(previewLocation.col) * (cellSize + columnSpacing)
             let y = CGFloat(previewLocation.row) * (cellSize + rowSpacing)
             
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: CBRadius.card)
                 .fill(Color.accentColor.opacity(0.3))
                 .stroke(Color.accentColor, lineWidth: 2)
                 .frame(width: width, height: height)
@@ -11231,7 +11205,7 @@ private struct iPadControlTile: View {
                             .fill(Color.gray.opacity(0.9))
                             .frame(width: isPhone ? 20 : 30, height: isPhone ? 20 : 30)
                         Image(systemName: "xmark")
-                            .font(.system(size: isPhone ? 10 : 13, weight: .bold))
+                            .font(.cbIcon(points: isPhone ? 10 : 13, .bold))
                             .foregroundColor(Color(uiColor: .systemBackground))
                     }
                 }
@@ -11330,28 +11304,28 @@ private struct iPadControlTile: View {
             if button.symbol.isEmpty {
                 // Text only
                 Text(button.title)
-                    .font(.custom("Sora-Bold", size: isPhone ? 11 : 12))
+                    .font(.cb(points: isPhone ? 11 : 12, .bold))
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
             } else if button.title.isEmpty {
                 // Icon only
                 Image(systemName: button.symbol)
-                    .font(.system(size: isPhone ? 16 : 22, weight: .semibold))
+                    .font(.cbIcon(points: isPhone ? 16 : 22, .semibold))
                     .foregroundColor(buttonIconColor)
             } else {
                 // Icon + text
                 Image(systemName: button.symbol)
-                    .font(.system(size: isPhone ? 14 : 22, weight: .semibold))
+                    .font(.cbIcon(points: isPhone ? 14 : 22, .semibold))
                     .foregroundColor(buttonIconColor)
                 Text(button.title)
-                    .font(.custom("Sora-Bold", size: isPhone ? 10 : 12))
+                    .font(.cb(points: isPhone ? 10 : 12, .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
 
             if showMIDIData {
                 Text(midiLabel())
-                    .font(.custom("Sora-Regular", size: isPhone ? 8 : 9))
+                    .font(.cb(points: isPhone ? 8 : 9))
                     .foregroundColor(buttonTextColor.opacity(0.5))
             }
 
@@ -11360,7 +11334,7 @@ private struct iPadControlTile: View {
         .foregroundColor(buttonTextColor)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: CBRadius.small)
                 .fill(buttonBackgroundColor)
         )
         .opacity(isTouching ? 0.7 : 1.0)
@@ -11389,17 +11363,17 @@ private struct iPadControlTile: View {
 
                 ZStack(alignment: fillAlignment) {
                     // Main fader track background - filled style with 8pt corners
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .fill(customButtonColor.opacity(0.2))
 
                     // Fader fill (dynamic based on faderValue) - alignment handles the direction
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .fill(customButtonColor.opacity(0.85))
                         .frame(width: w * faderVisualValue)
                         .padding(3)
 
                     // Fader head (dynamic position) - conditional offset for direction
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .fill(customButtonColor)
                         .frame(width: headWidth)
                         .offset(x: (direction == "right") ? (w * faderVisualValue) : -(w * faderVisualValue))
@@ -11466,14 +11440,14 @@ private struct iPadControlTile: View {
                     let textOnFill = faderVisualValue > 0.45
                     let faderTextColor = textOnFill ? filledTextColor : emptyTextColor
                     Text(button.title)
-                        .font(.custom("Sora-Bold", size: 11))
+                        .font(.cb(.caption, .bold))
                         .foregroundColor(faderTextColor)
                         .multilineTextAlignment(.center)
                         .padding(.leading, isPhone ? 2 : 4)
                     Spacer()
                     if showMIDIData {
                         Text(midiLabel())
-                            .font(.custom("Sora-Regular", size: 9))
+                            .font(.cb(.micro))
                             .foregroundColor(faderTextColor.opacity(0.5))
                             .multilineTextAlignment(.center)
                             .padding(.trailing, isPhone ? 2 : 4)
@@ -11493,17 +11467,17 @@ private struct iPadControlTile: View {
 
                 ZStack(alignment: fillAlignment) {
                     // Main fader track background - filled style with 8pt corners
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .fill(customButtonColor.opacity(0.2))
 
                     // Fader fill (dynamic based on faderValue) - alignment handles the direction
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .fill(customButtonColor.opacity(0.85))
                         .frame(height: h * faderVisualValue)
                         .padding(3)
 
                     // Fader head (dynamic position) - conditional offset for direction
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: CBRadius.small)
                         .fill(customButtonColor)
                         .frame(height: headHeight)
                             .offset(y: (direction == "up") ? -(h * faderVisualValue) : (h * faderVisualValue))
@@ -11571,14 +11545,14 @@ private struct iPadControlTile: View {
                     let titleOnFill = (direction == "up") ? faderVisualValue > 0.75 : faderVisualValue > 0.15
                     let midiOnFill = (direction == "up") ? faderVisualValue > 0.15 : faderVisualValue > 0.75
                     Text(button.title)
-                        .font(.custom("Sora-Bold", size: 11))
+                        .font(.cb(.caption, .bold))
                         .foregroundColor(titleOnFill ? filledTextColor : emptyTextColor)
                         .multilineTextAlignment(.center)
                         .padding(.top, isPhone ? 2 : 4)
                     Spacer()
                     if showMIDIData {
                         Text(midiLabel())
-                            .font(.custom("Sora-Regular", size: 9))
+                            .font(.cb(.micro))
                             .foregroundColor((midiOnFill ? filledTextColor : emptyTextColor).opacity(0.5))
                             .multilineTextAlignment(.center)
                             .padding(.bottom, isPhone ? 2 : 8)
@@ -11589,7 +11563,7 @@ private struct iPadControlTile: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.clear))
+        .background(RoundedRectangle(cornerRadius: CBRadius.small).fill(Color.clear))
         .contentShape(Rectangle())  // Ensure entire frame is tappable
         .highPriorityGesture(
             // Only apply TapGesture for buttons, not faders (faders have DragGesture with minimumDistance: 0)
@@ -11937,7 +11911,7 @@ struct MidiTableSheet: View {
                     }
                 } footer: {
                     Text("When enabled, all cues and controls will be assigned to the same MIDI channel. When disabled, each item can use any of the 16 MIDI channels.")
-                        .font(.footnote)
+                        .font(.cb(.caption))
                 }
 
                 // Section 2: MIDI Filter
@@ -12027,7 +12001,7 @@ struct MidiAssignmentsView: View {
                         HStack(spacing: 0) {
                                 Button(action: { toggleSort(.name) }) {
                                     HStack(spacing: 4) {
-                                        Text("Name").font(.subheadline.weight(.semibold)).foregroundColor(.secondary)
+                                        Text("Name").font(.cb(.small, .semibold)).foregroundColor(.secondary)
                                         sortIndicator(for: .name)
                                     }
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -12036,7 +12010,7 @@ struct MidiAssignmentsView: View {
                                 
                                 Button(action: { toggleSort(.type) }) {
                                     HStack(spacing: 4) {
-                                        Text("Type").font(.subheadline.weight(.semibold)).foregroundColor(.secondary)
+                                        Text("Type").font(.cb(.small, .semibold)).foregroundColor(.secondary)
                                         sortIndicator(for: .type)
                                     }
                                 .frame(width: 70, alignment: .center)
@@ -12046,7 +12020,7 @@ struct MidiAssignmentsView: View {
                             if !isGlobalChannel {
                                     Button(action: { toggleSort(.channel) }) {
                                         HStack(spacing: 4) {
-                                            Text("Channel").font(.subheadline.weight(.semibold)).foregroundColor(.secondary)
+                                            Text("Channel").font(.cb(.small, .semibold)).foregroundColor(.secondary)
                                             sortIndicator(for: .channel)
                                         }
                                     .frame(width: 80, alignment: .center)
@@ -12056,7 +12030,7 @@ struct MidiAssignmentsView: View {
                                 
                                 Button(action: { toggleSort(.value) }) {
                                     HStack(spacing: 4) {
-                                        Text("Value").font(.subheadline.weight(.semibold)).foregroundColor(.secondary)
+                                        Text("Value").font(.cb(.small, .semibold)).foregroundColor(.secondary)
                                         sortIndicator(for: .value)
                                     }
                                 .frame(width: 90, alignment: .center)
@@ -12317,7 +12291,7 @@ struct MidiAssignmentsView: View {
     private func sortIndicator(for key: MidiSortKey) -> some View {
         if sortKey == key {
             Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                .font(.caption2)
+                .font(.cbIcon(.micro, .regular))
                 .foregroundColor(.secondary)
         } else {
             EmptyView()
@@ -12408,10 +12382,10 @@ struct MidiValueMenu: View {
                     "\(item.value) - \(item.value.midiNoteName)" :
                     "\(item.value)"
                 Text(displayText)
-                    .font(.body)
+                    .font(.cb(.body))
                     .foregroundColor(.primary)
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption2)
+                    .font(.cbIcon(.micro, .regular))
                     .foregroundColor(.secondary)
             }
         }
@@ -12487,7 +12461,7 @@ struct MidiAssignmentEditSheet: View {
                 Section(header: Text("MIDI Assignment")) {
                     if midiFiltersEnabled && !midiFilter.isEmpty {
                         Text("Some MIDI values are unavailable because MIDI filters are enabled. Go to MIDI Settings to change this.")
-                            .font(.caption)
+                            .font(.cb(.caption))
                             .foregroundColor(.secondary)
                             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
                     }
@@ -12524,7 +12498,7 @@ struct MidiAssignmentEditSheet: View {
 
                             if editedType == .note {
                                 Text(editedValue.midiNoteName)
-                                    .font(.system(size: 14))
+                                    .font(.cb(.small))
                                     .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
                             }
 
@@ -12535,11 +12509,11 @@ struct MidiAssignmentEditSheet: View {
                                 }
                             }) {
                                 Image(systemName: "minus")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.cbIcon(.small, .semibold))
                                     .foregroundColor(editedValue > (editedType == .cc && !allowFullCCR ? 1 : 0) ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                                     .frame(width: 28, height: 28)
                                     .background(selectedTheme.titleBarColor(for: colorScheme))
-                                    .cornerRadius(6)
+                                    .cornerRadius(CBRadius.small)
                             }
                             .buttonStyle(.plain)
                             .disabled(editedValue <= (editedType == .cc && !allowFullCCR ? 1 : 0))
@@ -12552,9 +12526,9 @@ struct MidiAssignmentEditSheet: View {
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 6)
                                 .background(selectedTheme.backgroundColor(for: colorScheme))
-                                .cornerRadius(6)
+                                .cornerRadius(CBRadius.small)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
+                                    RoundedRectangle(cornerRadius: CBRadius.small)
                                         .stroke(selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3), lineWidth: 1)
                                 )
                                 .foregroundColor(selectedTheme.primaryTextColor(for: colorScheme))
@@ -12568,11 +12542,11 @@ struct MidiAssignmentEditSheet: View {
                                 }
                             }) {
                                 Image(systemName: "plus")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.cbIcon(.small, .semibold))
                                     .foregroundColor(editedValue < ((editedType == .cc && !allowFullCCR) ? 119 : 127) ? selectedTheme.primaryTextColor(for: colorScheme) : selectedTheme.secondaryTextColor(for: colorScheme).opacity(0.3))
                                     .frame(width: 28, height: 28)
                                     .background(selectedTheme.titleBarColor(for: colorScheme))
-                                    .cornerRadius(6)
+                                    .cornerRadius(CBRadius.small)
                             }
                             .buttonStyle(.plain)
                             .disabled(editedValue >= ((editedType == .cc && !allowFullCCR) ? 119 : 127))
@@ -12581,7 +12555,7 @@ struct MidiAssignmentEditSheet: View {
                         // Show ownership warning
                         if let owner = getOwnerName(editedType, isGlobalChannel ? globalChannel : editedChannel, editedValue, item.id, item.name) {
                             Text("⚠️ MIDI taken by: \(owner)")
-                                .font(.caption)
+                                .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.warningColor(for: colorScheme))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -12589,7 +12563,7 @@ struct MidiAssignmentEditSheet: View {
                         // Show filtered MIDI warning only when filters are enabled
                         if midiFiltersEnabled && !midiFilter.isEmpty && editedType == .cc && midiFilter.contains(editedValue) {
                             Text("⚠️ This CC is filtered. Turn off filter to use it.")
-                                .font(.caption)
+                                .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.warningColor(for: colorScheme))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -12627,12 +12601,12 @@ struct MidiAssignmentEditSheet: View {
                     }
                 }) {
                     Text("Save")
-                        .font(.headline)
+                        .font(.cb(.body, .semibold))
                         .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(isDisabled ? Color.gray.opacity(0.3) : selectedTheme.accentColor(for: colorScheme))
-                        .cornerRadius(10)
+                        .cornerRadius(CBRadius.control)
                 }
                 .disabled(isDisabled)
                 .listRowBackground(Color.clear)
@@ -12684,37 +12658,37 @@ struct MidiTableRow: View {
                 // Name Column
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name)
-                        .font(.body)
+                        .font(.cb(.body))
                         .lineLimit(1)
                     Text(item.type.displayName)
-                        .font(.caption)
+                        .font(.cb(.caption))
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 // Type Column
                 Text(item.midiType == .cc ? "CC" : "Note")
-                    .font(.body)
+                    .font(.cb(.body))
                     .foregroundColor(.primary)
                     .frame(width: 70, alignment: .center)
 
                 // Channel Column (only shown if not global)
                 if !isGlobalChannel {
                     Text("\(item.channel)")
-                        .font(.body)
+                        .font(.cb(.body))
                         .foregroundColor(.primary)
                         .frame(width: 80, alignment: .center)
                 }
 
                 // Value Column
                 Text(item.midiType == .note ? "\(item.value) - \(item.value.midiNoteName)" : "\(item.value)")
-                    .font(.body)
+                    .font(.cb(.body))
                     .foregroundColor(.primary)
                     .frame(width: 90, alignment: .center)
 
                 // Chevron to indicate tappable
                 Image(systemName: "chevron.right")
-                    .font(.caption)
+                    .font(.cbIcon(.caption, .regular))
                     .foregroundColor(.secondary)
                     .frame(width: 20)
             }
@@ -12761,7 +12735,7 @@ struct MidiFilterView: View {
 
             Section {
                 Text("Exclude these MIDI CC numbers from auto-assignment. Common performance controllers (mod wheel, volume, sustain) are filtered by default to prevent conflicts.")
-                    .font(.subheadline)
+                    .font(.cb(.small))
                     .foregroundColor(.secondary)
             }
             .listRowBackground(selectedTheme.titleBarColor(for: colorScheme))
@@ -12802,10 +12776,10 @@ struct MidiFilterView: View {
                         )) {
                             HStack {
                                 Text("CC \(cc)")
-                                    .font(.body)
+                                    .font(.cb(.body))
                                     .frame(width: 60, alignment: .leading)
                                 Text(name)
-                                    .font(.body)
+                                    .font(.cb(.body))
                                     .foregroundColor(.secondary)
                             }
                         }
@@ -12845,10 +12819,10 @@ struct MidiFilterView: View {
                     )) {
                         HStack {
                             Text("CC \(cc)")
-                                .font(.body)
+                                .font(.cb(.body))
                                 .frame(width: 60, alignment: .leading)
                             Text(name)
-                                .font(.body)
+                                .font(.cb(.body))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -12948,7 +12922,7 @@ struct NavPillContent: View {
                 flashPrev()
             }) {
                 Image(systemName: "chevron.up")
-                    .font(.system(size: 35, weight: .bold))
+                    .font(.cbIcon(.heading, .bold))
                     .foregroundColor(canPrev ? .primary : .secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
@@ -12966,7 +12940,7 @@ struct NavPillContent: View {
                 flashNext()
             }) {
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 35, weight: .bold))
+                    .font(.cbIcon(.heading, .bold))
                     .foregroundColor(canNext ? .primary : .secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
@@ -13186,7 +13160,7 @@ struct DraggableNavigationCapsule: View {
             }
         }) {
             Image(systemName: "chevron.left")
-                .font(.system(size: 20, weight: .bold))
+                .font(.cbIcon(.large, .bold))
                 .foregroundColor(.primary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
@@ -13239,10 +13213,10 @@ struct DraggableNavigationCapsule: View {
             .frame(width: pillSize.width, height: pillSize.height)
             .background(
                 GeometryReader { geo in
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: CBRadius.panel)
                         .fill(Color.black.opacity(0.5))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: CBRadius.panel)
                                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
                         .preference(
@@ -13417,7 +13391,7 @@ struct SimpleDraggableTransportDock: View {
             }
         }) {
             Image(systemName: "chevron.left")
-                .font(.system(size: 20, weight: .bold))
+                .font(.cbIcon(.large, .bold))
                 .foregroundColor(.primary)
                 .frame(width: capsuleSize.width, height: capsuleSize.height, alignment: .center)
                 .contentShape(Rectangle())
@@ -13470,10 +13444,10 @@ struct SimpleDraggableTransportDock: View {
             .frame(width: capsuleSize.width, height: capsuleSize.height)
             .background(
                 GeometryReader { geo in
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: CBRadius.panel)
                         .fill(Color.black.opacity(0.8))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: CBRadius.panel)
                                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
                         .preference(

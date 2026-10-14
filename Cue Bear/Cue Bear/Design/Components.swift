@@ -33,7 +33,7 @@ struct CBTransportDock: View {
                 // Top button: Up arrow (PREVIOUS)
                 Button(action: onPrev) {
                     Image(systemName: "chevron.up")
-                        .font(.system(size: min(28, containerWidth * 0.22), weight: .bold))
+                        .font(.cbIcon(points: min(28, containerWidth * 0.22), .bold))
                         .foregroundColor(canPrev ? .primary : .secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
@@ -48,7 +48,7 @@ struct CBTransportDock: View {
 
                 // Middle: GO button — fires on touch-down for zero latency
                 Text("GO")
-                    .font(.custom("Sora-Bold", size: min(32, containerWidth * 0.25)))
+                    .font(.cb(points: min(32, containerWidth * 0.25), .bold))
                     .foregroundColor(.black)
                     .frame(width: goButtonSize, height: goButtonSize)
                     .background(isGoEnabled ? Color.white : Color.gray)
@@ -80,7 +80,7 @@ struct CBTransportDock: View {
                 // Bottom button: Down arrow (NEXT)
                 Button(action: onNext) {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: min(28, containerWidth * 0.22), weight: .bold))
+                        .font(.cbIcon(points: min(28, containerWidth * 0.22), .bold))
                         .foregroundColor(canNext ? .primary : .secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
@@ -197,13 +197,13 @@ private struct CBDialogButtonStyle: ButtonStyle {
         let isOutlined = role == .secondary || role == .cancel
         configuration.label
             .background(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: CBRadius.control)
                     .fill(backgroundColor(pressed: configuration.isPressed))
             )
             .overlay(
                 Group {
                     if isOutlined {
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: CBRadius.control)
                             .stroke(Color.white.opacity(0.4), lineWidth: 1)
                     }
                 }
@@ -276,8 +276,8 @@ struct CBDialog: View {
         }
         .padding(24)
         .frame(maxWidth: 340)
-        .background(RoundedRectangle(cornerRadius: 20).fill(Color.black.opacity(0.85)))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.12), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: CBRadius.panel).fill(Color.black.opacity(0.85)))
+        .overlay(RoundedRectangle(cornerRadius: CBRadius.panel).stroke(Color.white.opacity(0.12), lineWidth: 1))
         .shadow(color: .black.opacity(0.5), radius: 30, x: 0, y: 10)
     }
 
@@ -305,8 +305,8 @@ struct CBDialog: View {
                 .foregroundColor(.white)
                 .tint(.white)
                 .padding(12)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.25), lineWidth: 1))
+                .background(RoundedRectangle(cornerRadius: CBRadius.control).fill(Color.white.opacity(0.08)))
+                .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(Color.white.opacity(0.25), lineWidth: 1))
                 .focused($isTextFieldFocused)
                 .onSubmit {
                     if let primary = buttons.first(where: { $0.role == .primary }) {
@@ -384,17 +384,15 @@ struct CBSheetButton: View {
     var body: some View {
         Button(action: { if !disabled { action() } }) {
             Text(title)
-                .font(.custom(bold ? "Sora-Bold" : "Sora-Regular", size: 15))
+                .font(.cb(.body, bold ? .bold : .regular))
                 .foregroundColor(disabled ? .white.opacity(0.3) : .white)
                 .lineLimit(1)
                 .fixedSize()   // never squeeze or wrap the label (toolbars on iPadOS 26 propose a narrow width)
                 .padding(.horizontal, 14)
                 .frame(minWidth: 44)
                 .frame(height: 44)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
+                .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -411,13 +409,11 @@ struct CBSheetIconButton: View {
     var body: some View {
         Button(action: { if !disabled { action() } }) {
             Image(systemName: systemName)
-                .font(.system(size: 18, weight: weight))
+                .font(.cbIcon(.large, weight))
                 .foregroundColor(disabled ? .white.opacity(0.3) : .white)
                 .frame(width: 44, height: 44)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
+                .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -435,13 +431,11 @@ struct CBSheetIconMenu<Content: View>: View {
             content()
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 18, weight: .medium))
+                .font(.cbIcon(.large, .medium))
                 .foregroundColor(.white)
                 .frame(width: 44, height: 44)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .cbChip()
+                .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)

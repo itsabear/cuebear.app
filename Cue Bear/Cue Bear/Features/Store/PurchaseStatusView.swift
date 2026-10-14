@@ -37,7 +37,7 @@ struct PurchaseStatusView: View {
                                 Text("Lifetime Access")
                                     .fontWeight(.semibold)
                                 Text("Thank you for being an early supporter!")
-                                    .font(.caption)
+                                    .font(.cb(.caption))
                                     .foregroundColor(.secondary)
                             }
                         }
@@ -51,7 +51,7 @@ struct PurchaseStatusView: View {
                                 Text("Active Subscription")
                                     .fontWeight(.semibold)
                                 Text("Subscription active")
-                                    .font(.caption)
+                                    .font(.cb(.caption))
                                     .foregroundColor(.secondary)
                             }
                         }
@@ -87,10 +87,10 @@ struct PurchaseStatusView: View {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("About Lifetime Access")
-                            .font(.headline)
+                            .font(.cb(.body, .semibold))
 
                         Text("If you purchased Cue Bear for $4.99, you have lifetime access to all features. When we introduce subscriptions in the future, you'll continue to have full access forever as a thank you for being an early supporter.")
-                            .font(.caption)
+                            .font(.cb(.caption))
                             .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
@@ -102,10 +102,10 @@ struct PurchaseStatusView: View {
                     Section {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Transaction ID")
-                                .font(.caption)
+                                .font(.cb(.caption))
                                 .foregroundColor(.secondary)
                             Text(String(describing: transactionID))
-                                .font(.system(.caption, design: .monospaced))
+                                .font(.cbMono(.caption, .regular))
                                 .foregroundColor(.secondary)
                         }
                     } header: {

@@ -46,16 +46,16 @@ struct PaywallView: View {
 
                         // App Icon/Logo
                         Image(systemName: "music.note.list")
-                            .font(.system(size: 80))
+                            .font(.cbIcon(.hero, .regular))
                             .foregroundColor(.blue)
 
                         // Title
                         VStack(spacing: 12) {
                             Text("Unlock Cue Bear")
-                                .font(.custom("Sora-Bold", size: 32))
+                                .font(.cb(.heading, .bold))
 
                             Text("Full-featured MIDI controller for your set list")
-                                .font(.custom("Sora-Regular", size: 17))
+                                .font(.cb(.body))
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
@@ -73,11 +73,11 @@ struct PaywallView: View {
                         // Price
                         VStack(spacing: 8) {
                             Text(priceText)
-                                .font(.custom("Sora-Bold", size: 48))
+                                .font(.cb(.display, .bold))
                                 .foregroundColor(.primary)
 
                             Text("One-time purchase")
-                                .font(.custom("Sora-Regular", size: 15))
+                                .font(.cb(.body))
                                 .foregroundColor(.secondary)
                         }
                         .padding(.top, 20)
@@ -93,14 +93,14 @@ struct PaywallView: View {
                                         .scaleEffect(0.9)
                                 } else {
                                     Text("Buy Cue Bear")
-                                        .font(.custom("Sora-Bold", size: 18))
+                                        .font(.cb(.large, .bold))
                                 }
                             }
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
                             .background(Color.blue)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .clipShape(RoundedRectangle(cornerRadius: CBRadius.card))
                         }
                         .disabled(isPurchasing || isRestoring)
                         .padding(.horizontal, 40)
@@ -116,7 +116,7 @@ struct PaywallView: View {
                                         .scaleEffect(0.8)
                                 }
                                 Text("Restore Purchases")
-                                    .font(.custom("Sora-Regular", size: 15))
+                                    .font(.cb(.body))
                                     .foregroundColor(.blue)
                             }
                         }
@@ -125,7 +125,7 @@ struct PaywallView: View {
                         // Status messages
                         if let info = infoMessage {
                             Text(info)
-                                .font(.custom("Sora-Regular", size: 13))
+                                .font(.cb(.small))
                                 .foregroundColor(.secondary)
                                 .padding(.horizontal, 40)
                                 .multilineTextAlignment(.center)
@@ -133,7 +133,7 @@ struct PaywallView: View {
 
                         if let error = errorMessage {
                             Text(error)
-                                .font(.custom("Sora-Regular", size: 12))
+                                .font(.cb(.caption))
                                 .foregroundColor(selectedTheme.errorColor(for: colorScheme))
                                 .padding(.horizontal, 40)
                                 .multilineTextAlignment(.center)
@@ -213,12 +213,12 @@ struct FeatureRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 24))
+                .font(.cbIcon(.title, .regular))
                 .foregroundColor(.blue)
                 .frame(width: 32)
 
             Text(text)
-                .font(.system(size: 17))
+                .font(.cb(.body))
                 .foregroundColor(.primary)
 
             Spacer()

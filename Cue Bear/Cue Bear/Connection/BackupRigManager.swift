@@ -176,8 +176,8 @@ struct BackupComputerSection: View {
                         .fill(statusColor)
                         .frame(width: 10, height: 10)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(name).font(.system(size: 16, weight: .semibold))
-                        Text(statusText).font(.system(size: 13)).foregroundColor(.secondary)
+                        Text(name).font(.cb(.body, .semibold))
+                        Text(statusText).font(.cb(.small)).foregroundColor(.secondary)
                     }
                     Spacer()
                 }

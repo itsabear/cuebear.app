@@ -56,7 +56,7 @@ struct FirstRunView: View {
                 HStack(spacing: 12) {
                     Button(action: onTryShowMode) {
                         Label("Try Show mode", systemImage: "play.rectangle.fill")
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.cb(.body, .semibold))
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                     }
@@ -75,9 +75,9 @@ struct FirstRunView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Welcome to Cue Bear")
-                .font(.system(size: 30, weight: .bold))
+                .font(.cb(.heading, .bold))
             Text("You're in a demo show already. Try it in Show mode, then connect your Mac. Each step below ticks itself when it works.")
-                .font(.system(size: 17))
+                .font(.cb(.body))
                 .foregroundColor(.secondary)
         }
     }
@@ -91,7 +91,7 @@ struct FirstRunView: View {
                     Text("Get the free Bridge app for your Mac at cuebear.app/bridge, then open it. It lives in the menu bar.")
                         .foregroundColor(.secondary)
                     Link("Open cuebear.app/bridge", destination: URL(string: Self.bridgeURL)!)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.cb(.body, .semibold))
                 }
                 Spacer(minLength: 8)
                 QRCodeView(text: Self.bridgeURL)
@@ -113,7 +113,7 @@ struct FirstRunView: View {
                     ForEach(wifiClient.discovered) { item in
                         Button(action: { onConnectWiFi(item) }) {
                             Label("Connect to \(item.name)", systemImage: "wifi")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.cb(.body, .semibold))
                         }
                         .buttonStyle(.bordered)
                         .tint(accent)
@@ -144,7 +144,7 @@ struct FirstRunView: View {
                         testSent = true
                     }) {
                         Label("Send test note", systemImage: "music.note")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.cb(.body, .semibold))
                     }
                     .buttonStyle(.bordered)
                     .tint(accent)
@@ -158,7 +158,7 @@ struct FirstRunView: View {
                 }
                 if !isConnected {
                     Text("Connect first (step 2).")
-                        .font(.footnote)
+                        .font(.cb(.caption))
                         .foregroundColor(.secondary)
                 }
             }
@@ -204,13 +204,13 @@ struct FirstRunView: View {
     private var dawGuide: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Which DAW do you use?")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.cb(.large, .semibold))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(Self.guides) { guide in
                         Button(action: { chosenDAW = guide.id }) {
                             Text(guide.id)
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.cb(.body, .semibold))
                                 .padding(.horizontal, 14)
                                 .frame(height: 36)
                                 .background(Capsule().fill(chosenDAW == guide.id ? accent.opacity(0.22) : Color.secondary.opacity(0.12)))
@@ -225,18 +225,18 @@ struct FirstRunView: View {
                     ForEach(Array(guide.steps.enumerated()), id: \.offset) { index, step in
                         HStack(alignment: .top, spacing: 10) {
                             Text("\(index + 1).")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.cb(.body, .semibold))
                                 .foregroundColor(accent)
                                 .frame(width: 22, alignment: .trailing)
                             Text(step)
-                                .font(.system(size: 15))
+                                .font(.cb(.body))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.08)))
+                .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(Color.secondary.opacity(0.08)))
             }
         }
     }
@@ -259,25 +259,25 @@ private struct ChecklistStep<Content: View>: View {
                     .overlay(Circle().stroke(done ? Color.green : accent, style: StrokeStyle(lineWidth: 2, dash: done ? [] : [4, 3])))
                 if done {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.cbIcon(.small, .bold))
                         .foregroundColor(.green)
                 } else {
                     Text("\(number)")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.cb(.small, .bold))
                         .foregroundColor(accent)
                 }
             }
             .frame(width: 30, height: 30)
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.cb(.large, .semibold))
                 content()
-                    .font(.system(size: 15))
+                    .font(.cb(.body))
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.secondary.opacity(0.06)))
+        .background(RoundedRectangle(cornerRadius: CBRadius.card).fill(Color.secondary.opacity(0.06)))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Step \(number): \(title)\(done ? ", done" : "")")
     }
@@ -294,9 +294,9 @@ private struct QRCodeView: View {
                 .resizable()
                 .scaledToFit()
                 .padding(6)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white))
+                .background(RoundedRectangle(cornerRadius: CBRadius.small).fill(Color.white))
         } else {
-            RoundedRectangle(cornerRadius: 8).stroke(Color.secondary)
+            RoundedRectangle(cornerRadius: CBRadius.small).stroke(Color.secondary)
         }
     }
 
