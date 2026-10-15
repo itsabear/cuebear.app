@@ -94,7 +94,7 @@ Update this file whenever an architectural decision is made or a major task fini
   - The look is a deliberately plain dark skeleton.
 - **The default theme is forced on launch** (`selectedThemeID = "default"` in `ContentView+Presentation.swift`), so the genre themes are effectively off.
 - **New UI structure (agreed 2026-10-15, mock-ups in Artifact "Cue Bear Next: Show & Build")**:
-  - Two modes, switched by **Show | Build** in the top bar.
+  - Two modes, Show and Build (Build later became Edit, see below).
   - **Show** becomes the home screen and replaces the old perform screen and floating GO dock. It shows the setlist, Now/Next/GO and the shared controls plus this song's extras, with a **Lock** button.
   - **Build** has a left panel with tabs (Setlist / Controls / Library) and an inspector on the right. The inspector replaces the Edit Cue sheet and the Notes & Extras sheet.
   - **Lock** (decided 2026-10-15): while locked, the menu, the show/cue-list chooser and the Show | Build switch are hidden. GO, pedals, tapping a song to make it next, and the controls still work. Unlock = hold for 1 s.
