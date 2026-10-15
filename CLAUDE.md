@@ -46,11 +46,12 @@ Update this file whenever an architectural decision is made or a major task fini
   - `TopBar.swift`, `PerformanceList.swift`, `SetlistEditor.swift`, `SongLibraryPopover.swift`, `CueListChooser.swift`, `ConnectionsSheet.swift`, `BackupComputerSection.swift`, `ProjectsSheet.swift`, `NavigationCapsule.swift`, `Tutorials.swift`.
 - `Features/Controls/`: the control area grid (`ControlArea.swift` plus `+Editing`/`+Pages`), control editor sheets, MIDI pickers, wobble.
 - `Features/MIDI/MidiAssignments.swift`: the MIDI table and filters.
-- **Show | Build (2026-10-15)**: `ContentView+SideMenu.swift › mainStack()` draws `modeBarView`, then Show or Build (`@AppStorage("cb.screenMode")`). Wiring is in `Features/Main/ContentView+ShowBuild.swift`.
-  - `Features/Shell/ModeBar.swift`: menu, show / cue-list chooser, Show | Build switch, status pill (tap = Connections), Lock (Show) or Undo/Redo (Build).
-  - `Features/ShowMode/ShowModeView.swift`: Show, the home screen. Pedals map to arrows, space and PageUp/PageDown (ContentView no longer handles keys).
-  - `Features/Build/`: `BuildScreen.swift` (tabs across the top: Setlist / Library = list + song editor; Controls = the board + control editor; Select to remove/delete several), `SongInspector.swift` (Send now, Learn, Copy extras), `ControlInspector.swift` (type, size Regular/Wide = `isSmall` true/false, icon, color, Send now).
-  - `Features/Controls/ControlsBoard.swift`: THE controls board, used by Show (play) and Build (edit in place: tap selects, drag onto a control moves it, + tile adds). `BoardFlowLayout` packs Regular (1 unit) and Wide (2 units) tiles in order; faders are full-width rows; song extras carry a THIS SONG tag. Inspectors apply edits live; one undo step per selected song/control (`inspectorUndoSongID`/`inspectorUndoControlID`).
+- **Show and Edit (2026-10-15)**: one screen. `ContentView+SideMenu.swift › mainStack()` draws `modeBarView` then `stageView` (`ContentView+ShowBuild.swift`). `@AppStorage("cb.screenMode")`: `show` or `build` (= Edit; raw value kept).
+  - `Features/Shell/ModeBar.swift`: menu, show / cue-list chooser, status pill (tap = Connections), **Edit** + Lock in Show, **Done** in Edit.
+  - `Features/ShowMode/ShowModeView.swift`: the screen. `edit: ShowEdit?` turns on editing: tap selects (the selected song plays the role of Now; its extras show on the board), drag reorders songs and controls, GO becomes **TRY** (sends once). Pedals only while playing.
+  - `Features/Shell/EditPalette.swift`: docked along the bottom in Edit: + Song, Library (popover, `EditLibraryList`), Button / Toggle / Fader (tap = add at the end, drag onto the board = place), All songs | This song (shared control or extra), Undo / Redo (`lastEditWasControls` picks the stack).
+  - Editor panel (`editPanel`): `Features/Build/SongInspector.swift` or `ControlInspector.swift`, right side (bottom in portrait). Extras open `SongExtraEditor` as a sheet. Edits apply live; one undo step per selected song/control.
+  - `Features/Controls/ControlsBoard.swift`: THE controls board for both. Drops: control UUID strings (move) or "tool:button|toggle|fader" (new). `BoardFlowLayout` packs Regular (1 unit) and Wide (2 units) tiles; faders are full-width rows; extras carry THIS SONG.
   - Shared-control order: `[ControlButton].inShowOrder` / `.normalizedShowOrder` (Models/ControlButton.swift). Build writes page 0, gridRow = index.
 - `Features/Songs/`:
   - `SongDetailsSheet.swift`: Notes & Extras, including MIDI learn.
@@ -101,6 +102,7 @@ Update this file whenever an architectural decision is made or a major task fini
   - **One way to play** (Omri, 2026-10-15): Next + GO only. The old Regular (tap fires), Navigator (Prev/Next pill) and Cue modes are dropped; tapping a song only makes it Next.
   - **Controls (decided 2026-10-15)**: no pages. One board, the same view in Show and in Build (what you see while building is what you play). In Build the board is edited in place: tap to select, drag to reorder, a "+" tile adds. Old projects' pages are merged in page order.
   - **Dropped settings** (Omri, 2026-10-15): cue height, navigation pill size, cue capsule size, font size, show-MIDI-data. Appearance settings go away with them.
+  - **Build becomes Edit** (Omri, 2026-10-15): no separate Build screen or tabs. Edit is the Show screen with editing on, a docked tool palette, an Edit / Done button instead of the Show | Build switch, and editors that slide in. Map section "Update, 15 Oct"; mock-up artboard "Edit".
   - **Process rule**: no UI code before the A-to-Z flow map is approved by Omri. The map is the Doc "Cue Bear Next: flow map (A to Z)" (claude.ai/code/artifact/37237ccb-a607-49d7-9fd3-6cc564c95aa0): journeys, screens and states, old-feature map, open questions.
 
 ## 8. Conventions
@@ -134,7 +136,7 @@ Update this file whenever an architectural decision is made or a major task fini
 
 ## 10. Next steps (priority order)
 1. Get `relaunch` building in Xcode (fix errors as Omri pastes them).
-2. Test Show | Build on the iPad (landscape and portrait), fix what's off.
+2. Test Show and Edit on the iPad (landscape and portrait), fix what's off. Drag and drop (songs, controls, palette tools) is unverified on device.
 3. Delete the old perform UI listed in section 6.
 4. Then run the test list in `CUE_BEAR_NEXT.md` on the iPad. That covers Show mode, extras, the backup Mac and first run.
 5. Later:

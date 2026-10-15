@@ -163,14 +163,8 @@ extension ContentView {
 
                 VStack(spacing: 0) {
                     modeBarView
-                    Group {
-                        if screenMode == .show {
-                            showScreenView
-                        } else {
-                            buildScreenView
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    stageView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .disabled(showSideMenu)
 

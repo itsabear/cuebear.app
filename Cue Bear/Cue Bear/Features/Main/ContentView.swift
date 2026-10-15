@@ -213,7 +213,13 @@ internal struct ContentView: View {
     // v1.3 (Cue Bear Next): Show | Build
     @AppStorage("cb.screenMode") var screenModeRaw: String = CBScreenMode.show.rawValue
     @State var isShowLocked = false
-    @State var buildTab: BuildTab = .setlist
+    /// Edit: where new controls go, the open editor panel, the library popover, an extra being edited
+    @State var editTarget: EditTarget = .allSongs
+    @State var editPanel: EditPanel? = nil
+    @State var showEditLibrary = false
+    @State var editingExtra: SongExtra? = nil
+    /// Which undo stack the palette's Undo uses: the last kind of thing edited
+    @State var lastEditWasControls = false
     @State var buildSelectedSongID: UUID? = nil
     @State var buildSelectedControlID: UUID? = nil
     /// The song / control whose inspector edits already made an undo step

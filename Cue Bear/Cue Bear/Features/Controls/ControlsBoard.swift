@@ -4,7 +4,9 @@
 //  The controls board: the one view of the shared controls (plus the current song's extras).
 //  Show plays it; Build edits it in place, so what you build is what you play.
 //  - Buttons and toggles flow in rows, Regular (1 unit) or Wide (2 units); faders are full-width rows.
-//  - Build: tap selects, hold and drag onto another control moves it there, the + tile adds.
+//  - Edit: tap selects, hold and drag onto another control moves it there; tools dragged from the
+//    edit palette ("tool:button" / "tool:toggle" / "tool:fader") drop in place; the dashed tile at the
+//    end takes drops for the end.
 //
 
 import SwiftUI
@@ -63,8 +65,32 @@ struct ControlsBoard: View {
     var onPress: (BoardItem) -> Void = { _ in }
     var onFader: (BoardItem, Double) -> Void = { _, _ in }
     var onSelect: (UUID) -> Void = { _ in }
-    var onMove: (_ moving: UUID, _ before: UUID) -> Void = { _, _ in }
-    var onAdd: (_ fader: Bool) -> Void = { _ in }
+    /// before == nil: move to the end
+    var onMove: (_ moving: UUID, _ before: UUID?) -> Void = { _, _ in }
+    /// A palette tool dropped on the board; before == nil: at the end
+    var onDropTool: (_ kind: BoardItem.Kind, _ before: UUID?) -> Void = { _, _ in }
+
+    /// Palette tools travel as "tool:<kind>" strings, controls as their UUID string.
+    static func tool(_ kind: BoardItem.Kind) -> String {
+        switch kind {
+        case .button: return "tool:button"
+        case .toggle: return "tool:toggle"
+        case .fader: return "tool:fader"
+        }
+    }
+
+    private func handleDrop(_ strings: [String], before: UUID?) -> Bool {
+        guard let s = strings.first else { return false }
+        switch s {
+        case "tool:button": onDropTool(.button, before); return true
+        case "tool:toggle": onDropTool(.toggle, before); return true
+        case "tool:fader": onDropTool(.fader, before); return true
+        default:
+            guard let moving = UUID(uuidString: s), moving != before else { return false }
+            onMove(moving, before)
+            return true
+        }
+    }
 
     private var buttons: [BoardItem] { items.filter { $0.kind != .fader } }
     private var faders: [BoardItem] { items.filter { $0.kind == .fader } }
@@ -77,7 +103,7 @@ struct ControlsBoard: View {
                         .layoutValue(key: BoardSpanKey.self, value: item.isWide ? 2 : 1)
                 }
                 if mode == .build {
-                    addMenu
+                    endDropTile
                         .layoutValue(key: BoardSpanKey.self, value: 1)
                 }
             }
@@ -97,11 +123,7 @@ struct ControlsBoard: View {
         if mode == .build && !item.isExtra {
             t
                 .draggable(item.id.uuidString)
-                .dropDestination(for: String.self) { ids, _ in
-                    guard let first = ids.first, let moving = UUID(uuidString: first), moving != item.id else { return false }
-                    onMove(moving, item.id)
-                    return true
-                }
+                .dropDestination(for: String.self) { strings, _ in handleDrop(strings, before: item.id) }
         } else {
             t
         }
@@ -116,32 +138,25 @@ struct ControlsBoard: View {
         if mode == .build && !item.isExtra {
             row
                 .draggable(item.id.uuidString)
-                .dropDestination(for: String.self) { ids, _ in
-                    guard let first = ids.first, let moving = UUID(uuidString: first), moving != item.id else { return false }
-                    onMove(moving, item.id)
-                    return true
-                }
+                .dropDestination(for: String.self) { strings, _ in handleDrop(strings, before: item.id) }
         } else {
             row
         }
     }
 
-    private var addMenu: some View {
-        Menu {
-            Button(action: { onAdd(false) }) { Label("Button or toggle", systemImage: "square.grid.2x2") }
-            Button(action: { onAdd(true) }) { Label("Fader", systemImage: "slider.horizontal.3") }
-        } label: {
-            VStack(spacing: CBSpace.xs) {
-                Image(systemName: "plus").font(.cbIcon(.title))
-                Text("Add").font(.cb(.small, .semibold))
-            }
-            .foregroundStyle(CBColor.textSecondary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(RoundedRectangle(cornerRadius: CBRadius.card)
-                .strokeBorder(CBColor.strokeStrong, style: StrokeStyle(lineWidth: CBSize.hairline, dash: [5, 4])))
-            .contentShape(RoundedRectangle(cornerRadius: CBRadius.card))
+    /// The end of the board: drop a control or a palette tool here to put it last.
+    private var endDropTile: some View {
+        VStack(spacing: CBSpace.xs) {
+            Image(systemName: "plus").font(.cbIcon(.large))
+            Text("Drop here").font(.cb(.caption, .semibold))
         }
-        .accessibilityLabel("Add a control")
+        .foregroundStyle(CBColor.textTertiary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(RoundedRectangle(cornerRadius: CBRadius.card)
+            .strokeBorder(CBColor.strokeStrong, style: StrokeStyle(lineWidth: CBSize.hairline, dash: [5, 4])))
+        .contentShape(RoundedRectangle(cornerRadius: CBRadius.card))
+        .dropDestination(for: String.self) { strings, _ in handleDrop(strings, before: nil) }
+        .accessibilityLabel("End of the board. Drag a control or a tool here.")
     }
 }
 

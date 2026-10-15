@@ -1,9 +1,9 @@
 //
 //  ModeBar.swift — Cue Bear Next
 //
-//  The bar at the top of every screen: menu, show / cue list, the Show | Build switch,
-//  connection status, and Lock (Show) or Undo / Redo (Build).
-//  While locked only the status and "Hold to unlock" remain, so nothing can leave the show by accident.
+//  The bar at the top of every screen: menu, show / cue list, connection status, and
+//  Edit + Lock (Show) or Done (Edit). Undo / Redo live in the edit palette.
+//  While locked only the name, the status and "Hold to unlock" remain, so nothing can leave the show by accident.
 //
 
 import SwiftUI
@@ -12,7 +12,7 @@ import UIKit
 /// The two halves of the app.
 enum CBScreenMode: String {
     case show   // perform: Now / Next / GO, setlist, controls
-    case build  // set up: setlist, controls, library
+    case build  // Edit: the same screen with editing on (raw value kept for saved settings)
 }
 
 struct ModeBar<TitlePopover: View>: View {
@@ -23,12 +23,8 @@ struct ModeBar<TitlePopover: View>: View {
     @ObservedObject var coordinator: ConnectionCoordinator
     @ObservedObject var wifiClient: BridgeOutput
     @ObservedObject var rigs: BackupRigManager
-    var canUndo: Bool
-    var canRedo: Bool
     var onMenu: () -> Void
     var onConnections: () -> Void
-    var onUndo: () -> Void
-    var onRedo: () -> Void
     @ViewBuilder var titlePopover: () -> TitlePopover
 
     @State private var unlockHint = false
@@ -47,9 +43,8 @@ struct ModeBar<TitlePopover: View>: View {
     /// `compact`: portrait, where the title and status get less room so the centered switch never overlaps them.
     private func bar(compact: Bool) -> some View {
         ZStack {
-            // The switch sits in the middle of the bar whatever is on either side
-            if !isLocked {
-                modeSwitch
+            if mode == .build {
+                CBSectionLabel("Editing", color: CBColor.highlight)
             }
             HStack(spacing: CBSpace.s) {
                 if !isLocked {
@@ -63,12 +58,6 @@ struct ModeBar<TitlePopover: View>: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: CBSpace.s)
-                if mode == .build && !isLocked {
-                    CBSheetIconButton(systemName: "arrow.uturn.backward", disabled: !canUndo, action: onUndo)
-                        .accessibilityLabel("Undo")
-                    CBSheetIconButton(systemName: "arrow.uturn.forward", disabled: !canRedo, action: onRedo)
-                        .accessibilityLabel("Redo")
-                }
                 Button(action: onConnections) {
                     ShowStatusPill(coordinator: coordinator, wifiClient: wifiClient, rigs: rigs)
                 }
@@ -77,7 +66,18 @@ struct ModeBar<TitlePopover: View>: View {
                 .frame(maxWidth: compact ? 160 : 260)
                 .accessibilityHint("Opens Connections")
                 if mode == .show {
+                    if !isLocked {
+                        Button(action: { setMode(.build) }) {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        .buttonStyle(.cbSecondary)
+                        .accessibilityHint("Edit this show on the same screen")
+                    }
                     lockButton
+                } else {
+                    Button("Done") { setMode(.show) }
+                        .buttonStyle(.cbPrimary)
+                        .accessibilityHint("Back to playing")
                 }
             }
         }
@@ -111,34 +111,9 @@ struct ModeBar<TitlePopover: View>: View {
         }
     }
 
-    private var modeSwitch: some View {
-        HStack(spacing: 0) {
-            modeSegment("Show", .show)
-            modeSegment("Build", .build)
-        }
-        .padding(3)
-        .background(RoundedRectangle(cornerRadius: CBRadius.control).fill(CBColor.surface))
-        .overlay(RoundedRectangle(cornerRadius: CBRadius.control).stroke(CBColor.stroke, lineWidth: CBSize.hairline))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Mode")
-    }
-
-    private func modeSegment(_ label: String, _ value: CBScreenMode) -> some View {
-        let selected = mode == value
-        return Button(action: {
-            guard mode != value else { return }
-            UISelectionFeedbackGenerator().selectionChanged()
-            withAnimation(.easeInOut(duration: 0.2)) { mode = value }
-        }) {
-            Text(label)
-                .font(.cb(.small, selected ? .bold : .regular))
-                .foregroundStyle(selected ? CBColor.onPrimary : CBColor.textSecondary)
-                .frame(width: 88, height: 36)
-                .background(RoundedRectangle(cornerRadius: CBRadius.small).fill(selected ? CBColor.primary : Color.clear))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+    private func setMode(_ value: CBScreenMode) {
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(.easeInOut(duration: 0.2)) { mode = value }
     }
 
     @ViewBuilder

@@ -365,3 +365,8 @@ struct InspectorValue: View {
         }
     }
 }
+
+/// "CC 32 · ch 1" / "Note 60 · ch 2"
+func cbMIDISummary(kind: MIDIKind, number: Int, channel: Int) -> String {
+    (kind == .cc ? "CC \(number)" : "Note \(number)") + " · ch \(channel)"
+}

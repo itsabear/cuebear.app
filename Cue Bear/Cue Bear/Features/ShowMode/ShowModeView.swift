@@ -31,8 +31,10 @@ struct ShowModeView: View {
     var onFire: (Song) -> Void
     /// Presses one of the show's shared buttons (keeps toggle state in the project)
     var onSharedControl: (ControlButton) -> Void
-    /// Empty cue list: jump to Build › Setlist
+    /// Empty cue list: switch to Edit
     var onBuild: () -> Void = {}
+    /// nil = Show (playing). Set = Edit: the same screen, with selection, dragging and Try.
+    var edit: ShowEdit? = nil
 
     @State private var currentID: UUID? = nil
     @State private var nextID: UUID? = nil
@@ -51,6 +53,36 @@ struct ShowModeView: View {
     private var nextSong: Song? {
         guard let id = nextID else { return nil }
         return songs.first(where: { $0.id == id })
+    }
+
+    // What the screen shows as Now / Next. In Edit, the selected song plays the role of Now.
+    private var isEditing: Bool { edit != nil }
+    private var shownNowID: UUID? {
+        if let edit { return edit.selectedSongID ?? songs.first?.id }
+        return currentID
+    }
+    private var shownNextID: UUID? {
+        guard isEditing else { return nextID }
+        guard let id = shownNowID, let i = songs.firstIndex(where: { $0.id == id }), i + 1 < songs.count else { return nil }
+        return songs[i + 1].id
+    }
+    private var displayNow: Song? { shownNowID.flatMap { id in songs.first(where: { $0.id == id }) } }
+    private var displayNext: Song? { shownNextID.flatMap { id in songs.first(where: { $0.id == id }) } }
+
+    /// Edit: songs drag onto each other to reorder
+    @ViewBuilder
+    private func songDragging<V: View>(_ view: V, song: Song) -> some View {
+        if let edit {
+            view
+                .draggable(song.id.uuidString)
+                .dropDestination(for: String.self) { strings, _ in
+                    guard let s = strings.first, let moving = UUID(uuidString: s), moving != song.id else { return false }
+                    edit.onMoveSong(moving, song.id)
+                    return true
+                }
+        } else {
+            view
+        }
     }
 
     // MARK: - Body
@@ -81,13 +113,13 @@ struct ShowModeView: View {
         .focusEffectDisabled()
         .focused($hasKeyFocus)
         // Bluetooth page-turner pedals (AirTurn and similar) and keyboards
-        .onKeyPress(.downArrow) { go(); return .handled }
-        .onKeyPress(.pageDown) { go(); return .handled }
-        .onKeyPress(.rightArrow) { go(); return .handled }
-        .onKeyPress(.space) { go(); return .handled }
-        .onKeyPress(.upArrow) { stepNext(by: -1); return .handled }
-        .onKeyPress(.pageUp) { stepNext(by: -1); return .handled }
-        .onKeyPress(.leftArrow) { stepNext(by: -1); return .handled }
+        .onKeyPress(.downArrow) { guard !isEditing else { return .ignored }; go(); return .handled }
+        .onKeyPress(.pageDown) { guard !isEditing else { return .ignored }; go(); return .handled }
+        .onKeyPress(.rightArrow) { guard !isEditing else { return .ignored }; go(); return .handled }
+        .onKeyPress(.space) { guard !isEditing else { return .ignored }; go(); return .handled }
+        .onKeyPress(.upArrow) { guard !isEditing else { return .ignored }; stepNext(by: -1); return .handled }
+        .onKeyPress(.pageUp) { guard !isEditing else { return .ignored }; stepNext(by: -1); return .handled }
+        .onKeyPress(.leftArrow) { guard !isEditing else { return .ignored }; stepNext(by: -1); return .handled }
         .onAppear {
             setUpPositions()
             hasKeyFocus = true
@@ -203,9 +235,11 @@ struct ShowModeView: View {
     }
 
     private func setlistRow(index: Int, song: Song) -> some View {
-        let isNow = song.id == currentID
-        let isNext = song.id == nextID
-        return Button(action: { chooseNext(song) }) {
+        let isNow = song.id == shownNowID
+        let isNext = song.id == shownNextID
+        let row = Button(action: {
+            if let edit { edit.onSelectSong(song.id) } else { chooseNext(song) }
+        }) {
             HStack(spacing: CBSpace.m) {
                 Text("\(index + 1)")
                     .font(.cbMono(.body, .semibold))
@@ -217,8 +251,8 @@ struct ShowModeView: View {
                     .lineLimit(1)
                 Spacer(minLength: CBSpace.xs)
                 if isNow {
-                    CBTag(text: "NOW", color: CBColor.highlight)
-                } else if isNext {
+                    CBTag(text: isEditing ? "SELECTED" : "NOW", color: CBColor.highlight)
+                } else if isNext && !isEditing {
                     CBTag(text: "NEXT", color: CBColor.surfaceRaised)
                 }
             }
@@ -230,14 +264,15 @@ struct ShowModeView: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: CBRadius.control)
-                    .stroke(isNow ? CBColor.highlight : (isNext ? CBColor.strokeStrong : Color.clear),
+                    .stroke(isNow ? (isEditing ? CBColor.textPrimary : CBColor.highlight) : (isNext && !isEditing ? CBColor.strokeStrong : Color.clear),
                             lineWidth: isNow ? CBSize.selection : CBSize.hairline)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(index + 1), \(song.name)\(isNow ? ", now playing" : "")\(isNext ? ", next" : "")")
-        .accessibilityHint("Makes this song next. Press GO to play it.")
+        .accessibilityLabel("\(index + 1), \(song.name)\(isNow ? (isEditing ? ", selected" : ", now playing") : "")\(isNext && !isEditing ? ", next" : "")")
+        .accessibilityHint(isEditing ? "Selects this song to edit. Hold and drag to reorder." : "Makes this song next. Press GO to play it.")
+        return songDragging(row, song: song)
     }
 
     private func isPlayed(_ song: Song) -> Bool {
@@ -254,25 +289,27 @@ struct ShowModeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: CBSpace.s) {
                     ForEach(Array(songs.enumerated()), id: \.element.id) { index, song in
-                        Button(action: { chooseNext(song) }) {
+                        songDragging(Button(action: {
+                            if let edit { edit.onSelectSong(song.id) } else { chooseNext(song) }
+                        }) {
                             VStack(alignment: .leading, spacing: CBSpace.xs) {
                                 Text("\(index + 1)")
                                     .font(.cbMono(.caption, .semibold))
                                     .foregroundStyle(CBColor.textTertiary)
                                 Text(song.name)
-                                    .font(.cb(.body, song.id == currentID ? .bold : .regular))
+                                    .font(.cb(.body, song.id == shownNowID ? .bold : .regular))
                                     .foregroundStyle(CBColor.textPrimary)
                                     .lineLimit(1)
                             }
                             .padding(CBSpace.m)
                             .frame(width: 150, alignment: .leading)
                             .background(RoundedRectangle(cornerRadius: CBRadius.control)
-                                .fill(song.id == currentID ? CBColor.highlight.opacity(0.25) : CBColor.surface))
+                                .fill(song.id == shownNowID ? CBColor.highlight.opacity(0.25) : CBColor.surface))
                             .overlay(RoundedRectangle(cornerRadius: CBRadius.control)
-                                .stroke(song.id == currentID ? CBColor.highlight : (song.id == nextID ? CBColor.strokeStrong : Color.clear),
-                                        lineWidth: song.id == currentID ? CBSize.selection : CBSize.hairline))
+                                .stroke(song.id == shownNowID ? (isEditing ? CBColor.textPrimary : CBColor.highlight) : (song.id == shownNextID && !isEditing ? CBColor.strokeStrong : Color.clear),
+                                        lineWidth: song.id == shownNowID ? CBSize.selection : CBSize.hairline))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.plain), song: song)
                         .id(song.id)
                     }
                 }
@@ -328,7 +365,7 @@ struct ShowModeView: View {
     private var nowCard: some View {
         VStack(alignment: .leading, spacing: CBSpace.s) {
             CBSectionLabel("Now", color: CBColor.highlight)
-            if let song = currentSong {
+            if let song = displayNow {
                 HStack(alignment: .firstTextBaseline, spacing: CBSpace.m) {
                     if let i = songs.firstIndex(where: { $0.id == song.id }) {
                         Text("\(i + 1)")
@@ -370,7 +407,7 @@ struct ShowModeView: View {
     private var nextCard: some View {
         VStack(alignment: .leading, spacing: CBSpace.xs) {
             CBSectionLabel("Next")
-            if let song = nextSong {
+            if let song = displayNext {
                 Text(song.name)
                     .font(.cb(.title, .bold))
                     .foregroundStyle(CBColor.textPrimary)
@@ -389,6 +426,29 @@ struct ShowModeView: View {
 
     /// Same look as the GO button on the main screen: white, black type.
     private var goButton: some View {
+        Group {
+            if let edit {
+                // Edit: Try sends the selected song once (also how the DAW learns it)
+                Button(action: { if let s = displayNow { edit.onTry(s) } }) {
+                    Text("TRY")
+                        .font(.cb(.heading, .bold))
+                        .foregroundStyle(displayNow == nil ? CBColor.textDisabled : CBColor.onPrimary)
+                        .frame(width: 200)
+                        .frame(maxHeight: .infinity)
+                        .background(RoundedRectangle(cornerRadius: CBRadius.card)
+                            .fill(displayNow == nil ? CBColor.surface : CBColor.primary))
+                }
+                .buttonStyle(IOSPressButtonStyle())
+                .disabled(displayNow == nil)
+                .accessibilityLabel("Try")
+                .accessibilityHint("Sends the selected song's message once")
+            } else {
+                playGoButton
+            }
+        }
+    }
+
+    private var playGoButton: some View {
         Button(action: go) {
             Text("GO")
                 .font(.cb(.display, .bold))
@@ -408,7 +468,7 @@ struct ShowModeView: View {
     // MARK: - Controls (shared + this song's extras)
 
 
-    private var songExtras: [SongExtra] { currentSong?.extras ?? [] }
+    private var songExtras: [SongExtra] { displayNow?.extras ?? [] }
 
     /// Shared controls in board order, then this song's extras.
     private var boardItems: [BoardItem] {
@@ -419,15 +479,16 @@ struct ShowModeView: View {
     private var controlsArea: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CBSpace.m) {
-                if controlButtons.isEmpty && songExtras.isEmpty {
-                    Text("No controls yet. Add them in Build › Controls.")
+                if controlButtons.isEmpty && songExtras.isEmpty && !isEditing {
+                    Text("No controls yet. Tap Edit, then drag a Button or Fader from the palette.")
                         .font(.cb(.body))
                         .foregroundStyle(CBColor.textTertiary)
                 } else {
-                    CBSectionLabel("Controls")
+                    CBSectionLabel(isEditing ? "Controls · tap to edit, hold and drag to move" : "Controls")
                     ControlsBoard(
                         items: boardItems,
-                        mode: .play,
+                        mode: isEditing ? .build : .play,
+                        selectedID: edit?.selectedControlID,
                         onPress: { item in
                             if item.isExtra {
                                 if let extra = songExtras.first(where: { $0.id == item.id }) { pressExtra(extra) }
@@ -448,7 +509,10 @@ struct ShowModeView: View {
                                 controlButtons[i].faderValue = newValue
                                 if midi != old { sendSharedFader(b, value: midi) }
                             }
-                        }
+                        },
+                        onSelect: { id in edit?.onSelectBoardItem(id) },
+                        onMove: { moving, before in edit?.onMoveControl(moving, before) },
+                        onDropTool: { kind, before in edit?.onDropTool(kind, before) }
                     )
                 }
             }
@@ -540,4 +604,17 @@ struct ShowStatusPill: View {
         }
         return (parts.joined(separator: " · "), color)
     }
+}
+
+/// What Show needs from its host to act as the editor (Edit mode).
+struct ShowEdit {
+    var selectedSongID: UUID?
+    var selectedControlID: UUID?
+    var onSelectSong: (UUID) -> Void
+    /// A shared control or a song extra
+    var onSelectBoardItem: (UUID) -> Void
+    var onMoveSong: (_ moving: UUID, _ before: UUID) -> Void
+    var onMoveControl: (_ moving: UUID, _ before: UUID?) -> Void
+    var onDropTool: (_ kind: BoardItem.Kind, _ before: UUID?) -> Void
+    var onTry: (Song) -> Void
 }
