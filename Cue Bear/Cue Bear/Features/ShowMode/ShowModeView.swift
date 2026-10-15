@@ -31,6 +31,8 @@ struct ShowModeView: View {
     var onFire: (Song) -> Void
     /// Presses one of the show's shared buttons (keeps toggle state in the project)
     var onSharedControl: (ControlButton) -> Void
+    /// Empty cue list: jump to Build › Setlist
+    var onBuild: () -> Void = {}
 
     @State private var currentID: UUID? = nil
     @State private var nextID: UUID? = nil
@@ -286,7 +288,28 @@ struct ShowModeView: View {
 
     // MARK: - Main column
 
+    @ViewBuilder
     private var mainColumn: some View {
+        if songs.isEmpty {
+            VStack(spacing: CBSpace.l) {
+                Text("This cue list has no songs yet")
+                    .font(.cb(.title, .bold))
+                    .foregroundStyle(CBColor.textPrimary)
+                Text("Add songs in Build, then come back here to play them.")
+                    .font(.cb(.body))
+                    .foregroundStyle(CBColor.textSecondary)
+                Button("Add songs in Build", action: onBuild)
+                    .buttonStyle(.cbPrimary)
+            }
+            .multilineTextAlignment(.center)
+            .padding(CBSpace.xxl)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            playColumn
+        }
+    }
+
+    private var playColumn: some View {
         VStack(spacing: CBSpace.l) {
             nowCard
             HStack(spacing: CBSpace.l) {
@@ -384,84 +407,50 @@ struct ShowModeView: View {
 
     // MARK: - Controls (shared + this song's extras)
 
-    private var sortedShared: [ControlButton] { controlButtons.inShowOrder }
 
-    private var sharedButtons: [ControlButton] { sortedShared.filter { $0.isFader != true } }
-    private var sharedFaders: [ControlButton] { sortedShared.filter { $0.isFader == true } }
     private var songExtras: [SongExtra] { currentSong?.extras ?? [] }
+
+    /// Shared controls in board order, then this song's extras.
+    private var boardItems: [BoardItem] {
+        controlButtons.inShowOrder.map { BoardItem(control: $0) }
+            + songExtras.map { BoardItem(extra: $0, isOn: extraToggles[$0.id] ?? false, value: extraFaders[$0.id] ?? 0) }
+    }
 
     private var controlsArea: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CBSpace.m) {
                 if controlButtons.isEmpty && songExtras.isEmpty {
-                    Text("No controls yet. Add them in the main screen's control area.")
+                    Text("No controls yet. Add them in Build › Controls.")
                         .font(.cb(.body))
                         .foregroundStyle(CBColor.textTertiary)
                 } else {
                     CBSectionLabel("Controls")
-                    HStack(alignment: .top, spacing: CBSpace.xl) {
-                        buttonGrid
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-                        if !sharedFaders.isEmpty || songExtras.contains(where: { $0.style == .fader }) {
-                            faderStack
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                    ControlsBoard(
+                        items: boardItems,
+                        mode: .play,
+                        onPress: { item in
+                            if item.isExtra {
+                                if let extra = songExtras.first(where: { $0.id == item.id }) { pressExtra(extra) }
+                            } else if let b = controlButtons.first(where: { $0.id == item.id }) {
+                                onSharedControl(b)
+                            }
+                        },
+                        onFader: { item, newValue in
+                            let midi = Int((newValue * 127).rounded())
+                            if item.isExtra {
+                                guard let extra = songExtras.first(where: { $0.id == item.id }) else { return }
+                                let old = Int(((extraFaders[extra.id] ?? 0) * 127).rounded())
+                                extraFaders[extra.id] = newValue
+                                if midi != old { sendExtra(extra, value: midi) }
+                            } else if let i = controlButtons.firstIndex(where: { $0.id == item.id }) {
+                                let b = controlButtons[i]
+                                let old = Int(((b.faderValue ?? 0) * 127).rounded())
+                                controlButtons[i].faderValue = newValue
+                                if midi != old { sendSharedFader(b, value: midi) }
+                            }
                         }
-                    }
+                    )
                 }
-            }
-        }
-    }
-
-    private let gridColumns = [GridItem(.adaptive(minimum: 120, maximum: 220), spacing: CBSpace.m)]
-
-    private var buttonGrid: some View {
-        LazyVGrid(columns: gridColumns, alignment: .leading, spacing: CBSpace.m) {
-            ForEach(sharedButtons) { b in
-                ShowControlTile(title: b.title.isEmpty ? "Button" : b.title,
-                                symbol: b.symbol,
-                                isOn: b.isToggle == true && b.toggleState,
-                                isExtra: false) {
-                    onSharedControl(b)
-                }
-            }
-            ForEach(songExtras.filter { $0.style != .fader }) { extra in
-                ShowControlTile(title: extra.title,
-                                symbol: extra.style == .toggle ? "power" : "",
-                                isOn: extra.style == .toggle && (extraToggles[extra.id] ?? false),
-                                isExtra: true) {
-                    pressExtra(extra)
-                }
-            }
-        }
-    }
-
-    private var faderStack: some View {
-        VStack(alignment: .leading, spacing: CBSpace.m) {
-            ForEach(sharedFaders) { b in
-                ShowFaderRow(title: b.title.isEmpty ? "Fader" : b.title,
-                             isExtra: false,
-                             value: Binding(
-                                get: { controlButtons.first(where: { $0.id == b.id })?.faderValue ?? 0 },
-                                set: { newValue in
-                                    let midi = Int((newValue * 127).rounded())
-                                    let old = Int(((controlButtons.first(where: { $0.id == b.id })?.faderValue ?? 0) * 127).rounded())
-                                    if let i = controlButtons.firstIndex(where: { $0.id == b.id }) {
-                                        controlButtons[i].faderValue = newValue
-                                    }
-                                    if midi != old { sendSharedFader(b, value: midi) }
-                                }))
-            }
-            ForEach(songExtras.filter { $0.style == .fader }) { extra in
-                ShowFaderRow(title: extra.title,
-                             isExtra: true,
-                             value: Binding(
-                                get: { extraFaders[extra.id] ?? 0 },
-                                set: { newValue in
-                                    let midi = Int((newValue * 127).rounded())
-                                    let old = Int(((extraFaders[extra.id] ?? 0) * 127).rounded())
-                                    extraFaders[extra.id] = newValue
-                                    if midi != old { sendExtra(extra, value: midi) }
-                                }))
             }
         }
     }
@@ -504,71 +493,6 @@ struct ShowModeView: View {
 }
 
 // MARK: - Pieces
-
-/// A shared control or a song extra. Extras carry a "THIS SONG" tag and a highlight edge.
-private struct ShowControlTile: View {
-    let title: String
-    let symbol: String
-    let isOn: Bool
-    let isExtra: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: CBSpace.xs) {
-                if !symbol.isEmpty {
-                    Image(systemName: symbol)
-                        .font(.cbIcon(.large))
-                }
-                Text(title)
-                    .font(.cb(.body, .semibold))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                if isExtra {
-                    CBTag(text: "THIS SONG", color: isOn ? CBColor.surfaceRaised : CBColor.highlight)
-                }
-            }
-            .foregroundStyle(CBColor.textPrimary)
-            .frame(maxWidth: .infinity, minHeight: 72)
-            .padding(.vertical, CBSpace.s)
-            .background(RoundedRectangle(cornerRadius: CBRadius.card)
-                .fill(isOn ? CBColor.highlight : CBColor.surface))
-            .overlay(RoundedRectangle(cornerRadius: CBRadius.card)
-                .stroke(isExtra ? CBColor.highlight : CBColor.stroke, lineWidth: isExtra ? CBSize.selection : CBSize.hairline))
-            .contentShape(RoundedRectangle(cornerRadius: CBRadius.card))
-        }
-        .buttonStyle(IOSPressButtonStyle())
-        .accessibilityLabel(title)
-        .accessibilityValue(isOn ? "On" : "")
-    }
-}
-
-private struct ShowFaderRow: View {
-    let title: String
-    let isExtra: Bool
-    @Binding var value: Double
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: CBSpace.xs) {
-            HStack(spacing: CBSpace.s) {
-                Text(title)
-                    .font(.cb(.body, .semibold))
-                    .foregroundStyle(CBColor.textPrimary)
-                if isExtra {
-                    CBTag(text: "THIS SONG")
-                }
-                Spacer()
-                Text("\(Int((value * 127).rounded()))")
-                    .font(.cbMono(.small))
-                    .foregroundStyle(CBColor.textTertiary)
-            }
-            Slider(value: $value, in: 0...1)
-                .tint(CBColor.highlight)
-                .accessibilityLabel(title)
-        }
-        .cbCard(outline: isExtra ? CBColor.highlight : nil, padding: CBSpace.m)
-    }
-}
 
 /// USB / Wi-Fi / backup status. Re-checks every second so it never shows a stale state.
 struct ShowStatusPill: View {

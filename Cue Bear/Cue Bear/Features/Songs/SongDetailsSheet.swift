@@ -345,7 +345,7 @@ private struct ValueRow: View {
 
 // MARK: - Copy extras to other songs
 
-private struct CopyExtrasSheet: View {
+struct CopyExtrasSheet: View {
     let songs: [Song]
     var onCopy: ([UUID]) -> Void
     var onCancel: () -> Void

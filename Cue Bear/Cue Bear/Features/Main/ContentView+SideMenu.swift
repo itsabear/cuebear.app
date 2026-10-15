@@ -16,36 +16,31 @@ extension ContentView {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Section 1: File Operations
-                    sideMenuSection(title: "Project") {
-                        sideMenuButton("New Project", icon: "doc.badge.plus", action: {
-                            if isEditing { isEditing = false }
+                    // Shows (autosave replaces Save)
+                    sideMenuSection(title: "Shows") {
+                        sideMenuButton("New show", icon: "doc.badge.plus", action: {
                             newProjectFlow()
                             closeMenu()
                         })
-                        sideMenuButton("Save", icon: "square.and.arrow.down", action: {
-                            if isEditing { isEditing = false }
-                            saveCurrentProject(overwrite: true)
-                            closeMenu()
-                        })
-                        sideMenuButton("Save As...", icon: "square.and.arrow.down.on.square", action: {
-                            if isEditing { isEditing = false }
-                            saveCurrentProject(overwrite: false)
-                            closeMenu()
-                        })
-                        sideMenuButton("Open...", icon: "folder", action: {
-                            if isEditing { isEditing = false }
+                        sideMenuButton("Open a show", icon: "folder", action: {
                             projectsList = ProjectIO.list()
                             showProjects = true
                             closeMenu()
                         })
-                        sideMenuButton("Import...", icon: "arrow.down.doc", action: {
-                            if isEditing { isEditing = false }
+                        sideMenuButton("Duplicate this show", icon: "plus.square.on.square", action: {
+                            saveCurrentProject(overwrite: false)
+                            closeMenu()
+                        })
+                        sideMenuButton("Rename this show", icon: "pencil", action: {
+                            tempName = projectName
+                            showNamePrompt = true
+                            closeMenu()
+                        })
+                        sideMenuButton("Import", icon: "arrow.down.doc", action: {
                             openDocumentPicker()
                             closeMenu()
                         })
-                        sideMenuButton("Export...", icon: "square.and.arrow.up", action: {
-                            if isEditing { isEditing = false }
+                        sideMenuButton("Export", icon: "square.and.arrow.up", action: {
                             exportCurrentProject()
                             closeMenu()
                         })
@@ -54,16 +49,9 @@ extension ContentView {
                     Rectangle().fill(CBColor.separator).frame(height: CBSize.hairline)
                         .padding(.horizontal, CBSpace.xl)
 
-                    // Section 2: Settings
-                    sideMenuSection(title: "Settings") {
-                        sideMenuButton("MIDI Settings...", icon: "slider.horizontal.3", action: {
-                            if isEditing { isEditing = false }
+                    sideMenuSection(title: "MIDI") {
+                        sideMenuButton("MIDI overview", icon: "list.bullet.rectangle", action: {
                             showMidiTable = true
-                            closeMenu()
-                        })
-                        sideMenuButton("Appearance...", icon: "paintbrush", action: {
-                            if isEditing { isEditing = false }
-                            showAppearanceSettingsSheet = true
                             closeMenu()
                         })
                     }
@@ -73,7 +61,7 @@ extension ContentView {
 
                     // Section 3: Help
                     sideMenuSection(title: "Help") {
-                        sideMenuButton("Getting Started", icon: "questionmark.circle", action: {
+                        sideMenuButton("Getting started", icon: "questionmark.circle", action: {
                             if isEditing { isEditing = false }
                             // Only show onboarding if crash alert is not active
                             if !crashAlertActive {

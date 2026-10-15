@@ -49,7 +49,8 @@ Update this file whenever an architectural decision is made or a major task fini
 - **Show | Build (2026-10-15)**: `ContentView+SideMenu.swift › mainStack()` draws `modeBarView`, then Show or Build (`@AppStorage("cb.screenMode")`). Wiring is in `Features/Main/ContentView+ShowBuild.swift`.
   - `Features/Shell/ModeBar.swift`: menu, show / cue-list chooser, Show | Build switch, status pill (tap = Connections), Lock (Show) or Undo/Redo (Build).
   - `Features/ShowMode/ShowModeView.swift`: Show, the home screen. Pedals map to arrows, space and PageUp/PageDown (ContentView no longer handles keys).
-  - `Features/Build/`: `BuildScreen.swift` (Setlist / Controls / Library tabs), `SongInspector.swift`, `ControlInspector.swift`. Inspectors apply edits live; one undo step per selected song/control (`inspectorUndoSongID`/`inspectorUndoControlID`).
+  - `Features/Build/`: `BuildScreen.swift` (tabs across the top: Setlist / Library = list + song editor; Controls = the board + control editor; Select to remove/delete several), `SongInspector.swift` (Send now, Learn, Copy extras), `ControlInspector.swift` (type, size Regular/Wide = `isSmall` true/false, icon, color, Send now).
+  - `Features/Controls/ControlsBoard.swift`: THE controls board, used by Show (play) and Build (edit in place: tap selects, drag onto a control moves it, + tile adds). `BoardFlowLayout` packs Regular (1 unit) and Wide (2 units) tiles in order; faders are full-width rows; song extras carry a THIS SONG tag. Inspectors apply edits live; one undo step per selected song/control (`inspectorUndoSongID`/`inspectorUndoControlID`).
   - Shared-control order: `[ControlButton].inShowOrder` / `.normalizedShowOrder` (Models/ControlButton.swift). Build writes page 0, gridRow = index.
 - `Features/Songs/`:
   - `SongDetailsSheet.swift`: Notes & Extras, including MIDI learn.
@@ -74,7 +75,8 @@ Update this file whenever an architectural decision is made or a major task fini
   - the ContentView and ControlSubviews split;
   - Show mode, Notes & Extras, backup rig, first run and demo shows.
   - Omri is fixing compile errors one round at a time; the last fix was `CBButtonStyle`'s inner view renamed from `Body`.
-- **Show | Build structure**: written 2026-10-15, not built yet (unverified). Reordering the setlist relies on List drag-to-reorder without edit mode (unverified on device).
+- **Show | Build, built to the flow map** (2026-10-15, not built in Xcode yet, unverified). Omri said "build" without answering the map's 3 open questions, so the defaults were used: faders horizontal only, old alias cues keep playing (no new ones), cue-list search dropped.
+- **Flow-map items not done yet**: Shows sheet restyle (per-show rename / duplicate / delete), a name required for every new show, "Add the demo shows back" in Getting started, MIDI overview restyle, Show empty state for controls in portrait (unverified). Reordering the setlist relies on List drag-to-reorder without edit mode (unverified on device).
 - **Old perform UI is now unused but still in the code**: `CBTopBar` (TopBar.swift), `CBPerformanceList`, `buildMiddleSectionView`, `controlSectionView`/Controls area, transport docks, `CBAddEditCueSheet`, `SongDetailsSheet` path, tutorials. Remove once Show | Build is confirmed on the iPad.
 - **Code-level checks only:** syntax only, with tree-sitter. No type checking or tests have run in the cloud.
 

@@ -1,9 +1,11 @@
 //
 //  BuildScreen.swift — Cue Bear Next
 //
-//  The Build half of Show | Build. Left: what you are building (Setlist, Controls, Library tabs).
-//  Right: an inspector for whatever is picked on the left. Nothing pops up over anything else,
-//  except the small editor for one song extra.
+//  The Build half of Show | Build (see the flow map, CLAUDE.md §7).
+//  Tabs across the top: Setlist, Controls, Library.
+//  - Setlist / Library: the list on the left, the selected song's editor on the right.
+//  - Controls: the board exactly as Show draws it, edited in place, with the editor beside it
+//    (below it in portrait).
 //
 
 import SwiftUI
@@ -35,42 +37,64 @@ struct BuildScreen: View {
     @Binding var selectedControlID: UUID?
 
     var onMoveSongs: (IndexSet, Int) -> Void
-    var onRemoveSongs: (IndexSet) -> Void
+    var onRemoveSongs: (Set<UUID>) -> Void
+    var onDeleteSongs: (Set<UUID>) -> Void
     var onNewSong: () -> Void
     var onAddToSetlist: (Song) -> Void
     var onNewControl: (_ fader: Bool) -> Void
+    var onMoveControl: (_ moving: UUID, _ before: UUID) -> Void
     var songInspector: (Song) -> AnyView
     var controlInspector: (ControlButton) -> AnyView
 
     @State private var libraryQuery = ""
+    @State private var isSelecting = false
+    @State private var picked: Set<UUID> = []
 
     var body: some View {
         GeometryReader { geo in
-            let leftWidth: CGFloat = geo.size.width < 900 ? 300 : 380
-            HStack(spacing: 0) {
-                leftPanel
-                    .frame(width: leftWidth)
-                Rectangle().fill(CBColor.separator).frame(width: CBSize.hairline)
-                rightPanel
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            let portrait = geo.size.width < 900
+            VStack(spacing: 0) {
+                tabPicker
+                    .padding(.horizontal, CBSpace.l)
+                    .padding(.vertical, CBSpace.m)
+                Rectangle().fill(CBColor.separator).frame(height: CBSize.hairline)
+                switch tab {
+                case .setlist, .library:
+                    HStack(spacing: 0) {
+                        Group {
+                            if tab == .setlist { setlistList } else { libraryList }
+                        }
+                        .padding(CBSpace.l)
+                        .frame(width: portrait ? 300 : 380)
+                        Rectangle().fill(CBColor.separator).frame(width: CBSize.hairline)
+                        songEditor
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                case .controls:
+                    if portrait {
+                        VStack(spacing: 0) {
+                            board.frame(maxHeight: geo.size.height * 0.45)
+                            Rectangle().fill(CBColor.separator).frame(height: CBSize.hairline)
+                            controlEditor.frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    } else {
+                        HStack(spacing: 0) {
+                            board.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            Rectangle().fill(CBColor.separator).frame(width: CBSize.hairline)
+                            controlEditor.frame(width: 380)
+                        }
+                    }
+                }
             }
         }
         .background(CBColor.background)
-    }
-
-    // MARK: - Left panel
-
-    private var leftPanel: some View {
-        VStack(alignment: .leading, spacing: CBSpace.m) {
-            tabPicker
-            switch tab {
-            case .setlist: setlistTab
-            case .controls: controlsTab
-            case .library: libraryTab
-            }
+        .onChange(of: tab) { _, _ in
+            isSelecting = false
+            picked.removeAll()
         }
-        .padding(CBSpace.l)
     }
+
+    // MARK: - Tabs
 
     private var tabPicker: some View {
         HStack(spacing: 0) {
@@ -91,29 +115,79 @@ struct BuildScreen: View {
         }
         .padding(3)
         .background(RoundedRectangle(cornerRadius: CBRadius.control).fill(CBColor.surface))
+        .frame(maxWidth: 480)
+        .frame(maxWidth: .infinity)
     }
 
-    // MARK: Setlist
+    // MARK: - Select several
 
-    private var setlistTab: some View {
+    private func selectHeader(title: String, count: Int, actionTitle: String, action: @escaping () -> Void) -> some View {
+        HStack(spacing: CBSpace.s) {
+            Text(isSelecting ? "\(picked.count) selected" : "\(count) \(title)")
+                .font(.cb(.small))
+                .foregroundStyle(CBColor.textTertiary)
+            Spacer()
+            if isSelecting {
+                Button(actionTitle) {
+                    action()
+                    picked.removeAll()
+                    isSelecting = false
+                }
+                .buttonStyle(.cbDestructive)
+                .disabled(picked.isEmpty)
+            }
+            Button(isSelecting ? "Done" : "Select") {
+                isSelecting.toggle()
+                picked.removeAll()
+            }
+            .buttonStyle(.cbSecondary)
+            .disabled(count == 0)
+        }
+    }
+
+    private func toggle(_ id: UUID) {
+        if picked.contains(id) { picked.remove(id) } else { picked.insert(id) }
+    }
+
+    // MARK: - Setlist
+
+    private var moveAction: ((IndexSet, Int) -> Void)? {
+        isSelecting ? nil : onMoveSongs
+    }
+
+    private var deleteAction: ((IndexSet) -> Void)? {
+        if isSelecting { return nil }
+        let list = songs
+        let remove = onRemoveSongs
+        return { offsets in remove(Set(offsets.map { list[$0].id })) }
+    }
+
+    private var setlistList: some View {
         VStack(alignment: .leading, spacing: CBSpace.m) {
+            selectHeader(title: songs.count == 1 ? "song" : "songs", count: songs.count, actionTitle: "Remove") {
+                onRemoveSongs(picked)
+            }
             if songs.isEmpty {
-                emptyNote("No songs in this cue list yet. Add a new song, or bring one in from the library.")
+                emptyNote("Add your first song. Each one sends a MIDI message when you press GO in Show.")
             } else {
                 List {
                     ForEach(Array(songs.enumerated()), id: \.element.id) { index, song in
-                        Button(action: { selectedSongID = song.id }) {
-                            BuildSongRow(index: index + 1, song: song, isSelected: selectedSongID == song.id)
+                        Button(action: {
+                            if isSelecting { toggle(song.id) } else { selectedSongID = song.id }
+                        }) {
+                            BuildSongRow(index: index + 1, song: song,
+                                         isSelected: !isSelecting && selectedSongID == song.id,
+                                         isPicked: isSelecting ? picked.contains(song.id) : nil)
                         }
                         .buttonStyle(.plain)
                         .buildRowStyle()
                     }
-                    .onMove(perform: onMoveSongs)
-                    .onDelete(perform: onRemoveSongs)
+                    .onMove(perform: moveAction)
+                    .onDelete(perform: deleteAction)
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                Text("Hold a song and drag to reorder. Swipe left to remove it from this list.")
+                Text("Hold a song and drag to reorder. Swipe left to remove it from this cue list.")
                     .font(.cb(.caption))
                     .foregroundStyle(CBColor.textTertiary)
             }
@@ -127,38 +201,7 @@ struct BuildScreen: View {
         }
     }
 
-    // MARK: Controls
-
-    private var controlsTab: some View {
-        VStack(alignment: .leading, spacing: CBSpace.m) {
-            Text("On every song, in this order in Show.")
-                .font(.cb(.small))
-                .foregroundStyle(CBColor.textTertiary)
-            if controls.isEmpty {
-                emptyNote("No controls yet. Add a button or a fader for things you press on every song, like Play, Stop or a vocal effect.")
-            } else {
-                ScrollView {
-                    VStack(spacing: CBSpace.s) {
-                        ForEach(controls) { control in
-                            Button(action: { selectedControlID = control.id }) {
-                                BuildControlRow(control: control, isSelected: selectedControlID == control.id)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-            Spacer(minLength: 0)
-            HStack(spacing: CBSpace.s) {
-                Button("+ Button") { onNewControl(false) }
-                    .buttonStyle(CBButtonStyle(kind: .primary, fullWidth: true))
-                Button("+ Fader") { onNewControl(true) }
-                    .buttonStyle(CBButtonStyle(kind: .secondary, fullWidth: true))
-            }
-        }
-    }
-
-    // MARK: Library
+    // MARK: - Library
 
     private var filteredLibrary: [Song] {
         let sorted = library.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -166,10 +209,13 @@ struct BuildScreen: View {
         return q.isEmpty ? sorted : sorted.filter { $0.name.localizedCaseInsensitiveContains(q) }
     }
 
-    private var libraryTab: some View {
+    private var libraryList: some View {
         VStack(alignment: .leading, spacing: CBSpace.m) {
             TextField("Search songs", text: $libraryQuery)
                 .textFieldStyle(CBTextFieldStyle())
+            selectHeader(title: library.count == 1 ? "song" : "songs", count: library.count, actionTitle: "Delete") {
+                onDeleteSongs(picked)
+            }
             if library.isEmpty {
                 emptyNote("Every song you make lands here, so you can reuse it in other cue lists.")
             } else {
@@ -178,16 +224,22 @@ struct BuildScreen: View {
                         ForEach(filteredLibrary) { song in
                             let inSetlist = songs.contains(where: { $0.id == song.id })
                             HStack(spacing: CBSpace.s) {
-                                Button(action: { selectedSongID = song.id }) {
-                                    BuildSongRow(index: nil, song: song, isSelected: selectedSongID == song.id)
+                                Button(action: {
+                                    if isSelecting { toggle(song.id) } else { selectedSongID = song.id }
+                                }) {
+                                    BuildSongRow(index: nil, song: song,
+                                                 isSelected: !isSelecting && selectedSongID == song.id,
+                                                 isPicked: isSelecting ? picked.contains(song.id) : nil)
                                 }
                                 .buttonStyle(.plain)
-                                if inSetlist {
-                                    CBTag(text: "IN LIST", color: CBColor.surfaceRaised)
-                                } else {
-                                    Button("Add") { onAddToSetlist(song) }
-                                        .buttonStyle(CBButtonStyle(kind: .secondary))
-                                        .accessibilityLabel("Add \(song.name) to this cue list")
+                                if !isSelecting {
+                                    if inSetlist {
+                                        CBTag(text: "IN LIST", color: CBColor.surfaceRaised)
+                                    } else {
+                                        Button("Add") { onAddToSetlist(song) }
+                                            .buttonStyle(CBButtonStyle(kind: .secondary))
+                                            .accessibilityLabel("Add \(song.name) to this cue list")
+                                    }
                                 }
                             }
                         }
@@ -206,25 +258,48 @@ struct BuildScreen: View {
             .cbCard()
     }
 
-    // MARK: - Right panel
+    // MARK: - Controls board
+
+    private var board: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: CBSpace.m) {
+                Text(controls.isEmpty
+                     ? "Add the controls you press on every song, like Play, Stop or a vocal effect."
+                     : "This is how they look in Show. Tap one to edit it, hold and drag to move it.")
+                    .font(.cb(.small))
+                    .foregroundStyle(CBColor.textTertiary)
+                ControlsBoard(
+                    items: controls.map { BoardItem(control: $0) },
+                    mode: .build,
+                    selectedID: selectedControlID,
+                    onSelect: { selectedControlID = $0 },
+                    onMove: onMoveControl,
+                    onAdd: onNewControl
+                )
+            }
+            .padding(CBSpace.xl)
+        }
+    }
+
+    // MARK: - Editors
 
     @ViewBuilder
-    private var rightPanel: some View {
-        switch tab {
-        case .setlist, .library:
-            if let id = selectedSongID,
-               let song = songs.first(where: { $0.id == id }) ?? library.first(where: { $0.id == id }) {
-                songInspector(song)
-            } else {
-                placeholder(tab == .setlist ? "Pick a song on the left to edit it, or add a new one."
-                                            : "Pick a song to edit it, or add it to this cue list.")
-            }
-        case .controls:
-            if let id = selectedControlID, let control = controls.first(where: { $0.id == id }) {
-                controlInspector(control)
-            } else {
-                placeholder("Pick a control on the left to edit it, or add a new one.")
-            }
+    private var songEditor: some View {
+        if let id = selectedSongID,
+           let song = songs.first(where: { $0.id == id }) ?? library.first(where: { $0.id == id }) {
+            songInspector(song)
+        } else {
+            placeholder(tab == .setlist ? "Pick a song on the left to edit it, or add a new one."
+                                        : "Pick a song to edit it, or add it to this cue list.")
+        }
+    }
+
+    @ViewBuilder
+    private var controlEditor: some View {
+        if let id = selectedControlID, let control = controls.first(where: { $0.id == id }) {
+            controlInspector(control)
+        } else {
+            placeholder("Tap a control to edit it, or + to add one.")
         }
     }
 
@@ -254,10 +329,16 @@ struct BuildSongRow: View {
     let index: Int?
     let song: Song
     let isSelected: Bool
+    /// nil = not selecting; true / false = picked for "remove several"
+    var isPicked: Bool? = nil
 
     var body: some View {
         HStack(spacing: CBSpace.s) {
-            if let index {
+            if let isPicked {
+                Image(systemName: isPicked ? "checkmark.circle.fill" : "circle")
+                    .font(.cbIcon(.large, .regular))
+                    .foregroundStyle(isPicked ? CBColor.highlight : CBColor.textTertiary)
+            } else if let index {
                 Text("\(index)")
                     .font(.cbMono(.small))
                     .foregroundStyle(CBColor.textTertiary)
@@ -286,52 +367,6 @@ struct BuildSongRow: View {
             .stroke(isSelected ? CBColor.highlight : Color.clear, lineWidth: CBSize.selection))
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-}
-
-struct BuildControlRow: View {
-    let control: ControlButton
-    let isSelected: Bool
-
-    private var typeName: String {
-        if control.isFader == true { return "Fader" }
-        return control.isToggle == true ? "Toggle" : "Button"
-    }
-
-    private var icon: String {
-        if control.isFader == true { return "slider.horizontal.3" }
-        return control.symbol.isEmpty ? "square" : control.symbol
-    }
-
-    var body: some View {
-        HStack(spacing: CBSpace.m) {
-            Image(systemName: icon)
-                .font(.cbIcon(.body))
-                .foregroundStyle(CBColor.textSecondary)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: CBSpace.xxs) {
-                Text(control.title.isEmpty ? typeName : control.title)
-                    .font(.cb(.body, isSelected ? .bold : .regular))
-                    .foregroundStyle(CBColor.textPrimary)
-                    .lineLimit(1)
-                Text(typeName)
-                    .font(.cb(.caption))
-                    .foregroundStyle(CBColor.textTertiary)
-            }
-            Spacer(minLength: CBSpace.xs)
-            Text(cbMIDISummary(kind: control.isFader == true ? .cc : control.kind, number: control.number, channel: control.channel))
-                .font(.cbMono(.caption))
-                .foregroundStyle(CBColor.textTertiary)
-        }
-        .padding(.horizontal, CBSpace.m)
-        .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: CBRadius.control)
-            .fill(isSelected ? CBColor.highlight.opacity(0.25) : CBColor.surface))
-        .overlay(RoundedRectangle(cornerRadius: CBRadius.control)
-            .stroke(isSelected ? CBColor.highlight : Color.clear, lineWidth: CBSize.selection))
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(isSelected || isPicked == true ? .isSelected : [])
     }
 }

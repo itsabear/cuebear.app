@@ -14,9 +14,14 @@ struct SongInspector: View {
     /// The show's shared faders (for "faders jump to, on GO")
     let sharedFaders: [ControlButton]
     let isInSetlist: Bool
+    let isConnected: Bool
+    /// Songs extras can be copied to
+    let otherSongs: [Song]
     /// Who else sends this MIDI message (nil = nobody)
     var conflictName: (MIDIKind, Int, Int) -> String?
     var onChange: (Song) -> Void
+    var onSendNow: (Song) -> Void
+    var onCopyExtras: ([UUID], [SongExtra]) -> Void
     var onDuplicate: () -> Void
     var onRemoveFromSetlist: () -> Void
     var onAddToSetlist: () -> Void
@@ -25,10 +30,13 @@ struct SongInspector: View {
     @State private var draft: Song
     @State private var editingExtra: SongExtra? = nil
     @State private var isLearning = false
+    @State private var showCopyExtras = false
 
-    init(song: Song, sharedFaders: [ControlButton], isInSetlist: Bool,
+    init(song: Song, sharedFaders: [ControlButton], isInSetlist: Bool, isConnected: Bool, otherSongs: [Song],
          conflictName: @escaping (MIDIKind, Int, Int) -> String?,
          onChange: @escaping (Song) -> Void,
+         onSendNow: @escaping (Song) -> Void,
+         onCopyExtras: @escaping ([UUID], [SongExtra]) -> Void,
          onDuplicate: @escaping () -> Void,
          onRemoveFromSetlist: @escaping () -> Void,
          onAddToSetlist: @escaping () -> Void,
@@ -36,8 +44,12 @@ struct SongInspector: View {
         self.song = song
         self.sharedFaders = sharedFaders
         self.isInSetlist = isInSetlist
+        self.isConnected = isConnected
+        self.otherSongs = otherSongs
         self.conflictName = conflictName
         self.onChange = onChange
+        self.onSendNow = onSendNow
+        self.onCopyExtras = onCopyExtras
         self.onDuplicate = onDuplicate
         self.onRemoveFromSetlist = onRemoveFromSetlist
         self.onAddToSetlist = onAddToSetlist
@@ -85,6 +97,16 @@ struct SongInspector: View {
             .presentationBackground(CBColor.background)
             .presentationCornerRadius(CBRadius.panel)
         }
+        .sheet(isPresented: $showCopyExtras) {
+            CopyExtrasSheet(songs: otherSongs,
+                            onCopy: { ids in
+                                onCopyExtras(ids, draft.extras ?? [])
+                                showCopyExtras = false
+                            },
+                            onCancel: { showCopyExtras = false })
+            .presentationBackground(CBColor.background)
+            .presentationCornerRadius(CBRadius.panel)
+        }
     }
 
     // MARK: - Header
@@ -97,6 +119,9 @@ struct SongInspector: View {
                 .submitLabel(.done)
             CBSheetIconMenu(systemName: "ellipsis") {
                 Button(action: onDuplicate) { Label("Duplicate", systemImage: "plus.square.on.square") }
+                if !(draft.extras ?? []).isEmpty && !otherSongs.isEmpty {
+                    Button(action: { showCopyExtras = true }) { Label("Copy extras to…", systemImage: "doc.on.doc") }
+                }
                 if isInSetlist {
                     Button(action: onRemoveFromSetlist) { Label("Remove from this cue list", systemImage: "minus.circle") }
                 } else {
@@ -142,13 +167,22 @@ struct SongInspector: View {
                     }
                 }
                 HStack(spacing: CBSpace.m) {
+                    Button(action: { onSendNow(draft) }) {
+                        Label("Send now", systemImage: "paperplane")
+                    }
+                    .buttonStyle(.cbSecondary)
                     Button(action: { isLearning.toggle() }) {
-                        Label(isLearning ? "Listening… move a control in your DAW" : "Learn from DAW",
+                        Label(isLearning ? "Listening…" : "Learn from DAW",
                               systemImage: isLearning ? "dot.radiowaves.left.and.right" : "wand.and.stars")
                     }
                     .buttonStyle(CBButtonStyle(kind: isLearning ? .highlight : .secondary))
                     Spacer(minLength: 0)
                 }
+                .disabled(!isConnected)
+                Text(isConnected ? "Send now plays it once, for MIDI learn in your DAW. Learn from DAW takes the next message your DAW sends."
+                                 : "Connect to your Mac to send or learn.")
+                    .font(.cb(.small))
+                    .foregroundStyle(CBColor.textTertiary)
                 if let other = conflictName(draft.kind, draft.channel, numberBinding.wrappedValue), other != draft.name {
                     Label("\(other) sends the same message", systemImage: "exclamationmark.triangle.fill")
                         .font(.cb(.small))
