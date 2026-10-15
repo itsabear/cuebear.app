@@ -109,10 +109,10 @@ struct CBButtonStyle: ButtonStyle {
     var height: CGFloat = CBSize.control
 
     func makeBody(configuration: Configuration) -> some View {
-        Body(configuration: configuration, kind: kind, fullWidth: fullWidth, height: height)
+        StyledLabel(configuration: configuration, kind: kind, fullWidth: fullWidth, height: height)
     }
 
-    private struct Body: View {
+    private struct StyledLabel: View {
         let configuration: Configuration
         let kind: Kind
         let fullWidth: Bool
