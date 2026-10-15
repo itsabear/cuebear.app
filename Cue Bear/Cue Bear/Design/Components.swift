@@ -442,3 +442,15 @@ struct CBSheetIconMenu<Content: View>: View {
         .buttonStyle(.plain)
     }
 }
+
+// MARK: - Reusable Button Styles
+
+struct DestructiveWideButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(title, action: action)
+            .buttonStyle(CBButtonStyle(kind: .destructive, fullWidth: true, height: CBSize.largeControl))
+    }
+}
