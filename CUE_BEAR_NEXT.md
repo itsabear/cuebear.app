@@ -24,10 +24,34 @@ app called **Cue Bear Next** (orange NEXT icon), so the App Store Cue Bear stays
 | **First run**: starts inside a demo show; checklist that ticks itself, QR code to the Bridge, test note, setup guide per DAW | First launch, or Menu > Getting Started |
 | Old step-by-step tutorials and the "beta" card retired | |
 
+## Design pass: one look everywhere
+
+Every screen now takes its look from one design foundation (see `DESIGN_FOUNDATION.md`):
+
+- One typeface (Sora) and one type scale of 9 sizes, instead of about 28 sizes and three typefaces.
+- Four corner sizes, one spacing scale, one set of colors by role.
+- Standard pieces: chip, card, row, sheet header, buttons (primary / secondary / destructive), tags, status pill.
+- Every sheet has the same background, header and row style, including Show mode, Getting started,
+  Notes & Extras and the pairing window, which used to look different from the rest of the app.
+- Show mode's GO now looks like the main screen's GO (white, black type). "Now" and selection are blue.
+
+The look is a plain skeleton on purpose. The real design language goes into the foundation files later,
+and the whole app follows.
+
+## Code clean-up
+
+- `ContentView.swift` went from 13,800 lines to about 1,300. The rest is split by feature:
+  `Features/Main` (top bar, side menu, setlist, library, cue lists, projects...), `Features/Controls`
+  (control area, editor, MIDI pickers), `Features/MIDI`, `Features/ShowMode`, `Features/Songs`,
+  `Features/Onboarding`, `Features/Settings`, `Features/Store`.
+- Other folders: `App`, `Design`, `Models`, `Storage`, `Connection`, `Debug`.
+- Removed about 8,000 lines of code nothing used (old tutorials, old onboarding, an old USB tunnel,
+  design experiments, placeholders).
+
 ## Not done yet (next passes)
 
-- Splitting the 13,800-line `ContentView.swift`. Everything new is in its own file instead, so
-  it doesn't grow further.
+- The real design language (the foundation is ready for it).
+- The editing screens still have the old layouts, now in the common style. Redesigning them is its own pass.
 - Resizable windows for iPadOS 27 (the app still asks for a fixed full-screen window).
 - Program Change messages (needs a matching Bridge change).
 - Pricing (left off on purpose).
@@ -35,7 +59,7 @@ app called **Cue Bear Next** (orange NEXT icon), so the App Store Cue Bear stays
 
 ## Built without Xcode
 
-This code was written overnight without a compiler, so the first build may show some errors.
+This code was written without a compiler, so a build may show some errors.
 Paste them to Claude.
 
 ## Test checklist

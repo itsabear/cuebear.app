@@ -496,7 +496,7 @@ struct SwipeableCueListRow: View {
                                 .frame(width: deleteButtonWidth)
                                 .frame(maxHeight: .infinity)
                         }
-                        .background(Color.red)
+                        .background(CBColor.danger)
                     }
 
                     // Main row content

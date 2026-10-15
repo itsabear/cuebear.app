@@ -748,7 +748,7 @@ struct MidiAssignmentEditSheet: View {
                         .foregroundColor(isDisabled ? Color.gray.opacity(0.5) : Color.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(isDisabled ? Color.gray.opacity(0.3) : selectedTheme.accentColor(for: colorScheme))
+                        .background(isDisabled ? CBColor.stroke : selectedTheme.accentColor(for: colorScheme))
                         .cornerRadius(CBRadius.control)
                 }
                 .disabled(isDisabled)

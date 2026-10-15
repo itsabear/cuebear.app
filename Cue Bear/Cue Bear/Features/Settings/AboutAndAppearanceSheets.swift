@@ -336,14 +336,14 @@ struct ThemePreviewCard: View {
                 Circle()
                     .fill(theme.backgroundColor(for: colorScheme))
                     .frame(width: 24, height: 24)
-                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                    .overlay(Circle().stroke(CBColor.stroke, lineWidth: 1))
                 Circle()
                     .fill(theme.defaultCueColor(for: colorScheme))
                     .frame(width: 30, height: 30)
                 Circle()
                     .fill(theme.accentColor(for: colorScheme))
                     .frame(width: 24, height: 24)
-                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                    .overlay(Circle().stroke(CBColor.stroke, lineWidth: 1))
             }
 
             // Font sample

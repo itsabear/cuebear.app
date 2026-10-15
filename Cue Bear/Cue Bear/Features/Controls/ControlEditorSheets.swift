@@ -364,7 +364,7 @@ struct CBControlEditorSheet: View {
                                     Circle()
                                         .fill(Color(hex: hex))
                                         .frame(width: 24, height: 24)
-                                        .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                        .overlay(Circle().stroke(CBColor.stroke, lineWidth: 1))
                                 } else {
                                     Text("Default")
                                         .foregroundColor(selectedTheme.secondaryTextColor(for: colorScheme))
@@ -1122,7 +1122,7 @@ struct CBEditControlSheet: View {
                                     Circle()
                                         .fill(Color(hex: hex))
                                         .frame(width: 24, height: 24)
-                                        .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                        .overlay(Circle().stroke(CBColor.stroke, lineWidth: 1))
                                 } else {
                                     Text("Default")
                                         .foregroundStyle(CBColor.textSecondary)

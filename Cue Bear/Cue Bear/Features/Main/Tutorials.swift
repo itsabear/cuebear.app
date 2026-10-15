@@ -92,7 +92,7 @@ struct SwipeableCapsuleTutorial: View {
             .padding(.vertical, 10)
             .background(
                 LinearGradient(
-                    colors: [Color.purple, Color.blue],
+                    colors: [CBColor.highlight, CBColor.highlight.opacity(0.85)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -183,7 +183,7 @@ struct UpwardTutorial: View {
                 .padding(.vertical, 10)
                 .background(
                     LinearGradient(
-                        colors: [Color.purple, Color.blue],
+                        colors: [CBColor.highlight, CBColor.highlight.opacity(0.85)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -267,7 +267,7 @@ struct DownwardTutorial: View {
                 .padding(.vertical, 10)
                 .background(
                     LinearGradient(
-                        colors: [Color.purple, Color.blue],
+                        colors: [CBColor.highlight, CBColor.highlight.opacity(0.85)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )

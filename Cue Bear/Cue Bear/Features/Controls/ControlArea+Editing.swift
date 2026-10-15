@@ -1612,7 +1612,7 @@ extension CBControlSection {
                         let x = CGFloat(col) * (cellSize + columnSpacing)
                         let y = CGFloat(row) * (cellSize + rowSpacing)
                         RoundedRectangle(cornerRadius: CBRadius.small)
-                            .stroke(Color.gray.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                            .stroke(CBColor.stroke, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                             .frame(width: cellSize, height: cellSize)
                             .offset(x: x, y: y)
                 }
@@ -1632,7 +1632,7 @@ extension CBControlSection {
             let shadowY = CGFloat(preview.row) * (cellSize + rowSpacing)
             
             // Choose shadow color based on whether displacement is valid
-            let shadowColor = hasInvalidDisplacement ? Color.red : Color.blue
+            let shadowColor = hasInvalidDisplacement ? CBColor.danger : CBColor.highlight
 
             // iPhone uses 6px corner radius, iPad uses 12px
             let cornerRadius: CGFloat = UIDevice.current.userInterfaceIdiom == .phone ? 6 : 12

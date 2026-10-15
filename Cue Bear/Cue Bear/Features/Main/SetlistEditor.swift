@@ -60,7 +60,7 @@ struct CBSetlistRow: View {
                         if let hex = song.colorHex {
                             Circle()
                                 .fill(Color(hex: hex))
-                                .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                .overlay(Circle().stroke(CBColor.stroke, lineWidth: 1))
                         } else {
                             Circle()
                                 .fill(Color.clear)
@@ -557,7 +557,7 @@ struct CBLibraryColumn: View {
                                     if let hex = row.song.colorHex {
                                         Circle()
                                             .fill(Color(hex: hex))
-                                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                            .overlay(Circle().stroke(CBColor.stroke, lineWidth: 1))
                                     } else {
                                         Circle()
                                             .fill(Color.clear)
