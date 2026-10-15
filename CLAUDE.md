@@ -146,4 +146,4 @@ Update this file whenever an architectural decision is made or a major task fini
 - **Fixed window size**: `CueBearApp` fixes the window at 1024×768 (`sizeRestrictions`).
 - **`@_exported import Foundation`** in `Design/Color+CueBear.swift` is intentional; it was there before. Removing it may break files that rely on it (unverified).
 - **Unused bundled project**: `Beethoven Live.cuebearproj` is referenced in the pbxproj but excluded from the target and unused (demo shows replaced it). It was left in place to avoid editing the pbxproj.
-- **Older docs**: the many `*.md` files at the repo root (DESIGN_SYSTEM.md, plans, changelogs) are older. `DESIGN_FOUNDATION.md` and this file are current.
+- **Root docs**: old plans, changelogs and exploration notes were removed from `relaunch` on 2026-10-15 (still in git history and in the main `SANDBOX/Cue Bear` folder). Current docs: this file, `DESIGN_FOUNDATION.md`, `CUE_BEAR_NEXT.md`, `CHANGELOG.md`, `APP_STORE_METADATA.md`, `SHIPPING_CHECKLIST.md`. `Test_Projects/` holds sample project files for migration testing; `Graphics/` holds design sources.
