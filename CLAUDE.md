@@ -96,6 +96,10 @@ Update this file whenever an architectural decision is made or a major task fini
   - **Build** has a left panel with tabs (Setlist / Controls / Library) and an inspector on the right. The inspector replaces the Edit Cue sheet and the Notes & Extras sheet.
   - **Lock** (decided 2026-10-15): while locked, the menu, the show/cue-list chooser and the Show | Build switch are hidden. GO, pedals, tapping a song to make it next, and the controls still work. Unlock = hold for 1 s.
   - **Portrait is required** (decided 2026-10-15): Show and Build must work upright as well as landscape.
+  - **One way to play** (Omri, 2026-10-15): Next + GO only. The old Regular (tap fires), Navigator (Prev/Next pill) and Cue modes are dropped; tapping a song only makes it Next.
+  - **Controls (decided 2026-10-15)**: no pages. One board, the same view in Show and in Build (what you see while building is what you play). In Build the board is edited in place: tap to select, drag to reorder, a "+" tile adds. Old projects' pages are merged in page order.
+  - **Dropped settings** (Omri, 2026-10-15): cue height, navigation pill size, cue capsule size, font size, show-MIDI-data. Appearance settings go away with them.
+  - **Process rule**: no UI code before the A-to-Z flow map is approved by Omri. The map is the Doc "Cue Bear Next: flow map (A to Z)" (claude.ai/code/artifact/37237ccb-a607-49d7-9fd3-6cc564c95aa0): journeys, screens and states, old-feature map, open questions.
 
 ## 8. Conventions
 - Swift/SwiftUI. Before writing UI, read `DESIGN_FOUNDATION.md` for the rules (tokens, `CBSheetHeader` plus `.cbSheetChrome()`, one primary button per screen).
