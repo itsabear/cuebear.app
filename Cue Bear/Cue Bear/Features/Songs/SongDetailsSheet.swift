@@ -190,7 +190,7 @@ private struct FormFooter: View {
 
 // MARK: - One remembered level
 
-private struct RememberedLevelRow: View {
+struct RememberedLevelRow: View {
     let title: String
     @Binding var level: Int?
     let currentValue: Int
@@ -221,7 +221,7 @@ private struct RememberedLevelRow: View {
 
 // MARK: - Edit one extra
 
-private struct SongExtraEditor: View {
+struct SongExtraEditor: View {
     @State private var draft: SongExtra
     @State private var isLearning = false
     var onSave: (SongExtra) -> Void

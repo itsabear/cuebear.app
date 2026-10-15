@@ -4,10 +4,11 @@
 //  The stage screen: the current song large, the next song under it, one big GO,
 //  then the show's shared controls plus this song's extras.
 //
+//  The app's home screen (the Show half of Show | Build). The top bar, Lock and the connection
+//  pill live in ModeBar.swift.
 //  Safe by design:
 //  - Nothing can be edited here. Tapping a song only makes it NEXT; only GO (or a pedal) fires.
-//  - Leaving Show mode needs a one-second hold on the exit button.
-//  - The connection pill is always visible and buzzes if the link drops.
+//  - The iPad buzzes if the link drops.
 //
 
 import SwiftUI
@@ -21,7 +22,6 @@ struct ShowModeView: View {
     @ObservedObject var rigs: BackupRigManager
     @Binding var controlButtons: [ControlButton]
 
-    let projectName: String
     let isGlobalChannel: Bool
     let globalChannel: Int
     /// Song that was last fired before entering Show mode (becomes NOW)
@@ -31,14 +31,12 @@ struct ShowModeView: View {
     var onFire: (Song) -> Void
     /// Presses one of the show's shared buttons (keeps toggle state in the project)
     var onSharedControl: (ControlButton) -> Void
-    var onExit: () -> Void
 
     @State private var currentID: UUID? = nil
     @State private var nextID: UUID? = nil
     @State private var extraToggles: [UUID: Bool] = [:]
     @State private var extraFaders: [UUID: Double] = [:]
     @State private var goPressed = false
-    @State private var showExitHint = false
     @FocusState private var hasKeyFocus: Bool
 
     private var songs: [Song] { store.activeSongs }
@@ -77,9 +75,6 @@ struct ShowModeView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
-        .statusBarHidden(true)
-        .persistentSystemOverlays(.hidden)
         .focusable()
         .focusEffectDisabled()
         .focused($hasKeyFocus)
@@ -293,7 +288,6 @@ struct ShowModeView: View {
 
     private var mainColumn: some View {
         VStack(spacing: CBSpace.l) {
-            topBar
             nowCard
             HStack(spacing: CBSpace.l) {
                 nextCard
@@ -304,49 +298,6 @@ struct ShowModeView: View {
             Spacer(minLength: 0)
         }
         .padding(CBSpace.xl)
-    }
-
-    private var topBar: some View {
-        HStack(spacing: CBSpace.m) {
-            VStack(alignment: .leading, spacing: CBSpace.xxs) {
-                Text(projectName)
-                    .font(.cb(.large, .bold))
-                    .foregroundStyle(CBColor.textPrimary)
-                    .lineLimit(1)
-                if let list = store.activeCueList {
-                    Text(list.name)
-                        .font(.cb(.small))
-                        .foregroundStyle(CBColor.textSecondary)
-                        .lineLimit(1)
-                }
-            }
-            Spacer()
-            ShowStatusPill(coordinator: coordinator, wifiClient: wifiClient, rigs: rigs)
-            exitButton
-        }
-    }
-
-    private var exitButton: some View {
-        HStack(spacing: CBSpace.s) {
-            Image(systemName: "lock.fill").font(.cbIcon(.small))
-            Text(showExitHint ? "Hold to exit" : "Exit")
-                .font(.cb(.body, .semibold))
-        }
-        .foregroundStyle(CBColor.textPrimary)
-        .padding(.horizontal, CBSpace.l)
-        .frame(height: CBSize.control)
-        .cbChip()
-        .contentShape(RoundedRectangle(cornerRadius: CBRadius.control))
-        .onTapGesture {
-            withAnimation { showExitHint = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { withAnimation { showExitHint = false } }
-        }
-        .onLongPressGesture(minimumDuration: 1.0) {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            onExit()
-        }
-        .accessibilityLabel("Exit Show mode")
-        .accessibilityHint("Touch and hold for one second")
     }
 
     // MARK: - Now / Next / GO
@@ -433,13 +384,7 @@ struct ShowModeView: View {
 
     // MARK: - Controls (shared + this song's extras)
 
-    private var sortedShared: [ControlButton] {
-        controlButtons.sorted { a, b in
-            if a.page != b.page { return a.page < b.page }
-            if (a.gridRow ?? 0) != (b.gridRow ?? 0) { return (a.gridRow ?? 0) < (b.gridRow ?? 0) }
-            return (a.gridCol ?? 0) < (b.gridCol ?? 0)
-        }
-    }
+    private var sortedShared: [ControlButton] { controlButtons.inShowOrder }
 
     private var sharedButtons: [ControlButton] { sortedShared.filter { $0.isFader != true } }
     private var sharedFaders: [ControlButton] { sortedShared.filter { $0.isFader == true } }

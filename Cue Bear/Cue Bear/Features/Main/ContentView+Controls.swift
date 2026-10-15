@@ -137,31 +137,9 @@ extension ContentView {
     @ViewBuilder
     var contentView: some View {
         ZStack {
+            // Pedals (arrows, Page Up/Down, space) are handled by ShowModeView while Show is on screen
             mainStack()
                 .ignoresSafeArea(.keyboard, edges: .bottom)
-                .focusable()  // Required to receive keyboard input from Bluetooth pedals
-                .focusEffectDisabled()  // Hide the blue focus indicator lines
-                // Bluetooth pedal support (Airturn BT500 and similar devices)
-                .onKeyPress(.upArrow) {
-                    debugPrint("🎹 Up Arrow pressed")
-                    handlePedalPrevious()
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    debugPrint("🎹 Down Arrow pressed")
-                    handlePedalNext()
-                    return .handled
-                }
-                .onKeyPress(.pageUp) {
-                    debugPrint("🎹 Page Up pressed")
-                    handlePedalPrevious()
-                    return .handled
-                }
-                .onKeyPress(.pageDown) {
-                    debugPrint("🎹 Page Down pressed")
-                    handlePedalNext()
-                    return .handled
-                }
                 // MARK: - Tutorial Overlays
                 .overlay {
                     ZStack {

@@ -209,7 +209,16 @@ internal struct ContentView: View {
     // Projects
     @State var showProjects = false
     @State var showOnboarding = false
-    @State var showShowMode = false  // v1.3: the stage screen (Now, Next, GO)
+    @State var showShowMode = false  // v1.3: no longer used (Show is now the home screen)
+    // v1.3 (Cue Bear Next): Show | Build
+    @AppStorage("cb.screenMode") var screenModeRaw: String = CBScreenMode.show.rawValue
+    @State var isShowLocked = false
+    @State var buildTab: BuildTab = .setlist
+    @State var buildSelectedSongID: UUID? = nil
+    @State var buildSelectedControlID: UUID? = nil
+    /// The song / control whose inspector edits already made an undo step
+    @State var inspectorUndoSongID: UUID? = nil
+    @State var inspectorUndoControlID: UUID? = nil
     @State var songForDetails: Song? = nil  // v1.3: Notes & Extras sheet
     @Binding var crashAlertActive: Bool  // Prevents onboarding from showing while crash alert is active
     @AppStorage("lastProjectName") var projectName: String = "Untitled"

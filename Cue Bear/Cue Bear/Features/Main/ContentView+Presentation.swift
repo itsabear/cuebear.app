@@ -16,24 +16,6 @@ extension ContentView {
     /// so the compiler can type-check each part quickly.
     func applyNextFeatures<V: View>(_ view: V) -> some View {
         view
-        // v1.3 (Cue Bear Next): the stage screen
-        .fullScreenCover(isPresented: $showShowMode) {
-            ShowModeView(
-                store: store,
-                coordinator: connectionCoordinator,
-                wifiClient: wifiClient,
-                usbServer: usbServer,
-                rigs: BackupRigManager.shared,
-                controlButtons: $controlButtons,
-                projectName: isUntitledProject(projectName) ? "Untitled show" : projectName,
-                isGlobalChannel: isGlobalChannel,
-                globalChannel: globalChannel,
-                startAfterSongID: lastPlayedCueID,
-                onFire: { song in trigger(song) },
-                onSharedControl: { button in triggerControl(button) },
-                onExit: { showShowMode = false }
-            )
-        }
         // v1.3 (Cue Bear Next): Notes & Extras for one song
         .sheet(item: $songForDetails) { song in
             SongDetailsSheet(
@@ -411,7 +393,8 @@ extension ContentView {
                 onConnectWiFi: { item in connectionCoordinator.connectToWiFi(bridge: item) },
                 onTryShowMode: {
                     showOnboarding = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { showShowMode = true }
+                    isShowLocked = false
+                    screenModeRaw = CBScreenMode.show.rawValue
                 },
                 onDone: { showOnboarding = false }
             )

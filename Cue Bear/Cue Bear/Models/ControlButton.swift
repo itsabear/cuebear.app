@@ -153,3 +153,27 @@ internal struct MIDIKey: Hashable {
     let channel: Int
     let number: Int
 }
+
+// MARK: - Order (v1.3, Cue Bear Next)
+
+extension Array where Element == ControlButton {
+    /// The order shared controls appear in Show and in Build › Controls.
+    var inShowOrder: [ControlButton] {
+        sorted { a, b in
+            if a.page != b.page { return a.page < b.page }
+            if (a.gridRow ?? 0) != (b.gridRow ?? 0) { return (a.gridRow ?? 0) < (b.gridRow ?? 0) }
+            return (a.gridCol ?? 0) < (b.gridCol ?? 0)
+        }
+    }
+
+    /// Same order, written back as plain positions (page 0, row = index) so moves are simple swaps.
+    var normalizedShowOrder: [ControlButton] {
+        inShowOrder.enumerated().map { index, control in
+            var c = control
+            c.page = 0
+            c.gridRow = index
+            c.gridCol = 0
+            return c
+        }
+    }
+}

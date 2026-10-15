@@ -46,7 +46,11 @@ Update this file whenever an architectural decision is made or a major task fini
   - `TopBar.swift`, `PerformanceList.swift`, `SetlistEditor.swift`, `SongLibraryPopover.swift`, `CueListChooser.swift`, `ConnectionsSheet.swift`, `BackupComputerSection.swift`, `ProjectsSheet.swift`, `NavigationCapsule.swift`, `Tutorials.swift`.
 - `Features/Controls/`: the control area grid (`ControlArea.swift` plus `+Editing`/`+Pages`), control editor sheets, MIDI pickers, wobble.
 - `Features/MIDI/MidiAssignments.swift`: the MIDI table and filters.
-- `Features/ShowMode/ShowModeView.swift`: the stage screen. Pedals map to arrows, space and PageUp/PageDown.
+- **Show | Build (2026-10-15)**: `ContentView+SideMenu.swift › mainStack()` draws `modeBarView`, then Show or Build (`@AppStorage("cb.screenMode")`). Wiring is in `Features/Main/ContentView+ShowBuild.swift`.
+  - `Features/Shell/ModeBar.swift`: menu, show / cue-list chooser, Show | Build switch, status pill (tap = Connections), Lock (Show) or Undo/Redo (Build).
+  - `Features/ShowMode/ShowModeView.swift`: Show, the home screen. Pedals map to arrows, space and PageUp/PageDown (ContentView no longer handles keys).
+  - `Features/Build/`: `BuildScreen.swift` (Setlist / Controls / Library tabs), `SongInspector.swift`, `ControlInspector.swift`. Inspectors apply edits live; one undo step per selected song/control (`inspectorUndoSongID`/`inspectorUndoControlID`).
+  - Shared-control order: `[ControlButton].inShowOrder` / `.normalizedShowOrder` (Models/ControlButton.swift). Build writes page 0, gridRow = index.
 - `Features/Songs/`:
   - `SongDetailsSheet.swift`: Notes & Extras, including MIDI learn.
   - `CueEditorSheet.swift`: add or edit a cue.
@@ -70,7 +74,8 @@ Update this file whenever an architectural decision is made or a major task fini
   - the ContentView and ControlSubviews split;
   - Show mode, Notes & Extras, backup rig, first run and demo shows.
   - Omri is fixing compile errors one round at a time; the last fix was `CBButtonStyle`'s inner view renamed from `Body`.
-- **Known gap:** Show mode is a full-screen cover on top of the old perform screen. Two screens do the same job. Next step 1 fixes this.
+- **Show | Build structure**: written 2026-10-15, not built yet (unverified). Reordering the setlist relies on List drag-to-reorder without edit mode (unverified on device).
+- **Old perform UI is now unused but still in the code**: `CBTopBar` (TopBar.swift), `CBPerformanceList`, `buildMiddleSectionView`, `controlSectionView`/Controls area, transport docks, `CBAddEditCueSheet`, `SongDetailsSheet` path, tutorials. Remove once Show | Build is confirmed on the iPad.
 - **Code-level checks only:** syntax only, with tree-sitter. No type checking or tests have run in the cloud.
 
 ## 7. Decisions (do not re-suggest the rejected ones)
@@ -89,9 +94,8 @@ Update this file whenever an architectural decision is made or a major task fini
   - Two modes, switched by **Show | Build** in the top bar.
   - **Show** becomes the home screen and replaces the old perform screen and floating GO dock. It shows the setlist, Now/Next/GO and the shared controls plus this song's extras, with a **Lock** button.
   - **Build** has a left panel with tabs (Setlist / Controls / Library) and an inspector on the right. The inspector replaces the Edit Cue sheet and the Notes & Extras sheet.
-  - Undecided:
-    - whether Lock also hides the mode switch;
-    - whether portrait support is needed (the window is currently fixed at 1024×768).
+  - **Lock** (decided 2026-10-15): while locked, the menu, the show/cue-list chooser and the Show | Build switch are hidden. GO, pedals, tapping a song to make it next, and the controls still work. Unlock = hold for 1 s.
+  - **Portrait is required** (decided 2026-10-15): Show and Build must work upright as well as landscape.
 
 ## 8. Conventions
 - Swift/SwiftUI. Before writing UI, read `DESIGN_FOUNDATION.md` for the rules (tokens, `CBSheetHeader` plus `.cbSheetChrome()`, one primary button per screen).
@@ -124,12 +128,10 @@ Update this file whenever an architectural decision is made or a major task fini
 
 ## 10. Next steps (priority order)
 1. Get `relaunch` building in Xcode (fix errors as Omri pastes them).
-2. Build the Show | Build structure from the mock-ups:
-   - Show as home, with Lock.
-   - Build's Setlist, Controls and Library tabs plus the inspector.
-   - Retire the old perform screen, the GO dock and the Edit Cue / Notes & Extras sheets.
-3. Then run the test list in `CUE_BEAR_NEXT.md` on the iPad. That covers Show mode, extras, the backup Mac and first run.
-4. Later:
+2. Test Show | Build on the iPad (landscape and portrait), fix what's off.
+3. Delete the old perform UI listed in section 6.
+4. Then run the test list in `CUE_BEAR_NEXT.md` on the iPad. That covers Show mode, extras, the backup Mac and first run.
+5. Later:
    - the real design language (in `Design/` only);
    - resizable windows for iPadOS 27;
    - Program Change (needs a Bridge change too);
